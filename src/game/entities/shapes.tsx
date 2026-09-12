@@ -73,7 +73,7 @@ export function Bone({
 }) {
   const { mid, length, quaternion } = useMemo(() => span(from, to), [from, to])
   return (
-    <mesh position={mid} quaternion={quaternion} material={materials[material]} castShadow>
+    <mesh position={mid} quaternion={quaternion} material={materials[material]}>
       <cylinderGeometry args={[top, bottom, length, sides]} />
     </mesh>
   )
@@ -95,7 +95,7 @@ export function Plate({
 }) {
   const { mid, length, quaternion } = useMemo(() => span(from, to), [from, to])
   return (
-    <mesh position={mid} quaternion={quaternion} material={materials[material]} castShadow>
+    <mesh position={mid} quaternion={quaternion} material={materials[material]}>
       <boxGeometry args={[width, length, depth]} />
     </mesh>
   )
@@ -113,7 +113,7 @@ export function Joint({
   material?: keyof typeof materials
 }) {
   return (
-    <mesh position={at} material={materials[material]} castShadow>
+    <mesh position={at} material={materials[material]}>
       <icosahedronGeometry args={[r, 0]} />
     </mesh>
   )

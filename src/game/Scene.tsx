@@ -71,7 +71,21 @@ export function Scene() {
       shadows
       camera={{ fov: 75, position: [0, 0.5, 29] }}
       gl={{ antialias: true }}
-      onCreated={({ scene }) => {
+      onCreated={({ scene, gl }) => {
+        // A lost WebGL context is the other way this screen goes black
+        // with no error and no explanation. Browsers fire an event for
+        // it, and will restore the context if we ask them to — but only
+        // if we prevent the default, which is to give up permanently.
+        const canvas = gl.domElement
+        canvas.addEventListener('webglcontextlost', (e) => {
+          e.preventDefault()
+          console.warn('[dread] WebGL context lost — requesting restore')
+          window.dispatchEvent(new CustomEvent('dread:gl-lost'))
+        })
+        canvas.addEventListener('webglcontextrestored', () => {
+          console.warn('[dread] WebGL context restored')
+          window.dispatchEvent(new CustomEvent('dread:gl-restored'))
+        })
         // Exponential fog, tinted to the room's own sickly yellow rather
         // than pure black. Linear black fog gave a hard "wall of
         // darkness" cutoff; a warm haze that matches the walls reads as

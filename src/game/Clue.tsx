@@ -21,7 +21,6 @@ import { useThreat } from './threat'
 export function Clue({ id, position }: { id: string; position: [number, number, number] }) {
   const glass = useRef<THREE.Mesh>(null!)
   const mat = useRef<THREE.MeshStandardMaterial>(null!)
-  const light = useRef<THREE.PointLight>(null!)
   const collected = useThreat((s) => s.cluesCollected.has(id))
 
   useFrame(({ clock }) => {
@@ -30,7 +29,6 @@ export function Clue({ id, position }: { id: string; position: [number, number, 
     // out, or you'd never find it.
     const flicker = 0.55 + 0.45 * Math.abs(Math.sin(t * 2.3) * Math.sin(t * 0.7 + 1.1))
     if (mat.current) mat.current.emissiveIntensity = 1.1 + flicker * 1.6
-    if (light.current) light.current.intensity = 14 + flicker * 16
   })
 
   if (collected) return null
@@ -72,7 +70,6 @@ export function Clue({ id, position }: { id: string; position: [number, number, 
           />
         </mesh>
       ))}
-      <pointLight ref={light} position={[0, 0.15, 0]} color="#ffdf9a" intensity={18} distance={5.5} />
     </group>
   )
 }

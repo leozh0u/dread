@@ -94,6 +94,45 @@ function CalmBeacon() {
   return <pointLight ref={light} position={[2, 2, -58]} color="#4a9a86" intensity={16} distance={14} />
 }
 
+/**
+ * One pooled light shared by all three fragments, moved to whichever
+ * uncollected one is nearest.
+ *
+ * Each fragment used to carry its own point light. Dynamic lights are
+ * the scarcest resource in this scene — every one of them is uniforms
+ * and per-fragment cost, and piling them up is a good way to get a
+ * shader that fails to link and a screen that goes black with no error.
+ * You can only ever be near one fragment at a time, so one light does
+ * the same job.
+ */
+function FragmentLight() {
+  const light = useRef<THREE.PointLight>(null!)
+  const collected = useThreat((s) => s.cluesCollected)
+
+  useFrame(({ clock, camera }) => {
+    if (!light.current) return
+    let best: [number, number, number] | null = null
+    let bestD = Infinity
+    for (const c of CLUES) {
+      if (collected.has(c.id)) continue
+      const d = (c.position[0] - camera.position.x) ** 2 + (c.position[2] - camera.position.z) ** 2
+      if (d < bestD) {
+        bestD = d
+        best = c.position
+      }
+    }
+    if (!best) {
+      light.current.intensity = 0
+      return
+    }
+    light.current.position.set(best[0], best[1] - 0.3, best[2])
+    const flicker = 0.55 + 0.45 * Math.abs(Math.sin(clock.elapsedTime * 2.3) * Math.sin(clock.elapsedTime * 0.7 + 1.1))
+    light.current.intensity = 14 + flicker * 16
+  })
+
+  return <pointLight ref={light} color="#ffdf9a" intensity={18} distance={6} />
+}
+
 export function House() {
   const collected = useThreat((s) => s.cluesCollected.size)
   const unlocked = collected >= CLUES_REQUIRED
@@ -193,6 +232,7 @@ export function House() {
       {CLUES.map((clue) => (
         <Clue key={clue.id} id={clue.id} position={clue.position} />
       ))}
+      <FragmentLight />
       {HIDING_SPOTS.map((spot, i) => (
         <HidingSpot key={i} spot={spot} />
       ))}

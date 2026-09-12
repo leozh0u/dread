@@ -5,6 +5,7 @@ import { Hud } from './components/Hud'
 import { ScreenFlash } from './components/ScreenFlash'
 import { FearCurve } from './components/FearCurve'
 import { StartGate } from './components/StartGate'
+import { Crash } from './components/Crash'
 import { BreathingPacer } from './components/BreathingPacer'
 import { useDirectorLoop } from './game/useDirectorLoop'
 import { useThreatLoop } from './game/useThreatLoop'
@@ -16,6 +17,59 @@ import { useDirector, type ScareType } from './game/director'
 import { useSession } from './game/session'
 import { playScare, startAmbient, startHeartbeatAudio, stopHeartbeatAudio, unlockAudio } from './game/scareFx'
 import { usePulseStore } from './lib/usePulse'
+
+/** Shown if the GPU drops the rendering context — otherwise the canvas
+ * just goes black and looks identical to a very dark corridor. */
+function GlLostBanner() {
+  const [lost, setLost] = useState(false)
+  useEffect(() => {
+    const onLost = () => setLost(true)
+    const onRestored = () => setLost(false)
+    window.addEventListener('dread:gl-lost', onLost)
+    window.addEventListener('dread:gl-restored', onRestored)
+    return () => {
+      window.removeEventListener('dread:gl-lost', onLost)
+      window.removeEventListener('dread:gl-restored', onRestored)
+    }
+  }, [])
+  if (!lost) return null
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+        background: 'rgba(0,0,0,0.94)',
+        color: '#c33',
+        fontFamily: 'monospace',
+        zIndex: 200,
+      }}
+    >
+      <div style={{ letterSpacing: 2 }}>GRAPHICS STOPPED</div>
+      <div style={{ opacity: 0.6, fontSize: 13, maxWidth: 420, textAlign: 'center', lineHeight: 1.6 }}>
+        The browser dropped the 3D context. Trying to recover — if this screen stays, reload.
+      </div>
+      <button
+        onClick={() => window.location.reload()}
+        style={{
+          background: 'transparent',
+          border: '1px solid #c33',
+          color: '#c33',
+          padding: '10px 28px',
+          fontFamily: 'monospace',
+          letterSpacing: 2,
+          cursor: 'pointer',
+        }}
+      >
+        RELOAD
+      </button>
+    </div>
+  )
+}
 
 function Game() {
   const setMonsterDistance = useDirector((s) => s.setMonsterDistance)
@@ -77,6 +131,7 @@ function Game() {
       <ScreenFlash />
       <BreathingPacer />
       {sessionStatus === 'ended' && <FearCurve />}
+      <GlLostBanner />
     </>
   )
 }
@@ -95,5 +150,9 @@ export default function App() {
     )
   }
 
-  return <Game />
+  return (
+    <Crash>
+      <Game />
+    </Crash>
+  )
 }

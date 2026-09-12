@@ -234,7 +234,6 @@ export function Clutter() {
       {/* Strange, failing light sources scattered through the maze */}
       <BrokenLight position={[2.7, 2.6, 2]} color="#6a7a55" />
       <BrokenLight position={[-2.7, 2.6, -24]} color="#55606a" />
-      <BrokenLight position={[-11.7, 2.6, -40]} color="#7a6a55" />
 
       {/* A toppled chair near the E hub */}
       <group position={[2, 0, -3]} rotation={[0, 0.6, Math.PI / 2.3]}>

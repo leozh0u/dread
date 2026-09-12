@@ -104,7 +104,7 @@ export function LongOne({ state }: CreatureProps) {
         const y = 1.3 + i * 0.17
         const w = 0.3 - i * 0.012
         return (
-          <mesh key={i} position={[0, y, 0]} rotation={[0, i * 0.06, 0]} material={materials.flesh} castShadow>
+          <mesh key={i} position={[0, y, 0]} rotation={[0, i * 0.06, 0]} material={materials.flesh}>
             <boxGeometry args={[w, 0.15, 0.19 - i * 0.008]} />
           </mesh>
         )
@@ -147,7 +147,7 @@ export function LongOne({ state }: CreatureProps) {
       {/* Head — elongated, faceted, no features at all. The blankness is
           the point; anything resembling a face is less frightening. */}
       <group ref={head} position={[0, 2.82, 0]}>
-        <mesh scale={[0.145, 0.21, 0.155]} castShadow>
+        <mesh scale={[0.145, 0.21, 0.155]}>
           <icosahedronGeometry args={[1, 1]} />
           <meshStandardMaterial
             ref={headMat}
@@ -231,10 +231,10 @@ export function Crawler({ state }: CreatureProps) {
         bottom={0.05}
       />
       {/* Pelvis and shoulder blades */}
-      <mesh position={[0, 0.5, -0.45]} material={materials.flesh} castShadow>
+      <mesh position={[0, 0.5, -0.45]} material={materials.flesh}>
         <boxGeometry args={[0.3, 0.16, 0.2]} />
       </mesh>
-      <mesh position={[0, 0.61, 0.3]} rotation={[0.1, 0, 0]} material={materials.flesh} castShadow>
+      <mesh position={[0, 0.61, 0.3]} rotation={[0.1, 0, 0]} material={materials.flesh}>
         <boxGeometry args={[0.34, 0.14, 0.26]} />
       </mesh>
 
@@ -303,7 +303,7 @@ export function Crawler({ state }: CreatureProps) {
       {/* Neck into an oversized cranium */}
       <Bone from={[0, 0.68, 0.52]} to={[0, 0.86, 0.66]} top={0.05} bottom={0.07} />
       <group ref={skull} position={[0, 0.95, 0.72]}>
-        <mesh scale={[0.23, 0.25, 0.24]} castShadow>
+        <mesh scale={[0.23, 0.25, 0.24]}>
           <icosahedronGeometry args={[1, 1]} />
           <meshStandardMaterial color="#c6c0b0" roughness={0.7} emissive="#5a564c" emissiveIntensity={0.25} />
         </mesh>
@@ -315,7 +315,7 @@ export function Crawler({ state }: CreatureProps) {
           <sphereGeometry args={[1, 10, 10]} />
         </mesh>
         {/* Brow ridge over them */}
-        <mesh position={[0, 0.11, 0.17]} rotation={[0.3, 0, 0]} material={materials.boneDim} castShadow>
+        <mesh position={[0, 0.11, 0.17]} rotation={[0.3, 0, 0]} material={materials.boneDim}>
           <boxGeometry args={[0.27, 0.05, 0.09]} />
         </mesh>
         {/* Jaw, hinged, wider than the skull should allow */}
