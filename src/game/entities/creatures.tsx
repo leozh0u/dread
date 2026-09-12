@@ -21,6 +21,31 @@ export interface EntityState {
    * movement, and the tall one had no leg animation at all, which is why
    * they read as gliding rather than walking. */
   speed: number
+  /**
+   * WHAT IT IS DOING, for animation.
+   *
+   * `hunting` is a boolean about pursuit and `closeness` is a distance;
+   * neither tells the body how to hold itself. Every creature therefore
+   * played one walk cycle with a couple of parameters nudged, so noticing
+   * you, closing on you and trying to kill you all looked like walking.
+   * The moments that matter most in a horror game were the ones with no
+   * animation of their own.
+   *
+   *   patrol  — hasn't found you
+   *   alert   — the instant it acquires you. A one-shot, and the most
+   *             important beat: the player needs to SEE the moment they
+   *             were noticed, or being hunted has no beginning
+   *   stalk   — knows where you are, closing deliberately
+   *   charge  — committed, coming in fast
+   *   strike  — within reach, trying to kill you
+   */
+  anim: 'patrol' | 'alert' | 'stalk' | 'charge' | 'strike'
+  /** Seconds since `anim` last changed. Drives the one-shot beats. */
+  animT: number
+  /** 0..1 through a lunge wind-up — compressed and loaded. */
+  coil: number
+  /** 0..1 strike intensity. */
+  strike: number
 }
 
 export interface CreatureProps {

@@ -29,18 +29,6 @@ jobs:
       # needs .env.local and is a local pre-deploy check.
       - run: npm run test:level && npm run test:run && npm run test:memory && npm run test:director
       - run: npm run build
-        env:
-          # Persona's template and environment ids are publishable BY
-          # DESIGN — they are meant to ship in the browser bundle, and
-          # Persona's actual protection is the dashboard domain allowlist.
-          # So these are repository *variables*, not secrets.
-          #
-          # NOTHING ELSE GOES HERE. PERSONA_API_KEY, BACKBOARD_API_KEY and
-          # TIGERDATA_URL must never appear in this file: Vite inlines any
-          # VITE_-prefixed value into the bundle, and this is a public
-          # static site, so a key added here is a key published forever.
-          VITE_PERSONA_TEMPLATE_ID: ${{ vars.VITE_PERSONA_TEMPLATE_ID }}
-          VITE_PERSONA_ENVIRONMENT_ID: ${{ vars.VITE_PERSONA_ENVIRONMENT_ID }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

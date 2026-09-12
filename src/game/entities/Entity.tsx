@@ -136,6 +136,12 @@ const TWITCH_GAP_MAX_S = 2.6
 /** Far enough to catch one down a corridor, close enough that it is not
  * happening at an indistinct shape on the horizon. */
 const TWITCH_RANGE = 16
+
+/** How long the "it has seen you" pose plays. Long enough to read as a
+ * deliberate beat, short enough that it never delays the pursuit. */
+const ALERT_POSE_S = 0.85
+/** Inside this, it is close enough to be reaching for you. */
+const STRIKE_DIST = 2.6
 /** Too close and it has nowhere to lunge from; too far and you have time
  * to simply walk away from it, which makes the whole move read as noise. */
 const LUNGE_MIN_DIST = 2.5
@@ -262,7 +268,24 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   // Mutated every frame, read by the creature's own frame loop. Never a
   // prop and never state: props would freeze (refs don't re-render) and
   // state would re-render three creatures at 60fps for nothing.
-  const state = useRef<EntityState>({ closeness: 0, hunting: false, attacking: false, speed: 0 })
+  const state = useRef<EntityState>({
+    closeness: 0,
+    hunting: false,
+    attacking: false,
+    speed: 0,
+    anim: 'patrol',
+    animT: 0,
+    coil: 0,
+    strike: 0,
+  })
+  /** Previous frame's anim, so a change can start the one-shot clock. */
+  const animStartedAt = useRef(0)
+  /** Whether it was alerted last frame — the false→true edge is the
+   * moment the player gets noticed, and the only moment `alert` fires. */
+  const wasAlerted = useRef(false)
+  /** Wall-clock until which the "it has seen you" pose plays. Distinct
+   * from alertUntil, which is how long it REMEMBERS you. */
+  const alertPoseUntil = useRef(0)
 
   useFrame(({ clock, camera }, delta) => {
     if (!group.current) return
@@ -603,11 +626,6 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       if (latest.type === 'proximity') attackUntil.current = t + 0.6
     }
     const attacking = t < attackUntil.current
-    if (body.current) {
-      const lunge = attacking ? Math.sin(((t - (attackUntil.current - 0.6)) / 0.6) * Math.PI) : 0
-      body.current.position.z = lunge * 1.2
-      body.current.rotation.x = -lunge * 0.2
-    }
 
     // Closest entity wins the audio bus and the threat system
     const closest = reportEntity(index, normalized, group.current.position)
@@ -623,11 +641,80 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       setMonsterAudioPosition(group.current.position.x, FLOOR_Y + 1, group.current.position.z)
     }
 
+    /* --- ANIMATION STATE -------------------------------------------
+     * Derived here rather than in the creature, because everything it
+     * depends on — alertness, the lunge cycle, real distance — lives in
+     * this component. The creature receives a verb, not a pile of flags.
+     */
+    // The false→true edge of alertness: the instant it found you. Held
+    // briefly so the pose has time to play, and only when you can see it
+    // happen — a creature rearing up in the dark behind you is a beat
+    // nobody receives.
+    if (alerted && !wasAlerted.current && los) alertPoseUntil.current = t + ALERT_POSE_S
+    wasAlerted.current = alerted
+
+    const coilProgress =
+      lungeState.current === 'coil'
+        ? THREE.MathUtils.clamp(1 - (lungeUntil.current - t) / COIL_S, 0, 1)
+        : 0
+    const strikeAmount = attacking ? 1 : realDist < STRIKE_DIST ? 1 - realDist / STRIKE_DIST : 0
+
+    const anim: EntityState['anim'] = attacking || strikeAmount > 0.55
+      ? 'strike'
+      : lunging || lungeState.current === 'coil'
+        ? 'charge'
+        : t < alertPoseUntil.current
+          ? 'alert'
+          : hunting
+            ? 'stalk'
+            : 'patrol'
+
+    if (anim !== state.current.anim) animStartedAt.current = t
+
     // Hand the creature its live state for this frame
     state.current.closeness = 1 - normalized
     state.current.hunting = fullHunt
     state.current.speed = moved / Math.max(dt, 0.0001)
     state.current.attacking = attacking
+    state.current.anim = anim
+    state.current.animT = t - animStartedAt.current
+    state.current.coil = coilProgress
+    state.current.strike = strikeAmount
+
+    /* --- WHOLE-BODY POSE -------------------------------------------
+     * Applied here rather than per-creature because it is the same idea
+     * for all three and it is the part that carries at distance: long
+     * before you can make out a skull you can read whether the shape at
+     * the end of the corridor is ambling, has stopped and risen, or is
+     * coming at you leaning forward.
+     *
+     * It rides on top of each creature's own walk cycle rather than
+     * replacing it — this group wraps the creature, so the legs keep
+     * running underneath while the whole body tilts and rises.
+     */
+    if (body.current) {
+      // ALERT: rears up and pulls back, like something that just heard a
+      // noise. Eases out over the pose's length rather than snapping off.
+      const alertPose = anim === 'alert' ? Math.sin(Math.min(1, state.current.animT / ALERT_POSE_S) * Math.PI) : 0
+      // COIL: compresses down and back, loading the lunge.
+      const coilPose = coilProgress
+      // CHARGE: pitched forward, low, committed.
+      const chargePose = lunging ? 1 : 0
+      // STRIKE: thrown forward at you.
+      const strikePose = attacking
+        ? Math.sin(((t - (attackUntil.current - 0.6)) / 0.6) * Math.PI)
+        : strikeAmount * 0.35
+
+      const targetPitch = -alertPose * 0.22 + coilPose * 0.18 + chargePose * 0.3 + strikePose * 0.25
+      const targetRise = alertPose * 0.35 - coilPose * 0.22
+      const targetPush = chargePose * 0.45 + strikePose * 1.2 - coilPose * 0.3
+
+      // Damped so poses blend into each other instead of popping, and at
+      // a rate that does not depend on the frame rate.
+      body.current.rotation.x = THREE.MathUtils.damp(body.current.rotation.x, targetPitch, 14, dt)
+      body.current.position.y = THREE.MathUtils.damp(body.current.position.y, targetRise, 12, dt)
+      body.current.position.z = THREE.MathUtils.damp(body.current.position.z, targetPush, 14, dt)
+    }
   })
 
   return (

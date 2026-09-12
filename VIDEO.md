@@ -36,7 +36,7 @@ else is replaceable. Get that first, while you have energy.
 
 | | |
 |---|---|
-| Sidecar running | `node sidecar/server.js` — wait for `persona=ready backboard=ready tigerdata=ready` |
+| Sidecar running | `node sidecar/server.js` — wait for `backboard=ready tigerdata=ready` |
 | Lamp | One desk lamp on your face. It is in-fiction (the game tells you to face the light) AND it is what Presage needs. Shoot it as staging, not as a compromise. |
 | Camera allowed | The start screen will tell you if it isn't. Do not record until the vitals panel shows `CAMERA live`. |
 | Headphones | Not for the recording — for you. Audio is spatial; you need to hear what you're describing. |
@@ -116,16 +116,14 @@ Screen-record the architecture while you narrate. Keep it concrete.
 >
 > The game is React Three Fiber and Rapier. The creatures path on a
 > shared breadth-first distance field, so all three navigate one real
-> maze. Identity is Persona — you prove you're a living human before the
-> door opens, and it's verified server-side, because a client-reported
-> pass on a static site is worth nothing. The house remembers you between
+> maze. The house remembers you between
 > runs through Backboard, and it learns which kind of scare works on you
 > specifically. Every heartbeat is written to Tiger Data as time-series,
 > which is what draws your fear curve at the end."
 
 Show, in order, as you say each: the sidecar terminal → the vitals panel
-→ the maze from above (press `M`) → the Persona gate → "the house has met
-you N times" → the fear curve.
+→ the maze from above (press `M`) → "the house has met you N times" →
+the fear curve.
 
 ### 5 · Why it matters — 2:45–3:15
 

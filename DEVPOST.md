@@ -5,9 +5,17 @@ judge with forty of these open, so the first line of every section carries
 the point.
 
 **Before submitting, tick every one of these:** Games & Gamification track,
-Presage, Persona, MathWorks, ElevenLabs (×2), Backboard, Tiger Data,
-Gemini, Vultr, GoDaddy, Notability. Sponsor challenges are
-track-independent — declaring Games costs nothing.
+Presage, MathWorks, ElevenLabs (×2), Backboard, Tiger Data, Gemini, Vultr,
+GoDaddy, Notability. Sponsor challenges are track-independent — declaring
+Games costs nothing.
+
+**Persona is deliberately NOT submitted.** It was built and working, but
+the integration was a gate in front of the game that nothing downstream
+read — you clicked through it and then played a game that behaved
+identically either way. A healthcare or fintech team will use identity
+verification as the actual subject of their product; a decorative entry
+next to that one loses, and judges flag shoehorned sponsor use. Cut rather
+than padded.
 
 **Mark the YouTube video "Not for Kids"** or judges cannot view it.
 
@@ -278,19 +286,6 @@ Browser captures frames and pushes them to a local SmartSpectra process over
 a WebSocket; RGBA straight from the canvas so the conversion happens in C++
 rather than on the thread rendering the game, at 480×360/24fps with
 backpressure and monotonic timestamps.
-
-## Persona — "prove you're alive to enter"
-
-Two different proofs of life, which is exactly this game's premise: Persona
-confirms a real human is there, and Presage then confirms that human has a
-pulse. The house won't open for anything else.
-
-The embedded flow runs client-side with the publishable template and
-environment ids; the API key never leaves the local server, which
-independently confirms the returned inquiry — the browser's completion
-callback is client-reported and trivially forged on a static site, so a
-verification nobody checked isn't a verification. Where the server can't
-confirm, the UI says so rather than claiming one.
 
 ## MathWorks — a solved model, not a live call
 

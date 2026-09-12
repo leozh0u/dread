@@ -82,9 +82,6 @@ const API_KEY = readKey('PRESAGE_API_KEY')
 // These two are SECRET and must never reach the browser. DREAD is a static
 // site, so anything in the client bundle is public forever — that is why
 // they live here and are proxied, rather than being VITE_-prefixed.
-// Persona's template/environment ids ARE publishable and do live in the
-// bundle; the API key below is only for confirming an inquiry server-side.
-const PERSONA_KEY = readKey('PERSONA_API_KEY')
 const BACKBOARD_KEY = readKey('BACKBOARD_API_KEY')
 // A connection string carries a password. There is no browser-safe form of
 // this, ever — it is read here and nowhere else.
@@ -247,9 +244,6 @@ sdk.on('error', (code, message, retryable) =>
  * The sidecar is also the game's only trusted server.
  *
  * Two integrations need a secret the browser must never hold:
- *   - Persona: the browser's onComplete status is client-reported and so
- *     trivially forged in a static site. Only a holder of the API key can
- *     actually confirm an inquiry.
  *   - Backboard: has no publishable key concept at all. Its docs are
  *     explicit that keys are server-side only, so every memory call has
  *     to be proxied.
@@ -313,29 +307,11 @@ const httpServer = createServer(async (req, res) => {
           ok: true,
           pulse: lastPulse,
           confidence: lastConfidence,
-          persona: Boolean(PERSONA_KEY),
           backboard: Boolean(BACKBOARD_KEY),
           tigerdata: timeseriesStatus(),
         },
         origin,
       )
-    }
-
-    // Confirm a Persona inquiry actually passed.
-    if (url.pathname === '/verify-inquiry') {
-      const id = url.searchParams.get('id')
-      if (!id) return sendJson(res, 400, { verified: false, reason: 'missing id' }, origin)
-      if (!PERSONA_KEY)
-        return sendJson(res, 200, { verified: false, reason: 'no PERSONA_API_KEY' }, origin)
-
-      const r = await fetch(`https://api.withpersona.com/api/v1/inquiries/${encodeURIComponent(id)}`, {
-        headers: { Authorization: `Bearer ${PERSONA_KEY}`, accept: 'application/json' },
-      })
-      if (!r.ok) return sendJson(res, 200, { verified: false, reason: `persona ${r.status}` }, origin)
-      const body = await r.json()
-      const status = body?.data?.attributes?.status
-      console.log(`[sidecar] persona inquiry ${id} -> ${status}`)
-      return sendJson(res, 200, { verified: status === 'completed' || status === 'approved', status }, origin)
     }
 
     // Backboard memory proxy — "the house remembers you between sessions".
@@ -422,7 +398,7 @@ httpServer.listen(PORT)
 httpServer.on('listening', () => {
   console.log(`[sidecar] listening on ws://localhost:${PORT}`)
   console.log(
-    `[sidecar] persona=${PERSONA_KEY ? 'ready' : 'no key'} backboard=${BACKBOARD_KEY ? 'ready' : 'no key'}`,
+    `[sidecar] backboard=${BACKBOARD_KEY ? 'ready' : 'no key'}`,
   )
   // Connect in the background — a slow or unreachable database must never
   // delay the game starting.

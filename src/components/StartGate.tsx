@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { livenessConfigured, runLivenessCheck } from '../lib/liveness'
 
 /**
  * CAMERA PRE-FLIGHT.
@@ -85,13 +84,8 @@ function isTouchOnly() {
  */
 export function StartGate({ onStart }: { onStart: () => void }) {
   const [starting, setStarting] = useState(false)
-  const [verifying, setVerifying] = useState(false)
-  // null = not attempted yet. The house's line about you changes once it
-  // has decided what you are.
-  const [verdict, setVerdict] = useState<string | null>(null)
   const [camera, setCamera] = useState<CameraProbe | null>(null)
   const [probing, setProbing] = useState(false)
-  const showLiveness = livenessConfigured() && verdict === null
   const touchOnly = isTouchOnly()
 
   // If the browser already knows the answer, say so before anything is
@@ -127,29 +121,6 @@ export function StartGate({ onStart }: { onStart: () => void }) {
     // pressing the button again goes in regardless, blind.
     if (!probe.ok && camera === null) return
     next()
-  }
-
-  async function verifyThenStart() {
-    setVerifying(true)
-    const result = await runLivenessCheck()
-    setVerifying(false)
-    if (result.status === 'verified') {
-      setVerdict(
-        result.serverVerified
-          ? 'CONFIRMED. Something alive is out there.'
-          : 'CONFIRMED, unverified. The house will take your word for now.',
-      )
-    } else if (result.status === 'declined') {
-      setVerdict('You would rather not say. The house noticed.')
-    } else {
-      // Never block entry on a verification that couldn't run.
-      console.warn('[dread] liveness unavailable:', result.reason)
-      setVerdict(null)
-      begin()
-      return
-    }
-    // Let the verdict land before the dark.
-    setTimeout(begin, 1600)
   }
 
   function begin() {
@@ -230,10 +201,6 @@ export function StartGate({ onStart }: { onStart: () => void }) {
           off the camera.
         </p>
       )}
-      {verdict && (
-        <p style={{ color: '#c33', fontSize: 13, letterSpacing: 1, opacity: 0.9 }}>{verdict}</p>
-      )}
-
       {camera && !camera.ok && (
         <p
           style={{
@@ -254,8 +221,8 @@ export function StartGate({ onStart }: { onStart: () => void }) {
       )}
 
       <button
-        onClick={() => startWithCamera(showLiveness ? verifyThenStart : begin)}
-        disabled={starting || verifying || probing}
+        onClick={() => startWithCamera(begin)}
+        disabled={starting || probing}
         style={{
           background: 'transparent',
           border: '1px solid #c33',
@@ -264,40 +231,12 @@ export function StartGate({ onStart }: { onStart: () => void }) {
           fontFamily: 'monospace',
           fontSize: 14,
           letterSpacing: 2,
-          cursor: starting || verifying ? 'default' : 'pointer',
+          cursor: starting || probing ? 'default' : 'pointer',
         }}
       >
-        {probing
-          ? 'LOOKING FOR YOU...'
-          : verifying
-          ? 'PROVING...'
-          : starting
-            ? 'LISTENING...'
-            : showLiveness
-              ? 'PROVE YOU ARE ALIVE'
-              : 'BEGIN'}
+        {probing ? 'LOOKING FOR YOU...' : starting ? 'LISTENING...' : 'BEGIN'}
       </button>
 
-      {/* A judge who can't get past a verification screen can't play the
-          game at all, so this is always here. */}
-      {showLiveness && !verifying && !starting && (
-        <button
-          onClick={begin}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#c33',
-            opacity: 0.35,
-            fontFamily: 'monospace',
-            fontSize: 11,
-            letterSpacing: 1,
-            cursor: 'pointer',
-            textDecoration: 'underline',
-          }}
-        >
-          skip — just let me in
-        </button>
-      )}
       </div>
     </div>
   )
