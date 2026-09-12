@@ -1,5 +1,67 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { livenessConfigured, runLivenessCheck } from '../lib/liveness'
+
+/**
+ * CAMERA PRE-FLIGHT.
+ *
+ * The camera used to be requested only once the game itself mounted,
+ * behind the start screen, and a rejection there wrote one line to the
+ * console. So the entire failure — denied permission, camera held by
+ * another app, page served over plain http — looked like a game that had
+ * simply started, in the dark, reading nothing. The symptom Leo reported
+ * was "the camera isn't on, at least there's no green light", which is
+ * exactly what all of those look like from outside.
+ *
+ * Asking here instead does two things. The prompt now appears at the
+ * moment someone deliberately clicked a button, which is when a
+ * permission dialog makes sense and is least likely to be dismissed
+ * blind; and if it fails we are still on a full-screen page with room to
+ * say what went wrong and how to fix it, rather than in a corner readout
+ * over a dark corridor.
+ *
+ * It never blocks entry. A refused camera drops the game into its
+ * existing blind mode, which is playable — the standing rule for this
+ * build is that nobody is ever stuck on a screen they cannot get past.
+ */
+type CameraProbe = { ok: boolean; message: string | null }
+
+async function probeCamera(): Promise<CameraProbe> {
+  if (!window.isSecureContext) {
+    return {
+      ok: false,
+      message:
+        'This page is not on https:// or localhost, so the browser will not give it a camera at all. Open the localhost address instead.',
+    }
+  }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return { ok: false, message: 'This browser will not expose a camera to this page.' }
+  }
+  try {
+    // Released immediately. This is a permission probe, not the capture —
+    // Webcam.tsx opens the real stream a moment later, and by then the
+    // grant already exists so it resolves without a second prompt.
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    for (const track of stream.getTracks()) track.stop()
+    return { ok: true, message: null }
+  } catch (err) {
+    const name = (err as { name?: string })?.name ?? ''
+    if (name === 'NotAllowedError' || name === 'SecurityError')
+      return {
+        ok: false,
+        message:
+          'Camera blocked. Click the camera icon in the address bar, allow it, and reload — without it the house is hunting blind.',
+      }
+    if (name === 'NotReadableError' || name === 'AbortError')
+      return {
+        ok: false,
+        message:
+          'Another app is holding the camera (Zoom, Photo Booth, another tab). Quit it and reload.',
+      }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError')
+      return { ok: false, message: 'No camera found on this machine.' }
+    return { ok: false, message: `Camera failed: ${name || String(err)}` }
+  }
+}
 
 /**
  * This needs a keyboard, a mouse and a webcam, and the hosted link will
@@ -27,8 +89,45 @@ export function StartGate({ onStart }: { onStart: () => void }) {
   // null = not attempted yet. The house's line about you changes once it
   // has decided what you are.
   const [verdict, setVerdict] = useState<string | null>(null)
+  const [camera, setCamera] = useState<CameraProbe | null>(null)
+  const [probing, setProbing] = useState(false)
   const showLiveness = livenessConfigured() && verdict === null
   const touchOnly = isTouchOnly()
+
+  // If the browser already knows the answer, say so before anything is
+  // clicked — a permission that was denied on a previous visit is
+  // remembered, and that is the case most likely to waste someone's time.
+  useEffect(() => {
+    let cancelled = false
+    navigator.permissions
+      ?.query({ name: 'camera' as PermissionName })
+      .then((status) => {
+        if (cancelled || status.state !== 'denied') return
+        setCamera({
+          ok: false,
+          message:
+            'Camera is blocked for this site from a previous visit. Click the camera icon in the address bar, allow it, and reload.',
+        })
+      })
+      .catch(() => {
+        // Firefox and Safari do not support querying 'camera'. Not a
+        // problem: the probe on click still catches everything.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function startWithCamera(next: () => void) {
+    setProbing(true)
+    const probe = await probeCamera()
+    setProbing(false)
+    setCamera(probe)
+    // A failed probe stops here ONCE, so the message is actually read;
+    // pressing the button again goes in regardless, blind.
+    if (!probe.ok && camera === null) return
+    next()
+  }
 
   async function verifyThenStart() {
     setVerifying(true)
@@ -107,9 +206,28 @@ export function StartGate({ onStart }: { onStart: () => void }) {
         <p style={{ color: '#c33', fontSize: 13, letterSpacing: 1, opacity: 0.9 }}>{verdict}</p>
       )}
 
+      {camera && !camera.ok && (
+        <p
+          style={{
+            color: '#ff6a5a',
+            fontSize: 12,
+            maxWidth: 420,
+            textAlign: 'center',
+            lineHeight: 1.6,
+            border: '1px solid rgba(255,90,90,0.55)',
+            background: 'rgba(120,0,0,0.15)',
+            padding: '8px 12px',
+          }}
+        >
+          {camera.message}
+          <br />
+          <span style={{ opacity: 0.7 }}>Press again to play without it.</span>
+        </p>
+      )}
+
       <button
-        onClick={showLiveness ? verifyThenStart : begin}
-        disabled={starting || verifying}
+        onClick={() => startWithCamera(showLiveness ? verifyThenStart : begin)}
+        disabled={starting || verifying || probing}
         style={{
           background: 'transparent',
           border: '1px solid #c33',
@@ -121,7 +239,9 @@ export function StartGate({ onStart }: { onStart: () => void }) {
           cursor: starting || verifying ? 'default' : 'pointer',
         }}
       >
-        {verifying
+        {probing
+          ? 'LOOKING FOR YOU...'
+          : verifying
           ? 'PROVING...'
           : starting
             ? 'LISTENING...'

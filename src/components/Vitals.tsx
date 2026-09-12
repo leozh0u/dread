@@ -36,6 +36,7 @@ export function Vitals() {
   const framesSent = useSensorStatus((s) => s.framesSent)
   const sidecar = useSensorStatus((s) => s.sidecarConnected)
   const validation = useSensorStatus((s) => s.validation)
+  const cameraError = useSensorStatus((s) => s.cameraError)
   const blind = useSensorless((s) => s.blind)
 
   // Only while it is actually a problem: kOk means framing is fine, and a
@@ -76,7 +77,12 @@ export function Vitals() {
     >
       <div style={{ opacity: 0.45, marginBottom: 6 }}>WHAT IT CAN SEE · B</div>
 
-      <Row label="CAMERA" ok={framesSent > 0} value={framesSent > 0 ? 'live' : 'waiting'} />
+      <Row
+        label="CAMERA"
+        ok={framesSent > 0}
+        alert={Boolean(cameraError)}
+        value={cameraError ? 'BLOCKED' : framesSent > 0 ? 'live' : 'waiting'}
+      />
       <Row
         label="LINK"
         ok={sidecar}
@@ -112,7 +118,25 @@ export function Vitals() {
           not kOk, because at judging someone will sit down in a room we
           did not light, and kTooDark is the single most likely way this
           demo fails. */}
-      {presageFix && (
+      {/* The camera failure outranks everything else in this panel: with
+          no camera there are no frames, so Presage has nothing to say and
+          any framing advice would be noise on top of the real problem. */}
+      {cameraError && (
+        <div
+          style={{
+            marginTop: 7,
+            padding: '5px 6px',
+            border: '1px solid rgba(255,60,60,0.8)',
+            background: 'rgba(120,0,0,0.18)',
+            color: '#ff6a5a',
+            maxWidth: 190,
+            lineHeight: 1.4,
+          }}
+        >
+          {cameraError}
+        </div>
+      )}
+      {!cameraError && presageFix && (
         <div
           style={{
             marginTop: 7,
