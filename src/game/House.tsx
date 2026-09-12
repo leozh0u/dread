@@ -6,6 +6,7 @@ import { Clue } from './Clue'
 import { HidingSpot } from './HidingSpot'
 import { Clutter } from './Clutter'
 import { Signage } from './Signage'
+import { WallDressing } from './WallDressing'
 import { Fluorescents } from './Fluorescents'
 import { ExitDoorLight } from './ExitDoor'
 import { useThreat, CLUES_REQUIRED } from './threat'
@@ -198,6 +199,7 @@ export function House() {
 
       <ExitDoorLight position={[2, 1.5, DOOR_Z]} />
       <Fluorescents />
+      <WallDressing />
       <Clutter />
       <Signage />
     </>

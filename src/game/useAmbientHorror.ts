@@ -3,8 +3,10 @@ import { pointAtArcLength, PATH_TOTAL_LENGTH } from './maze'
 import { playCreak, playScratch, playSpatialSfx } from './scareFx'
 import { useSession } from './session'
 
-const MIN_DELAY_MS = 14_000
-const MAX_DELAY_MS = 34_000
+// Deliberately sparse. These land because they're unpredictable and
+// rare; at a steady drumbeat they'd just become part of the room tone.
+const MIN_DELAY_MS = 35_000
+const MAX_DELAY_MS = 80_000
 
 /**
  * Random, positioned horror stingers — a creak, a scratch — completely

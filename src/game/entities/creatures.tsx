@@ -1,21 +1,14 @@
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Slab, Limb, Glow, Grin, VOID } from './shapes'
+import { Bone, Plate, Joint, Chain, Glow, Grin, materials } from './shapes'
 
 export type EntityKind = 'long' | 'crawler' | 'smile'
 
-const DULL_BONE = new THREE.Color('#8d897e')
-const LIT_BONE = new THREE.Color('#f2efe6')
-
 /**
  * Live per-frame state, passed as a mutable object rather than props.
- *
- * This matters: these values change every frame, and passing them as React
- * props would either freeze them (refs don't re-render) or re-render three
- * creatures at 60fps (state does). So Entity.tsx mutates this object in its
- * frame loop and each creature reads it in its own frame loop. No renders,
- * always current.
+ * These change every frame: as props they'd freeze (refs don't
+ * re-render), as state they'd re-render three creatures at 60fps.
  */
 export interface EntityState {
   closeness: number // 0 far .. 1 on top of you
@@ -28,22 +21,40 @@ export interface CreatureProps {
 }
 
 /**
- * All three are built with the ORIGIN AT THEIR FEET (local y=0 is the
- * floor they stand on). Entity.tsx then places that origin on the floor
- * plane. Building them around hip-height origins is how you end up with
- * creatures buried to the knee.
+ * All three are built ORIGIN AT FEET (local y=0 is the floor), and every
+ * limb is a Chain/Bone spanning explicit endpoints so nothing can float
+ * free of the body. See shapes.tsx for why that matters — the previous
+ * versions placed limbs by guessed offsets and visibly came apart.
  */
 
-/**
- * THE LONG ONE — Slender-derived. Nearly ceiling height, impossibly thin,
- * blank pale head with no features at all. It does not walk: it glides,
- * upright and still, which is exactly why it's worse than something that
- * runs. Four tendrils drift from its shoulders.
- */
+type Vec3 = [number, number, number]
+
+/* ------------------------------------------------------------------ */
+/* THE LONG ONE                                                        */
+/* Slender-derived. Ceiling height, impossibly narrow, blank pale head. */
+/* It glides — the head stays dead still above a body that's covering   */
+/* ground, which is far worse than something that runs.                */
+/* ------------------------------------------------------------------ */
 export function LongOne({ state }: CreatureProps) {
   const tendrils = useRef<THREE.Group>(null!)
   const head = useRef<THREE.Group>(null!)
-  const headMat = useRef<THREE.MeshBasicMaterial>(null!)
+  const headMat = useRef<THREE.MeshStandardMaterial>(null!)
+  const arms = useRef<THREE.Group>(null!)
+
+  // Four tendrils, each a chain that curls — precomputed control points
+  const tendrilPaths = useMemo<Vec3[][]>(() => {
+    return [-0.62, -0.22, 0.22, 0.62].map((a, i) => {
+      const dir = a < 0 ? -1 : 1
+      const reach = 1.05 + (i % 2) * 0.35
+      return [
+        [a * 0.22, 0, 0],
+        [a * 0.55, 0.28 + i * 0.05, -0.25],
+        [a * 0.95, 0.42, -0.6 - i * 0.1],
+        [dir * reach, 0.2 - i * 0.08, -0.95 - i * 0.12],
+        [dir * (reach + 0.35), -0.35 - i * 0.1, -1.0 - i * 0.15],
+      ] as Vec3[]
+    })
+  }, [])
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -51,52 +62,116 @@ export function LongOne({ state }: CreatureProps) {
 
     if (tendrils.current) {
       tendrils.current.children.forEach((c, i) => {
-        // Slow, underwater drift — never in sync with each other
-        c.rotation.z = Math.sin(t * (0.6 + i * 0.17) + i) * 0.35
-        c.rotation.x = Math.cos(t * (0.5 + i * 0.13) + i * 2) * 0.28
+        // Slow underwater drift, each on its own period so they never sync
+        c.rotation.z = Math.sin(t * (0.42 + i * 0.13) + i) * 0.3
+        c.rotation.x = Math.cos(t * (0.36 + i * 0.09) + i * 2) * 0.22
+        c.rotation.y = Math.sin(t * (0.28 + i * 0.07)) * 0.18
       })
     }
-    // The head barely moves. Total stillness on top of a body that's
-    // covering ground is the entire trick with this one.
-    if (head.current) head.current.rotation.y = Math.sin(t * 0.3) * 0.12
+    if (arms.current) {
+      // Arms sway a fraction behind the body — dead weight, not walking
+      arms.current.rotation.x = Math.sin(t * 0.8) * 0.07
+      arms.current.rotation.z = Math.sin(t * 0.55) * 0.04
+    }
+    if (head.current) head.current.rotation.y = Math.sin(t * 0.3) * 0.1
     if (headMat.current) {
-      // Brighten toward bone-white as it hunts / closes, keeping the hue
-      // rather than washing to flat grey (setScalar would).
-      const target = (hunting ? 1 : 0.78) * (0.8 + closeness * 0.2)
-      headMat.current.color.lerpColors(DULL_BONE, LIT_BONE, THREE.MathUtils.clamp(target, 0, 1))
+      const lit = (hunting ? 1 : 0.75) * (0.75 + closeness * 0.25)
+      headMat.current.emissiveIntensity = 0.25 + lit * 0.55
     }
   })
 
   return (
     <group>
-      {/* legs: two long verticals, no knees. 0 -> 1.35 */}
-      <Limb length={1.35} top={0.07} bottom={0.035} position={[-0.09, 0.675, 0]} />
-      <Limb length={1.35} top={0.07} bottom={0.035} position={[0.09, 0.675, 0]} />
-      {/* torso: 1.35 -> 2.45 */}
-      <Slab args={[0.34, 1.1, 0.22]} position={[0, 1.9, 0]} />
-      {/* arms hanging far past where hands should stop */}
-      <Limb length={1.45} top={0.05} bottom={0.022} position={[-0.21, 1.62, 0]} rotation={[0, 0, 0.05]} />
-      <Limb length={1.45} top={0.05} bottom={0.022} position={[0.21, 1.62, 0]} rotation={[0, 0, -0.05]} />
+      {/* Legs — long, jointless, slightly knock-kneed */}
+      <Chain points={[[-0.1, 0, 0], [-0.13, 0.62, 0.02], [-0.08, 1.24, 0]]} top={0.075} bottom={0.05} />
+      <Chain points={[[0.1, 0, 0], [0.13, 0.62, 0.02], [0.08, 1.24, 0]]} top={0.075} bottom={0.05} />
 
-      {/* blank pale head — no eyes, no mouth. Featurelessness is the point */}
-      <group ref={head} position={[0, 2.62, 0]}>
-        <mesh scale={[0.16, 0.23, 0.16]}>
-          <sphereGeometry args={[1, 12, 10]} />
-          <meshBasicMaterial ref={headMat} color="#b9b4a8" toneMapped={false} />
+      {/* Coat flare — a suggestion of a suit jacket, ragged at the hem */}
+      {[-0.2, -0.07, 0.07, 0.2].map((x, i) => (
+        <Plate
+          key={i}
+          from={[x, 1.3, 0]}
+          to={[x * 1.6, 0.72 - (i % 2) * 0.14, 0.02]}
+          width={0.13}
+          depth={0.05}
+          material="fleshDark"
+        />
+      ))}
+
+      {/* Spine — stacked vertebrae give the torso texture instead of
+          being one smooth slab */}
+      {Array.from({ length: 7 }).map((_, i) => {
+        const y = 1.3 + i * 0.17
+        const w = 0.3 - i * 0.012
+        return (
+          <mesh key={i} position={[0, y, 0]} rotation={[0, i * 0.06, 0]} material={materials.flesh} castShadow>
+            <boxGeometry args={[w, 0.15, 0.19 - i * 0.008]} />
+          </mesh>
+        )
+      })}
+
+      {/* Shoulder yoke — wide, thin, unnaturally square */}
+      <Plate from={[-0.33, 2.4, 0]} to={[0.33, 2.4, 0]} width={0.16} depth={0.17} />
+      <Joint at={[-0.33, 2.4, 0]} r={0.075} />
+      <Joint at={[0.33, 2.4, 0]} r={0.075} />
+
+      {/* Arms — three segments, hanging far past any plausible hand */}
+      <group ref={arms}>
+        <Chain
+          points={[[-0.33, 2.4, 0], [-0.38, 1.75, 0.04], [-0.34, 1.05, 0.02], [-0.36, 0.62, 0.05]]}
+          top={0.06}
+          bottom={0.028}
+        />
+        <Chain
+          points={[[0.33, 2.4, 0], [0.37, 1.72, 0.04], [0.33, 1.0, 0.02], [0.35, 0.55, 0.05]]}
+          top={0.06}
+          bottom={0.028}
+        />
+        {/* Fingers — four per hand, far too long */}
+        {[-1, 1].map((side) =>
+          [-0.05, -0.017, 0.017, 0.05].map((off, j) => (
+            <Bone
+              key={`${side}-${j}`}
+              from={[side * 0.355 + off, side < 0 ? 0.62 : 0.55, 0.05]}
+              to={[side * 0.355 + off * 2.4, (side < 0 ? 0.62 : 0.55) - 0.34 - j * 0.02, 0.09]}
+              top={0.014}
+              bottom={0.004}
+            />
+          )),
+        )}
+      </group>
+
+      {/* Neck — actually connects the head to the shoulders */}
+      <Bone from={[0, 2.4, 0]} to={[0, 2.66, 0.01]} top={0.07} bottom={0.085} />
+
+      {/* Head — elongated, faceted, no features at all. The blankness is
+          the point; anything resembling a face is less frightening. */}
+      <group ref={head} position={[0, 2.82, 0]}>
+        <mesh scale={[0.145, 0.21, 0.155]} castShadow>
+          <icosahedronGeometry args={[1, 1]} />
+          <meshStandardMaterial
+            ref={headMat}
+            color="#a8a294"
+            emissive="#cdc7b6"
+            emissiveIntensity={0.4}
+            roughness={0.65}
+          />
+        </mesh>
+        {/* Two shallow hollows where eyes should be — not glowing, just
+            absent. Sockets read worse than eyes. */}
+        <mesh position={[-0.062, 0.02, 0.125]} scale={[0.04, 0.055, 0.03]} material={materials.fleshDark}>
+          <sphereGeometry args={[1, 8, 8]} />
+        </mesh>
+        <mesh position={[0.062, 0.02, 0.125]} scale={[0.04, 0.055, 0.03]} material={materials.fleshDark}>
+          <sphereGeometry args={[1, 8, 8]} />
         </mesh>
       </group>
 
-      {/* tendrils from the shoulders */}
-      <group ref={tendrils} position={[0, 2.35, -0.1]}>
-        {[-0.5, -0.25, 0.25, 0.5].map((a, i) => (
+      {/* Tendrils from behind the shoulders */}
+      <group ref={tendrils} position={[0, 2.3, -0.08]}>
+        {tendrilPaths.map((pts, i) => (
           <group key={i}>
-            <Limb
-              length={1.4 + i * 0.12}
-              top={0.028}
-              bottom={0.007}
-              position={[a * 1.3, 0.35, -0.2]}
-              rotation={[0, 0, a * 1.5]}
-            />
+            <Chain points={pts} top={0.042} bottom={0.008} material="fleshDark" />
           </group>
         ))}
       </group>
@@ -104,174 +179,301 @@ export function LongOne({ state }: CreatureProps) {
   )
 }
 
-/**
- * THE CRAWLER — SCP-096-derived. Low to the ground, oversized bald
- * cranium, a grin far too wide for the skull, fingers longer than its
- * forearms, limbs folded above its back like a spider. The fast one.
- */
+/* ------------------------------------------------------------------ */
+/* THE CRAWLER                                                         */
+/* SCP-096-derived. Oversized bald cranium, grin wider than the skull,  */
+/* fingers longer than its forearms, limbs folded above its own back.   */
+/* ------------------------------------------------------------------ */
 export function Crawler({ state }: CreatureProps) {
   const legs = useRef<THREE.Group>(null!)
   const skull = useRef<THREE.Group>(null!)
   const jaw = useRef<THREE.Group>(null!)
 
+  const legRoots = useMemo(
+    () =>
+      [
+        [-0.22, 0.42],
+        [0.22, 0.42],
+        [-0.24, -0.3],
+        [0.24, -0.3],
+      ] as [number, number][],
+    [],
+  )
+
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     const { closeness, hunting, attacking } = state.current
-    const rate = hunting ? 10 : 4.5
+    const rate = hunting ? 9.5 : 4.2
 
     if (legs.current) {
       legs.current.children.forEach((c, i) => {
-        // Opposing pairs at uneven amplitude — a scuttle, not a march
         const phase = i * 1.9
-        c.rotation.x = Math.sin(t * rate + phase) * (0.32 + (i % 2) * 0.18)
-        c.rotation.z = Math.cos(t * rate * 0.7 + phase) * 0.14
+        c.rotation.x = Math.sin(t * rate + phase) * (0.3 + (i % 2) * 0.16)
+        c.rotation.z = Math.cos(t * rate * 0.7 + phase) * 0.13
       })
     }
     if (skull.current) {
-      skull.current.rotation.z = Math.sin(t * 2.3) * 0.09
-      skull.current.rotation.x = -0.2 + Math.sin(t * 1.6) * 0.07
+      skull.current.rotation.z = Math.sin(t * 2.1) * 0.1
+      skull.current.rotation.x = -0.18 + Math.sin(t * 1.5) * 0.08
     }
-    // Jaw hangs wider the closer it gets; gapes fully on the attack
     if (jaw.current) {
-      const open = 1 + 0.18 + closeness * 0.5 + (attacking ? 0.7 : 0)
+      const open = 1 + 0.15 + closeness * 0.45 + (attacking ? 0.8 : 0)
       jaw.current.scale.y = THREE.MathUtils.lerp(jaw.current.scale.y, open, 0.15)
     }
   })
 
   return (
     <group>
-      {/* hunched spine, held low */}
-      <Slab args={[0.3, 0.26, 0.95]} position={[0, 0.62, 0]} rotation={[0.12, 0, 0]} />
+      {/* Spine: pelvis -> ribcage -> neck, as real segments */}
+      <Chain
+        points={[[0, 0.5, -0.45], [0, 0.56, -0.12], [0, 0.6, 0.25], [0, 0.68, 0.52]]}
+        top={0.075}
+        bottom={0.05}
+      />
+      {/* Pelvis and shoulder blades */}
+      <mesh position={[0, 0.5, -0.45]} material={materials.flesh} castShadow>
+        <boxGeometry args={[0.3, 0.16, 0.2]} />
+      </mesh>
+      <mesh position={[0, 0.61, 0.3]} rotation={[0.1, 0, 0]} material={materials.flesh} castShadow>
+        <boxGeometry args={[0.34, 0.14, 0.26]} />
+      </mesh>
 
-      {/* four spider-folded limbs — knee above the back, foot on the floor */}
+      {/* Ribs — five arcs a side, the main source of surface detail */}
+      {[0, 1, 2, 3, 4].map((i) => {
+        const z = 0.34 - i * 0.15
+        const drop = 0.1 + i * 0.012
+        const w = 0.24 - Math.abs(i - 2) * 0.03
+        return [-1, 1].map((side) => (
+          <Chain
+            key={`${i}-${side}`}
+            points={[
+              [0, 0.58, z],
+              [side * w, 0.5 - drop * 0.4, z + 0.02],
+              [side * w * 0.82, 0.4 - drop, z],
+            ]}
+            top={0.028}
+            bottom={0.016}
+            material="fleshDark"
+            joints={false}
+          />
+        ))
+      })}
+
+      {/* Four spider-folded limbs — knee above the back, foot on the
+          floor, fingers splayed flat. Chained so they're one limb. */}
       <group ref={legs}>
-        {[
-          [-0.26, 0.34],
-          [0.26, 0.34],
-          [-0.26, -0.34],
-          [0.26, -0.34],
-        ].map(([x, z], i) => (
-          <group key={i} position={[x, 0.62, z]}>
-            {/* upper segment rises above the back */}
-            <Limb
-              length={0.6}
-              top={0.05}
-              bottom={0.035}
-              position={[x * 0.55, 0.22, 0]}
-              rotation={[0, 0, x > 0 ? -0.7 : 0.7]}
-            />
-            {/* lower segment drops to the floor */}
-            <Limb
-              length={0.78}
-              top={0.035}
-              bottom={0.012}
-              position={[x * 1.25, -0.28, 0]}
-              rotation={[0, 0, x > 0 ? 0.22 : -0.22]}
-            />
-            {/* fingers, splayed flat on the ground */}
-            {[-0.05, 0, 0.05].map((fx, j) => (
-              <Limb
-                key={j}
-                length={0.38}
-                top={0.012}
-                bottom={0.003}
-                position={[x * 1.4 + fx, -0.6, 0.14 + j * 0.03]}
-                rotation={[1.35, 0, fx * 3]}
+        {legRoots.map(([x, z], i) => {
+          const side = x > 0 ? 1 : -1
+          const root: Vec3 = [x, 0.55, z]
+          const knee: Vec3 = [x * 1.9, 1.12, z + side * 0.02]
+          const ankle: Vec3 = [x * 2.5, 0.28, z + 0.12]
+          const foot: Vec3 = [x * 2.35, 0, z + 0.24]
+          return (
+            <group key={i} position={root}>
+              <Chain
+                points={[
+                  [0, 0, 0],
+                  [knee[0] - root[0], knee[1] - root[1], knee[2] - root[2]],
+                  [ankle[0] - root[0], ankle[1] - root[1], ankle[2] - root[2]],
+                  [foot[0] - root[0], foot[1] - root[1], foot[2] - root[2]],
+                ]}
+                top={0.062}
+                bottom={0.022}
               />
-            ))}
-          </group>
-        ))}
+              {/* Fingers — longer than the forearm, flat on the ground */}
+              {[-0.07, -0.024, 0.024, 0.07].map((off, j) => (
+                <Bone
+                  key={j}
+                  from={[foot[0] - root[0], foot[1] - root[1], foot[2] - root[2]]}
+                  to={[
+                    foot[0] - root[0] + off * 2.2,
+                    -root[1] + 0.012,
+                    foot[2] - root[2] + 0.42 - Math.abs(off) * 1.2,
+                  ]}
+                  top={0.017}
+                  bottom={0.004}
+                  material="fleshDark"
+                />
+              ))}
+            </group>
+          )
+        })}
       </group>
 
-      {/* oversized bald cranium thrust forward on a long neck */}
-      <group ref={skull} position={[0, 0.88, 0.6]}>
-        <mesh scale={[0.26, 0.29, 0.27]}>
-          <sphereGeometry args={[1, 14, 12]} />
-          <meshBasicMaterial color="#cfc9ba" toneMapped={false} />
+      {/* Neck into an oversized cranium */}
+      <Bone from={[0, 0.68, 0.52]} to={[0, 0.86, 0.66]} top={0.05} bottom={0.07} />
+      <group ref={skull} position={[0, 0.95, 0.72]}>
+        <mesh scale={[0.23, 0.25, 0.24]} castShadow>
+          <icosahedronGeometry args={[1, 1]} />
+          <meshStandardMaterial color="#c6c0b0" roughness={0.7} emissive="#5a564c" emissiveIntensity={0.25} />
         </mesh>
-        {/* hollow sockets punched into the pale skull */}
-        <mesh position={[-0.1, 0.04, 0.21]} scale={[0.075, 0.1, 0.05]}>
-          <sphereGeometry args={[1, 8, 8]} />
-          <meshBasicMaterial color={VOID} />
+        {/* Deep sockets — dark holes, not eyes */}
+        <mesh position={[-0.095, 0.035, 0.185]} scale={[0.062, 0.075, 0.06]} material={materials.fleshDark}>
+          <sphereGeometry args={[1, 10, 10]} />
         </mesh>
-        <mesh position={[0.1, 0.04, 0.21]} scale={[0.075, 0.1, 0.05]}>
-          <sphereGeometry args={[1, 8, 8]} />
-          <meshBasicMaterial color={VOID} />
+        <mesh position={[0.095, 0.035, 0.185]} scale={[0.062, 0.075, 0.06]} material={materials.fleshDark}>
+          <sphereGeometry args={[1, 10, 10]} />
         </mesh>
-        {/* the grin, wider than the skull should allow */}
-        <group ref={jaw} position={[0, -0.13, 0.2]}>
-          <mesh position={[0, -0.04, 0]} scale={[0.23, 0.1, 0.06]}>
-            <boxGeometry args={[1, 1, 1]} />
-            <meshBasicMaterial color={VOID} />
+        {/* Brow ridge over them */}
+        <mesh position={[0, 0.11, 0.17]} rotation={[0.3, 0, 0]} material={materials.boneDim} castShadow>
+          <boxGeometry args={[0.27, 0.05, 0.09]} />
+        </mesh>
+        {/* Jaw, hinged, wider than the skull should allow */}
+        <group ref={jaw} position={[0, -0.12, 0.16]}>
+          <mesh position={[0, -0.05, 0.02]} material={materials.fleshDark}>
+            <boxGeometry args={[0.22, 0.11, 0.14]} />
           </mesh>
-          <Grin position={[0, -0.02, 0.05]} width={0.42} arc={0.2} teeth={11} scale={0.8} color="#e0d9c6" />
+          <Grin position={[0, -0.02, 0.09]} width={0.34} arc={0.16} teeth={12} scale={0.75} />
         </group>
       </group>
     </group>
   )
 }
 
-/**
- * THE SMILE — the Roblox/Doors-style corridor filler. Not a body: a mass
- * that occupies the hallway, with nothing visible on it but two eyes and
- * a grin. Six spindly arms brace against the walls. It doesn't step, it
- * slides, and the arms twitch while it does.
- */
+/* ------------------------------------------------------------------ */
+/* THE SMILE                                                           */
+/* The Doors-style corridor filler. Not a body: a mass, with nothing on */
+/* it but two eyes and a grin, bracing itself on six arms.             */
+/* ------------------------------------------------------------------ */
 export function Smile({ state }: CreatureProps) {
   const arms = useRef<THREE.Group>(null!)
   const face = useRef<THREE.Group>(null!)
+  const strands = useRef<THREE.Group>(null!)
+
+  // Ragged mass: many overlapping slabs rather than one box, so the
+  // silhouette has a broken edge instead of four clean corners.
+  const chunks = useMemo(() => {
+    const out: { pos: Vec3; size: Vec3; rot: number }[] = []
+    for (let i = 0; i < 11; i++) {
+      const j = Math.sin(i * 78.233) * 43758.5453
+      const r = j - Math.floor(j)
+      const j2 = Math.sin(i * 12.9898) * 43758.5453
+      const r2 = j2 - Math.floor(j2)
+      out.push({
+        pos: [(r - 0.5) * 0.85, 0.35 + i * 0.21, (r2 - 0.5) * 0.35],
+        size: [1.0 + r * 0.55, 0.4 + r2 * 0.3, 0.5 + r * 0.25],
+        rot: (r - 0.5) * 0.3,
+      })
+    }
+    return out
+  }, [])
+
+  const armSpecs = useMemo(
+    () =>
+      [
+        [-1, 2.25, 0.35],
+        [1, 2.3, -0.3],
+        [-1, 1.75, -0.25],
+        [1, 1.7, 0.3],
+        [-1, 1.15, 0.15],
+        [1, 1.1, -0.2],
+      ] as [number, number, number][],
+    [],
+  )
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const { attacking } = state.current
+    const { attacking, closeness } = state.current
 
     if (arms.current) {
       arms.current.children.forEach((c, i) => {
-        // Irregular twitching rather than a cycle — two detuned sines
-        // multiplied, so it stalls and jerks instead of swinging.
-        const s = Math.sin(t * (2.1 + i * 0.6) + i * 3)
-        const s2 = Math.sin(t * (0.7 + i * 0.2))
-        c.rotation.z = s * s2 * 0.35
-        c.rotation.y = Math.cos(t * (1.3 + i * 0.3) + i) * 0.22
+        // Stalling, jerking twitches — two detuned sines multiplied, so
+        // it hangs still then snaps rather than swinging evenly
+        const s = Math.sin(t * (1.9 + i * 0.55) + i * 3)
+        const s2 = Math.sin(t * (0.6 + i * 0.17))
+        c.rotation.z = s * s2 * 0.3
+        c.rotation.y = Math.cos(t * (1.1 + i * 0.26) + i) * 0.2
+      })
+    }
+    if (strands.current) {
+      strands.current.children.forEach((c, i) => {
+        c.rotation.x = Math.sin(t * (0.8 + i * 0.2) + i) * 0.22
+        c.rotation.z = Math.cos(t * (0.6 + i * 0.15)) * 0.16
       })
     }
     if (face.current) {
-      face.current.position.y = 1.95 + Math.sin(t * 0.9) * 0.05
-      const target = attacking ? 1.35 : 1
-      face.current.scale.setScalar(THREE.MathUtils.lerp(face.current.scale.x, target, 0.15))
+      face.current.position.y = 2.35 + Math.sin(t * 0.85) * 0.045
+      const target = attacking ? 1.3 : 1 + closeness * 0.08
+      face.current.scale.setScalar(THREE.MathUtils.lerp(face.current.scale.x, target, 0.14))
     }
   })
 
   return (
     <group>
-      {/* the mass — wide enough to fill a corridor, no discernible form */}
-      <Slab args={[1.45, 2.2, 0.65]} position={[0, 1.15, 0]} />
-      <Slab args={[1.0, 0.7, 0.55]} position={[0, 2.5, 0]} />
-      <Slab args={[0.68, 0.85, 0.5]} position={[-0.52, 0.5, 0.1]} rotation={[0, 0, 0.3]} />
-      <Slab args={[0.68, 0.85, 0.5]} position={[0.52, 0.5, 0.1]} rotation={[0, 0, -0.3]} />
+      {/* The mass */}
+      {chunks.map((c, i) => (
+        <mesh
+          key={i}
+          position={c.pos}
+          rotation={[0, c.rot, c.rot * 0.4]}
+          material={i % 3 === 0 ? materials.fleshDark : materials.flesh}
+          castShadow
+        >
+          <boxGeometry args={c.size} />
+        </mesh>
+      ))}
 
-      {/* six long arms braced outward against the walls */}
-      <group ref={arms} position={[0, 2.1, 0]}>
-        {[
-          [-1, 0.5, -0.9],
-          [1, 0.5, 0.9],
-          [-1, 0.0, -1.2],
-          [1, 0.0, 1.2],
-          [-1, -0.55, -0.7],
-          [1, -0.55, 0.7],
-        ].map(([side, y, rot], i) => (
-          <group key={i} position={[side * 0.55, y, 0]}>
-            <Limb length={1.6} top={0.055} bottom={0.015} position={[side * 0.7, 0.1, 0]} rotation={[0, 0, rot]} />
-            <Limb length={1.0} top={0.028} bottom={0.008} position={[side * 1.4, -0.45, 0.1]} rotation={[0.3, 0, rot * 0.4]} />
+      {/* Shoulder ridge the arms visibly attach to — without this they
+          read as sticks floating beside the body */}
+      <Plate from={[-0.62, 2.3, 0]} to={[0.62, 2.3, 0]} width={0.3} depth={0.42} />
+      <Plate from={[-0.55, 1.55, 0]} to={[0.55, 1.55, 0]} width={0.26} depth={0.38} />
+
+      {/* Six arms, each a chain from the ridge out to a braced hand */}
+      <group ref={arms}>
+        {armSpecs.map(([side, y, lean], i) => {
+          const root: Vec3 = [side * 0.5, y, 0]
+          return (
+            <group key={i} position={root}>
+              <Chain
+                points={[
+                  [0, 0, 0],
+                  [side * 0.75, 0.3 + lean * 0.2, side * 0.1],
+                  [side * 1.55, 0.05 + lean * 0.3, side * 0.25],
+                  [side * 2.1, -0.55 + lean * 0.2, side * 0.3],
+                ]}
+                top={0.075}
+                bottom={0.02}
+              />
+              {/* splayed fingers gripping the wall */}
+              {[-0.06, 0, 0.06].map((off, j) => (
+                <Bone
+                  key={j}
+                  from={[side * 2.1, -0.55 + lean * 0.2, side * 0.3]}
+                  to={[side * 2.3 + off * 0.4, -0.95 + lean * 0.2 - j * 0.04, side * 0.35 + off]}
+                  top={0.018}
+                  bottom={0.005}
+                  material="fleshDark"
+                />
+              ))}
+            </group>
+          )
+        })}
+      </group>
+
+      {/* Strands hanging off the underside — breaks the flat bottom edge */}
+      <group ref={strands}>
+        {[-0.4, -0.15, 0.12, 0.38].map((x, i) => (
+          <group key={i} position={[x, 0.5, 0.1 + (i % 2) * 0.1]}>
+            <Chain
+              points={[
+                [0, 0, 0],
+                [x * 0.15, -0.25, 0.04],
+                [x * 0.25, -0.48 - (i % 2) * 0.1, 0.02],
+              ]}
+              top={0.022}
+              bottom={0.006}
+              material="fleshDark"
+              joints={false}
+            />
           </group>
         ))}
       </group>
 
-      {/* the only features: two eyes and a wide grin */}
-      <group ref={face} position={[0, 1.95, 0.34]}>
-        <Glow position={[-0.17, 0.12, 0]} scale={[0.05, 0.06, 0.03]} />
-        <Glow position={[0.15, 0.16, 0]} scale={[0.042, 0.048, 0.03]} />
-        <Grin position={[0, -0.06, 0]} width={0.6} arc={0.38} teeth={13} scale={1.1} />
+      {/* The only features */}
+      <group ref={face} position={[0, 2.35, 0.36]}>
+        <Glow position={[-0.19, 0.13, 0]} scale={[0.055, 0.065, 0.032]} />
+        <Glow position={[0.16, 0.17, 0]} scale={[0.046, 0.052, 0.032]} />
+        <Grin position={[0, -0.07, 0]} width={0.66} arc={0.4} teeth={15} scale={1.15} />
       </group>
     </group>
   )

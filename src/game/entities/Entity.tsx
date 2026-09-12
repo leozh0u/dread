@@ -27,23 +27,24 @@ const PROFILE: Record<
      * is near with your eyes shut. */
     idle: SfxName
     close: SfxName
+    step: SfxName
     voiceGap: [number, number] // seconds between vocalisations, [min, max]
   }
 > = {
   // Tall and slow: glides, barely makes a sound, no bob at all.
   long: {
     patrol: 1.5, hunt: 2.6, retreat: 2.2, stepDist: 2.4, stepPitch: 0.55, bob: 0,
-    idle: 'long-presence', close: 'long-near', voiceGap: [14, 26],
+    idle: 'long-presence', close: 'long-near', step: 'step-long', voiceGap: [40, 75],
   },
   // Low and fast: rapid skittering steps, high and light.
   crawler: {
     patrol: 2.4, hunt: 4.4, retreat: 3.0, stepDist: 0.7, stepPitch: 1.8, bob: 0.06,
-    idle: 'crawler-skitter', close: 'crawler-shriek', voiceGap: [7, 15],
+    idle: 'crawler-skitter', close: 'crawler-shriek', step: 'step-crawler', voiceGap: [30, 60],
   },
   // Heavy and deliberate: slow, enormous, dragging footfalls.
   smile: {
     patrol: 1.2, hunt: 2.9, retreat: 2.0, stepDist: 1.9, stepPitch: 0.4, bob: 0.03,
-    idle: 'smile-drag', close: 'smile-laugh', voiceGap: [10, 20],
+    idle: 'smile-drag', close: 'smile-laugh', step: 'step-smile', voiceGap: [35, 65],
   },
 }
 
@@ -170,6 +171,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
         FLOOR_Y + 0.1,
         group.current.position.z,
         prof.stepPitch,
+        prof.step,
       )
     }
 
@@ -178,17 +180,23 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     // the soundtrack of it approaching changes character rather than
     // just getting louder.
     if (t > nextVoice.current) {
-      const near = normalized < 0.45
+      // The shriek/laugh is reserved for genuinely close encounters, and
+      // even then only sometimes. A scream you hear every few seconds
+      // stops being a scream and becomes wallpaper — the whole reason it
+      // works is that it's rare and you can't predict it.
+      const veryClose = normalized < 0.3
+      const useClose = veryClose && Math.random() < 0.45
       playSpatialSfx(
-        near ? prof.close : prof.idle,
+        useClose ? prof.close : prof.idle,
         group.current.position.x,
         FLOOR_Y + 1.2,
         group.current.position.z,
-        { volume: near ? 0.9 : 0.55, rate: 0.9 + Math.random() * 0.2 },
+        { volume: useClose ? 0.95 : 0.5, rate: 0.9 + Math.random() * 0.2 },
       )
       const [lo, hi] = prof.voiceGap
-      // Closer = more frequent, down to a third of the idle interval
-      const scale = 0.35 + normalized * 0.65
+      // Closer means somewhat more frequent, but never frantic — floors
+      // at 60% of the idle interval rather than a third of it.
+      const scale = 0.6 + normalized * 0.4
       nextVoice.current = t + (lo + Math.random() * (hi - lo)) * scale
     }
 

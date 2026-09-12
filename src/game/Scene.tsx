@@ -28,7 +28,7 @@ function Flashlight() {
     <>
       <spotLight
         ref={light}
-        intensity={620}
+        intensity={520}
         angle={0.4}
         penumbra={0.6}
         distance={14}
@@ -83,7 +83,7 @@ export function Scene() {
       {/* Enough ambient to read the space — the fluorescents are the real
           light source now, so the room is lit-but-wrong rather than a
           black void navigated by torch. */}
-      <ambientLight intensity={0.2} color="#b8a878" />
+      <ambientLight intensity={0.11} color="#b8a878" />
       <Physics gravity={[0, -20, 0]}>
         <House />
         <Entities />

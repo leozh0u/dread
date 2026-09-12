@@ -32,6 +32,10 @@ export type SfxName =
   | 'vo-still-here'
   | 'vo-breathe'
   | 'vo-not-alone'
+  | 'step-player'
+  | 'step-long'
+  | 'step-crawler'
+  | 'step-smile'
 
 const FILES: Record<SfxName, string> = {
   'long-presence': 'ent-long-presence.mp3',
@@ -49,6 +53,10 @@ const FILES: Record<SfxName, string> = {
   'vo-still-here': 'vo-still-here.mp3',
   'vo-breathe': 'vo-breathe.mp3',
   'vo-not-alone': 'vo-not-alone.mp3',
+  'step-player': 'step-player.mp3',
+  'step-long': 'step-long.mp3',
+  'step-crawler': 'step-crawler.mp3',
+  'step-smile': 'step-smile.mp3',
 }
 
 const cache = new Map<SfxName, Promise<AudioBuffer | null>>()
@@ -72,6 +80,10 @@ export function loadSfx(ctx: AudioContext, name: SfxName): Promise<AudioBuffer |
  * scare isn't preceded by a fetch. Fire-and-forget. */
 export function preloadSfx(ctx: AudioContext) {
   const early: SfxName[] = [
+    'step-player',
+    'step-long',
+    'step-crawler',
+    'step-smile',
     'crawler-skitter',
     'crawler-shriek',
     'smile-drag',

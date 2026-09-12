@@ -195,9 +195,9 @@ export function startAmbient() {
   // the near/far and left/right difference — real HRTF alone can be
   // subtle on non-ideal speakers/headphones, and the whole point of this
   // sound is "I can tell where it is."
-  growlPanner.refDistance = 1.2
-  growlPanner.rolloffFactor = 2.2
-  growlPanner.maxDistance = 40
+  growlPanner.refDistance = 3
+  growlPanner.rolloffFactor = 1.1
+  growlPanner.maxDistance = 45
   const growlGain = audioCtx.createGain()
   growlGain.gain.value = 0
   // Occlusion filter — setMonsterProximity opens/closes this with distance
@@ -244,9 +244,14 @@ function positionedPanner(audioCtx: AudioContext, x: number, y: number, z: numbe
   const panner = audioCtx.createPanner()
   panner.panningModel = 'HRTF'
   panner.distanceModel = 'inverse'
-  panner.refDistance = 1.2
-  panner.rolloffFactor = 2.2
-  panner.maxDistance = 40
+  // Gentle falloff on purpose. The previous values (ref 1.2, rolloff
+  // 2.2) put a sound 10m away at ~6% gain — the creature was inaudible
+  // until it was already on top of you, which defeats navigating by ear.
+  // These keep it clearly audible down a corridor while still falling
+  // off obviously with distance.
+  panner.refDistance = 3
+  panner.rolloffFactor = 1.1
+  panner.maxDistance = 45
   if (panner.positionX) {
     panner.positionX.value = x
     panner.positionY.value = y
@@ -309,10 +314,31 @@ export function playSfx(name: SfxName, { volume = 1, rate = 1, pan = 0 } = {}) {
  * positioned at the monster's exact location so its footfalls pan and
  * attenuate correctly even though the continuous growl/breathing bed is
  * a separate, always-on chain. */
-export function playMonsterFootstep(x: number, y: number, z: number, pitch = 1) {
+export function playMonsterFootstep(
+  x: number,
+  y: number,
+  z: number,
+  pitch = 1,
+  step?: SfxName,
+) {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
   const panner = positionedPanner(audioCtx, x, y, z)
+
+  // Its recorded footfall, positioned. This is the main thing you track
+  // it by, so it's mixed loud and falls off gently (see positionedPanner).
+  if (step) {
+    void loadSfx(audioCtx, step).then((buffer) => {
+      if (!buffer) return
+      const src = audioCtx.createBufferSource()
+      src.buffer = buffer
+      src.playbackRate.value = 0.95 + Math.random() * 0.1
+      const gain = audioCtx.createGain()
+      gain.gain.value = 1
+      src.connect(gain).connect(panner)
+      src.start()
+    })
+  }
 
   const osc = audioCtx.createOscillator()
   osc.type = 'sine'
@@ -513,36 +539,37 @@ export function playFootstep() {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
   const panner = audioCtx.createStereoPanner()
-  panner.pan.value = footstepLeft ? -0.35 : 0.35
+  panner.pan.value = footstepLeft ? -0.3 : 0.3
   footstepLeft = !footstepLeft
   panner.connect(master())
+  panner.connect(reverb())
 
-  // Weight: dull, low, no ringing — a lowpass (not bandpass) so there's no
-  // resonant tone, just a soft muffled thump.
+  // The recording carries it — a footfall is grit and cloth and shifting
+  // weight, which is exactly what oscillators cannot produce. Pitch
+  // varies slightly per step so consecutive steps aren't identical.
+  void loadSfx(audioCtx, 'step-player').then((buffer) => {
+    if (!buffer) return
+    const src = audioCtx.createBufferSource()
+    src.buffer = buffer
+    src.playbackRate.value = 0.94 + Math.random() * 0.12
+    const gain = audioCtx.createGain()
+    gain.gain.value = 0.85 // your own feet: loud, you're wearing the shoes
+    src.connect(gain).connect(panner)
+    src.start()
+  })
+
+  // Quiet synthesised low thump underneath for weight, in case the
+  // recording hasn't loaded yet on the very first steps.
   const weight = noiseSource(audioCtx)
   const weightFilter = audioCtx.createBiquadFilter()
   weightFilter.type = 'lowpass'
   weightFilter.frequency.value = 250 + Math.random() * 120
-  weightFilter.Q.value = 0.3
   const weightGain = audioCtx.createGain()
-  weightGain.gain.setValueAtTime(0.09, t0)
+  weightGain.gain.setValueAtTime(0.07, t0)
   weightGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07)
   weight.connect(weightFilter).connect(weightGain).connect(panner)
   weight.start()
   weight.stop(t0 + 0.08)
-
-  // Scuff: brief, quiet, high — the contact transient. Tiny relative to
-  // the weight layer, just enough texture to read as a real step.
-  const scuff = noiseSource(audioCtx)
-  const scuffFilter = audioCtx.createBiquadFilter()
-  scuffFilter.type = 'highpass'
-  scuffFilter.frequency.value = 2500 + Math.random() * 1500
-  const scuffGain = audioCtx.createGain()
-  scuffGain.gain.setValueAtTime(0.02, t0)
-  scuffGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.02)
-  scuff.connect(scuffFilter).connect(scuffGain).connect(panner)
-  scuff.start()
-  scuff.stop(t0 + 0.03)
 }
 
 // ---------------------------------------------------------------------------

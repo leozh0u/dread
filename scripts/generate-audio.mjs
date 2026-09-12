@@ -95,6 +95,29 @@ const SOUND_EFFECTS = [
     text: 'fingernails scratching slowly on drywall, close and dry',
     duration: 3,
   },
+  // --- Footsteps. Recorded beats synthesised here by a mile: a footfall
+  // is texture (grit, cloth, weight shifting), and texture is exactly
+  // what oscillators can't do.
+  {
+    file: 'step-player.mp3',
+    text: 'single footstep on worn carpet, close microphone, dry, soft grit underfoot',
+    duration: 2,
+  },
+  {
+    file: 'step-long.mp3',
+    text: 'slow deliberate heavy footstep on carpet, tall figure, faint cloth rustle',
+    duration: 2,
+  },
+  {
+    file: 'step-crawler.mp3',
+    text: 'quick sharp claw taps on concrete, bony, light and fast',
+    duration: 2,
+  },
+  {
+    file: 'step-smile.mp3',
+    text: 'massive heavy body thudding down, floor shudder, low impact with debris',
+    duration: 2,
+  },
   {
     file: 'amb-flicker.mp3',
     text: 'fluorescent light buzzing and stuttering, electrical, failing ballast',

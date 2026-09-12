@@ -59,7 +59,7 @@ function buildFixtures(): Fixture[] {
   // isn't frightening.
   return out.map((f, i) => ({
     ...f,
-    state: (i % 7 === 3 ? 'dead' : i % 4 === 1 ? 'flicker' : 'steady') as FixtureState,
+    state: (i % 4 === 3 ? 'dead' : i % 3 === 1 ? 'flicker' : 'steady') as FixtureState,
     seed: i * 1.7,
   }))
 }
@@ -86,7 +86,7 @@ export function Fluorescents() {
     // Flicker every tube's emissive (cheap — material uniform only)
     for (let i = 0; i < fixtures.length; i++) {
       const mat = tubeMats.current[i]
-      if (mat) mat.emissiveIntensity = 2.2 * levelOf(fixtures[i], t)
+      if (mat) mat.emissiveIntensity = 1.5 * levelOf(fixtures[i], t)
     }
 
     // Re-point the light pool at the nearest fixtures
@@ -110,7 +110,7 @@ export function Fluorescents() {
       }
       const f = fixtures[pick.i]
       light.position.set(f.position[0], f.position[1] - 0.25, f.position[2])
-      light.intensity = 10 * levelOf(f, t)
+      light.intensity = 6.2 * levelOf(f, t)
     }
   })
 
@@ -134,7 +134,7 @@ export function Fluorescents() {
                 }}
                 color={dead ? '#2e2e28' : '#fff6cc'}
                 emissive={dead ? '#000000' : '#ffeeaa'}
-                emissiveIntensity={dead ? 0 : 2.2}
+                emissiveIntensity={dead ? 0 : 1.5}
                 toneMapped={false}
               />
             </mesh>
