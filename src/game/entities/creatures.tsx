@@ -457,6 +457,8 @@ export function Smile({ state }: CreatureProps) {
   const arms = useRef<THREE.Group>(null!)
   const face = useRef<THREE.Group>(null!)
   const strands = useRef<THREE.Group>(null!)
+  const mass = useRef<THREE.Group>(null!)
+  const gait = useRef(0)
 
   // Ragged mass: many overlapping slabs rather than one box, so the
   // silhouette has a broken edge instead of four clean corners.
@@ -491,7 +493,27 @@ export function Smile({ state }: CreatureProps) {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const { attacking, closeness } = state.current
+    const { attacking, closeness, speed } = state.current
+
+    // This one has no legs — it's a mass that hauls itself along — so a
+    // step cycle would be wrong for it. Instead it LURCHES: a hard heave
+    // forward and up, then a long settle under its own weight, once per
+    // cycle. Long stride, so the heaves are slow and far apart and each
+    // one lands with the recorded drag sound.
+    gait.current = advanceGait(gait.current, speed, 0.016, 1.9)
+    const g = gait.current
+    const heaveAmp = Math.min(1, speed / 2.9)
+    if (mass.current) {
+      // Sharp rise over the first fifth of the cycle, then a slow sag —
+      // effort, then weight winning.
+      const rise = g < 0.2 ? g / 0.2 : 1 - (g - 0.2) / 0.8
+      mass.current.position.y = rise * 0.11 * heaveAmp
+      // Pitches forward as it heaves and rocks back as it settles.
+      mass.current.rotation.x = -rise * 0.07 * heaveAmp
+      // Rolls onto alternate sides, so consecutive heaves aren't identical.
+      mass.current.rotation.z =
+        Math.sin(g * Math.PI * 2) * 0.05 * heaveAmp + Math.sin(t * 0.5) * 0.012
+    }
 
     if (arms.current) {
       arms.current.children.forEach((c, i) => {
@@ -522,17 +544,24 @@ export function Smile({ state }: CreatureProps) {
   return (
     <group>
       {/* The mass */}
-      {chunks.map((c, i) => (
-        <mesh
-          key={i}
-          position={c.pos}
-          rotation={[0, c.rot, c.rot * 0.4]}
-          material={i % 3 === 0 ? materials.fleshDark : materials.flesh}
-          castShadow
-        >
-          <boxGeometry args={c.size} />
-        </mesh>
-      ))}
+      {/* The whole mass heaves as one — see the lurch in useFrame. */}
+      <group ref={mass}>
+        {chunks.map((c, i) => (
+          <mesh
+            key={i}
+            position={c.pos}
+            rotation={[0, c.rot, c.rot * 0.4]}
+            material={i % 3 === 0 ? materials.fleshDark : materials.flesh}
+            castShadow
+          >
+            <boxGeometry args={c.size} />
+          </mesh>
+        ))}
+        {/* Growths in the seams between slabs. The slabs read as a stack
+            of boxes without something bridging them. */}
+        <Ridges from={[-0.3, 0.5, 0.28]} to={[0.25, 2.3, 0.24]} count={10} size={0.055} />
+        <Ridges from={[0.3, 0.8, -0.26]} to={[-0.2, 2.1, -0.22]} count={7} size={0.045} />
+      </group>
 
       {/* Shoulder ridge the arms visibly attach to — without this they
           read as sticks floating beside the body */}
