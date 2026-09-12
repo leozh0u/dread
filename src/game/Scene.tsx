@@ -8,6 +8,7 @@ import { Entities } from './entities'
 import { EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { updateAudioListener } from './scareFx'
+import { installDevBridge } from './devBridge'
 
 /** Flashlight rigidly attached to the camera. */
 function Flashlight() {
@@ -55,6 +56,16 @@ function Flashlight() {
  * "transient activation" window from the BEGIN click still being open a
  * moment later — true in every browser we've tested this in — with the
  * old click-to-lock behavior as an automatic fallback if it isn't. */
+/** Publishes a handle on the running game for automated playthroughs.
+ * Compiled out of production builds — see devBridge.ts. */
+function DevBridge() {
+  const { camera } = useThree()
+  useEffect(() => {
+    installDevBridge(camera)
+  }, [camera])
+  return null
+}
+
 function AutoPointerLock() {
   const controls = useRef<ElementRef<typeof PointerLockControls>>(null)
   useEffect(() => {
@@ -114,6 +125,7 @@ export function Scene() {
       </Physics>
       <Flashlight />
       <AutoPointerLock />
+      <DevBridge />
       <EffectComposer>
         <Noise opacity={0.06} />
         <Vignette darkness={0.9} offset={0.3} />

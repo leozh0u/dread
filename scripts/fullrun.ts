@@ -15,7 +15,7 @@
  * catastrophic to discover while filming.
  */
 import { buildCorridorWalls, buildJunctionCaps, type WallSpec } from '../src/game/maze'
-import { CLUES, OUTSIDE, CALM_ROOM } from '../src/game/triggers'
+import { CLUES, OUTSIDE, CALM_ROOM, HIDING_SPOTS } from '../src/game/triggers'
 import { usePlayerPosition } from '../src/game/playerPosition'
 import { useThreat, CLUES_REQUIRED } from '../src/game/threat'
 import { useSession } from '../src/game/session'
@@ -110,10 +110,30 @@ const check = (label: string, ok: boolean) => {
   if (!ok) failures++
 }
 
+/**
+ * The player's REAL tracked height: the centre of their capsule, which
+ * Player.tsx writes to the position store every frame.
+ *
+ * This used to be 0.5, which is the height the FRAGMENTS sit at — so the
+ * test walked the player through each pickup at exactly the pickup's own
+ * elevation, a thing that never happens in the running game. That made
+ * the vertical component of the distance check zero here and 0.65 in
+ * reality, and the pickup radius is 0.9: the test was measuring a
+ * 0.9-metre sphere while the game had an effective radius of 0.62 metres
+ * horizontally.
+ *
+ * The consequence was not theoretical. An automated playthrough in a real
+ * browser walked to within 0.7 of all three fragments and collected none
+ * of them, while this test reported every pickup working. A test that
+ * feeds the system numbers the system never produces will confirm whatever
+ * you already believe.
+ */
+const PLAYER_TRACKED_Y = -0.15
+
 /** Walk the player along a path, ticking triggers exactly as the game does. */
 function walk(path: [number, number][]) {
   for (const [x, z] of path) {
-    usePlayerPosition.setState({ x, y: 0.5, z })
+    usePlayerPosition.setState({ x, y: PLAYER_TRACKED_Y, z })
     tickTriggers()
   }
 }
@@ -122,7 +142,7 @@ function reset() {
   useThreat.getState().reset()
   useSession.setState({ status: 'calibrating', startedAt: null })
   useCalmRoom.setState({ inCalmRoom: false })
-  usePlayerPosition.setState({ x: 0, y: 0.5, z: 30 })
+  usePlayerPosition.setState({ x: 0, y: PLAYER_TRACKED_Y, z: 30 })
 }
 
 console.log('\n=== RUN 1: collect all fragments, escape through the door ===')
@@ -153,6 +173,22 @@ useSession.getState().start()
   if (path) walk(path)
   check("outcome is 'escaped_door'", useThreat.getState().outcome === 'escaped_door')
   check("session ended", useSession.getState().status === 'ended')
+}
+
+console.log('\n=== HIDING: every spot must register at the real player height ===')
+{
+  reset()
+  useSession.getState().start()
+  for (const spot of HIDING_SPOTS) {
+    usePlayerPosition.setState({ x: spot.center[0], y: PLAYER_TRACKED_Y, z: spot.center[2] })
+    tickTriggers()
+    check(`standing in the ${spot.kind} counts as hidden`, useThreat.getState().isHidden)
+    // And stepping out of it must stop counting, or hiding would be
+    // permanent once entered.
+    usePlayerPosition.setState({ x: spot.center[0] + 6, y: PLAYER_TRACKED_Y, z: spot.center[2] + 6 })
+    tickTriggers()
+    check(`stepping away from the ${spot.kind} stops counting`, !useThreat.getState().isHidden)
+  }
 }
 
 console.log('\n=== RUN 2: take the southern fork to the calm room instead ===')

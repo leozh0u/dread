@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useDirector } from '../director'
@@ -158,6 +158,18 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const scareLog = useDirector((s) => s.scareLog)
 
   const pathS = useRef(startS)
+  /**
+   * Where this creature stands on its very first frame.
+   *
+   * It used to be a hardcoded [0, FLOOR_Y, -6], which put all three in the
+   * same spot six metres from the world origin — and the world origin is
+   * precisely what the not-yet-written player position was being compared
+   * against when the player could die at spawn without moving (see
+   * playerPosition.ts). The guards there make that harmless now; starting
+   * them where they actually belong makes the first frame simply correct
+   * rather than merely survivable.
+   */
+  const home = useMemo(() => pointAtArcLength(startS), [startS])
   const facing = useRef(0)
   const distSinceStep = useRef(0)
   const hitchPhase = useRef(index * 3)
@@ -517,7 +529,11 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
 
     // Closest entity wins the audio bus and the threat system
     const closest = reportEntity(index, normalized, group.current.position)
-    if (closest === index) {
+    // Same guard as useThreatLoop, one level earlier: don't publish a
+    // threat distance computed against a player position that has not been
+    // written yet. Without this the Director latches monsterDistance=0.30
+    // and monsterVisible=true on frame one and keeps them.
+    if (closest === index && usePlayerPosition.getState().live) {
       useDirector.getState().setMonsterDistance(normalized)
       setMonsterOccluded(!los)
       useDirector.getState().setMonsterVisible(los)
@@ -533,7 +549,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   })
 
   return (
-    <group ref={group} position={[0, FLOOR_Y, -6]}>
+    <group ref={group} position={[home.x, FLOOR_Y, home.z]}>
       <group ref={body}>
         <Creature kind={kind} state={state} />
       </group>

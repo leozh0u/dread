@@ -3,7 +3,7 @@ import { usePlayerPosition } from './playerPosition'
 import { useThreat, CLUES_REQUIRED } from './threat'
 import { useCalmRoom } from './calmRoom'
 import { useSession } from './session'
-import { CLUES, HIDING_SPOTS, CALM_ROOM, OUTSIDE, distance3, insideBox } from './triggers'
+import { CLUES, HIDING_SPOTS, CALM_ROOM, OUTSIDE, distanceXZ, heightGap, insideColumn } from './triggers'
 
 const TICK_MS = 100
 
@@ -20,17 +20,18 @@ export function tickTriggers() {
 
   for (const clue of CLUES) {
     if (collected.has(clue.id)) continue
-    if (distance3(p, clue.position) <= clue.radius) {
+    // Horizontal, with the floor bounded separately — see distanceXZ.
+    if (distanceXZ(p, clue.position) <= clue.radius && heightGap(p, clue.position) < 2) {
       useThreat.getState().addClue(clue.id)
     }
   }
 
-  const hidden = HIDING_SPOTS.some((spot) => insideBox(p, spot))
+  const hidden = HIDING_SPOTS.some((spot) => insideColumn(p, spot))
   if (hidden !== useThreat.getState().isHidden) {
     useThreat.getState().setHidden(hidden)
   }
 
-  const inCalm = insideBox(p, CALM_ROOM)
+  const inCalm = insideColumn(p, CALM_ROOM)
   if (inCalm !== useCalmRoom.getState().inCalmRoom) {
     useCalmRoom.getState().setInCalmRoom(inCalm)
   }
@@ -44,7 +45,7 @@ export function tickTriggers() {
     useSession.getState().status === 'playing' &&
     useThreat.getState().outcome === 'playing' &&
     collected.size >= CLUES_REQUIRED &&
-    insideBox(p, OUTSIDE)
+    insideColumn(p, OUTSIDE)
   ) {
     useThreat.getState().setOutcome('escaped_door')
     useSession.getState().setStatus('ended')

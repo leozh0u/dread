@@ -5,6 +5,7 @@ import { useMicStore } from '../lib/useMic'
 import { useSession } from './session'
 import { playScare, playJumpscareSound } from './scareFx'
 import { inspect } from './entities/registry'
+import { usePlayerPosition } from './playerPosition'
 
 const TICK_MS = 200
 const CLOSE_THRESHOLD = 0.35
@@ -68,6 +69,12 @@ export function useThreatLoop() {
       // be the safe, sit-still intro; the stealth mechanic only matters
       // once the real game has begun.
       if (useSession.getState().status !== 'playing') return
+      // Nothing may kill the player until their real position is known.
+      // See playerPosition.ts: before Player.tsx's first frame the store
+      // held the world origin rather than the spawn, the creatures mount
+      // six metres from that origin, and the detection meter would fill
+      // against someone standing still thirty-five metres away.
+      if (!usePlayerPosition.getState().live) return
 
       const monsterDistance = useDirector.getState().monsterDistance
       const isHidden = useThreat.getState().isHidden

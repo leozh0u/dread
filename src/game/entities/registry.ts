@@ -28,6 +28,17 @@ export function nearestDistance() {
   return Math.min(...distances)
 }
 
+/** Dev only: what each creature is currently reporting. Used by the
+ * automated playthrough to explain a death rather than just record one. */
+export function entityReports() {
+  return distances.map((d, i) => ({
+    index: i,
+    normalized: d,
+    x: positions[i].x,
+    z: positions[i].z,
+  }))
+}
+
 /**
  * Only one creature may hunt at a time.
  *
