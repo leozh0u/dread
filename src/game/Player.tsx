@@ -16,6 +16,9 @@ const LOOK_SPEED = 1.8 // rad/sec, arrow-key look
 /** Well below the floor (top face -0.9). Anything past this means the
  * player is no longer in the level. */
 const FALL_LIMIT = -8
+/** Metres travelled per full two-step stride. Keeps the head bob locked
+ * to the footstep rhythm rather than running on its own clock. */
+const STRIDE = 1.9
 const keys = {
   forward: false,
   back: false,
@@ -72,6 +75,10 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
   const lastStep = useRef(0)
   /** Last ground the player actually stood on, for fall recovery. */
   const lastSafe = useRef({ x: 0, y: 0.5, z: 30 })
+  const stepPhase = useRef(0)
+  const bobAmount = useRef(0)
+  const landDip = useRef(0)
+  const cameraRoll = useRef(0)
   const wasGrounded = useRef(true)
   const fallSpeed = useRef(0)
 
@@ -91,8 +98,11 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
     if (!body.current) return
+    // Clamped so a frame-rate hitch (screen recording, a GC pause) can't
+    // jolt the camera — the one place a dropped frame would be visible.
+    const dtClamped = Math.min(delta, 0.05)
 
     if (keys.lookLeft) camera.rotation.y += LOOK_SPEED * delta
     if (keys.lookRight) camera.rotation.y -= LOOK_SPEED * delta
@@ -124,6 +134,9 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     // by how fast we were falling the instant before touchdown.
     if (grounded && !wasGrounded.current) {
       playLandSound(Math.abs(fallSpeed.current))
+      // Knees absorbing the impact. Scaled by how hard the landing was, so
+      // stepping off a kerb and dropping properly don't feel identical.
+      landDip.current = Math.min(0.16, Math.abs(fallSpeed.current) * 0.018)
     }
     if (!grounded) fallSpeed.current = vel.y
     wasGrounded.current = grounded
@@ -141,6 +154,40 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     }
 
     const t = body.current.translation()
+
+    // --- CAMERA FEEL ---
+    // The camera used to be bolted rigidly to the body, which is why
+    // walking felt like being slid along on rails: a first-person camera
+    // that never moves relative to its own body reads as a floating
+    // viewpoint rather than as a person. All of it is deliberately small —
+    // this is a dark game people play for a while, and an aggressive head
+    // bob is the fastest way to make someone feel ill.
+    const planarSpeed = Math.hypot(vel.x, vel.z)
+    const walking = grounded && planarSpeed > 0.4
+
+    // Step phase accumulates from distance travelled, so the bob stays in
+    // sync with the footstep sounds instead of drifting against them.
+    if (walking) stepPhase.current += (planarSpeed * dtClamped) / STRIDE
+    const sp = stepPhase.current * Math.PI * 2
+    // Amplitude eases in and out so starting and stopping don't snap.
+    bobAmount.current += ((walking ? 1 : 0) - bobAmount.current) * Math.min(1, dtClamped * 6)
+    const a = bobAmount.current
+
+    // Vertical dips twice per stride (once per foot), lateral once — the
+    // figure-of-eight a real head traces.
+    const bobY = -Math.abs(Math.sin(sp)) * 0.032 * a
+    const bobX = Math.sin(sp * 0.5) * 0.022 * a
+
+    // Landing dip recovers over about a quarter second.
+    landDip.current *= Math.max(0, 1 - dtClamped * 7)
+
+    // Idle sway: breathing, so standing still isn't perfectly static.
+    const idle = (1 - a) * Math.sin(clock.elapsedTime * 1.1) * 0.006
+
+    // Roll into a strafe. Tiny — enough to feel, not enough to notice.
+    const strafe = right.dot(new THREE.Vector3(vel.x, 0, vel.z)) / Math.max(SPEED, 0.001)
+    cameraRoll.current += (strafe * -0.016 - cameraRoll.current) * Math.min(1, dtClamped * 5)
+    camera.rotation.z = cameraRoll.current + Math.sin(sp * 0.5) * 0.004 * a
 
     // Last-resort recovery. The level is sealed and the floor is a solid
     // collider, so this should never fire — but "should never" is exactly
@@ -161,7 +208,11 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
       lastSafe.current.z = t.z
     }
 
-    camera.position.set(t.x, t.y + 0.6, t.z)
+    camera.position.set(
+      t.x + right.x * bobX,
+      t.y + 0.6 + bobY + idle - landDip.current,
+      t.z + right.z * bobX,
+    )
     usePlayerPosition.getState().set(t.x, t.y, t.z)
   })
 
