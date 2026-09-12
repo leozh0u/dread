@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Bone, Plate, Joint, Chain, Glow, Grin, materials } from './shapes'
+import { Bone, Plate, Joint, Chain, Glow, Grin, Ridges, materials } from './shapes'
 import { advanceGait, legSwing, kneeBend, bodyBob, bodySway, shoulderTwist, hipTwist } from './gait'
 
 export type EntityKind = 'long' | 'crawler' | 'smile'
@@ -182,6 +182,11 @@ export function LongOne({ state }: CreatureProps) {
       {/* Torso counter-rotates against the hips. */}
       <group ref={torso} position={[0, 2.4, 0]}>
       <group position={[0, -2.4, 0]}>
+      {/* Growths down the spine — the torso was a clean stack of boxes,
+          which is the largest unbroken area on this creature. */}
+      <Ridges from={[0.06, 1.35, -0.09]} to={[0.02, 2.36, -0.08]} count={9} size={0.045} />
+      <Ridges from={[-0.05, 1.5, -0.08]} to={[-0.03, 2.2, -0.07]} count={5} size={0.032} />
+
       {/* Shoulder yoke — wide, thin, unnaturally square */}
       <Plate from={[-0.33, 2.4, 0]} to={[0.33, 2.4, 0]} width={0.16} depth={0.17} />
       <Joint at={[-0.33, 2.4, 0]} r={0.075} />
@@ -199,6 +204,11 @@ export function LongOne({ state }: CreatureProps) {
           top={0.06}
           bottom={0.028}
         />
+        {/* Nodules down the forearms, so the long hanging arms have
+            something for the torch to break on. */}
+        <Ridges from={[-0.36, 1.7, 0.04]} to={[-0.36, 0.7, 0.05]} count={6} size={0.028} />
+        <Ridges from={[0.35, 1.66, 0.04]} to={[0.35, 0.62, 0.05]} count={6} size={0.028} />
+
         {/* Fingers — four per hand, far too long */}
         {[-1, 1].map((side) =>
           [-0.05, -0.017, 0.017, 0.05].map((off, j) => (
@@ -340,6 +350,9 @@ export function Crawler({ state }: CreatureProps) {
       <mesh position={[0, 0.61, 0.3]} rotation={[0.1, 0, 0]} material={materials.flesh}>
         <boxGeometry args={[0.34, 0.14, 0.26]} />
       </mesh>
+
+      {/* Growths along the spine, between the ribs. */}
+      <Ridges from={[0, 0.56, -0.4]} to={[0, 0.66, 0.48]} count={8} size={0.038} />
 
       {/* Ribs — five arcs a side, the main source of surface detail */}
       {[0, 1, 2, 3, 4].map((i) => {

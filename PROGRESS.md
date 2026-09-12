@@ -89,6 +89,28 @@ static host — same fallback path that already exists for local use.
 
 ## Open — in priority order
 
+0a. **OVERNIGHT PASS (2026-09-12 02:00-04:00), all pushed.** Fixed while
+   Leo slept, each found by reading or testing rather than playing:
+   detection ignored line of sight (dying through walls); the crawler
+   hunted at 4.4 vs the player's 4.0, so chases were unwinnable — now
+   enforced in code via an exported PLAYER_SPEED; all three creatures
+   hunted at once (dogpile) — now only the closest; restart left the
+   killer standing on the spawn (death loop); **calibration had no
+   timeout, so a denied camera meant the game NEVER STARTED** — a judge
+   would just close the tab; no fall-through recovery; audio never
+   resumed after a tab switch; hiding props, fragments and the exit door
+   were ALL floating 0.9 above the floor like the walls. Test suite now
+   129 checks incl. nav, threat fairness, geometry alignment, secrets.
+   Devpost copy drafted in DEVPOST.md.
+
+0b. **CREATURE VISUAL DETAIL — STILL OPEN, raised THREE times.**
+   "still ugly", then "bland, not complex in design, texture,
+   colouring/shading", then "still very bland, no details". Each time I
+   have addressed something adjacent (connectivity, then shading, then
+   gait and shadows) rather than surface detail itself. This is the
+   oldest repeatedly-unaddressed item in the project and should be
+   treated as the one most at risk.
+
 0. **FIRST REAL PLAYTHROUGH HAPPENED (2026-09-12 ~02:00).** Leo played.
    It found five things no test could have:
    - **Every wall floated 0.9 above the floor** — floor top is -0.9, walls

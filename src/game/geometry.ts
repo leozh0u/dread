@@ -29,3 +29,18 @@ export const CEILING_BOTTOM = WALL_H
  * drift from the floor again. */
 export const WALL_SPAN = CEILING_BOTTOM - FLOOR_TOP
 export const WALL_MID_Y = (FLOOR_TOP + CEILING_BOTTOM) / 2
+
+/**
+ * Height of a framed room opening (DoorFrame in House.tsx).
+ *
+ * Lives here so the geometry test can check a player actually fits
+ * through one — a doorway you can't walk through is a room nobody can
+ * enter, and the level tests check routes on a 2D grid that knows nothing
+ * about height.
+ */
+export const DOOR_OPENING_H = 2.5
+
+/** Player capsule: half-height plus radius (Player.tsx CapsuleCollider),
+ * and the camera's offset above the body centre. */
+export const PLAYER_HALF_H = 0.75
+export const EYE_OFFSET = 0.6

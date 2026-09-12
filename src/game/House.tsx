@@ -8,6 +8,7 @@ import { Clutter } from './Clutter'
 import { Signage } from './Signage'
 import { playSfx } from './scareFx'
 import {
+  DOOR_OPENING_H,
   FLOOR_TOP,
   FLOOR_Y,
   FLOOR_THICK,
@@ -38,6 +39,7 @@ const FLOOR_TINT = '#4a3f28'
 const SKIRTING_TINT = '#3b3520'
 const RAIL_TINT = '#544a2c'
 const CONDUIT_TINT = '#3a3a34'
+const FRAME_TINT = '#6b5f38'
 const CEILING_TINT = '#5d5638'
 
 /**
@@ -105,6 +107,84 @@ function ExitDoor({ unlocked }: { unlocked: boolean }) {
  * flashlight at a different angle than the wall does — the whole point is
  * to give the light something to break on as you sweep it along.
  */
+/**
+ * A door frame around a room opening.
+ *
+ * Every room, the alcove and the branch were entered through a bare gap
+ * in a wall — geometrically correct and architecturally meaningless. A
+ * real opening has a frame: two posts and a lintel, proud of the wall,
+ * which is what tells you at a glance that you are looking at a WAY IN
+ * rather than at a hole. They also give the flashlight three more edges
+ * to catch as you approach, so a doorway announces itself before you can
+ * see through it.
+ *
+ * `axis` is the wall's axis: 'x' means a wall at fixed x (posts sit at
+ * the ends of a z-range), 'z' the other way round.
+ */
+function DoorFrame({
+  axis,
+  fixed,
+  from,
+  to,
+}: {
+  axis: 'x' | 'z'
+  fixed: number
+  from: number
+  to: number
+}) {
+  const lo = Math.min(from, to)
+  const hi = Math.max(from, to)
+  const span = hi - lo
+  const H = DOOR_OPENING_H // lintel sits on top
+  const POST = 0.16
+  const yMid = FLOOR_TOP + H / 2
+
+  const post = (at: number): [number, number, number] =>
+    axis === 'x' ? [fixed, yMid, at] : [at, yMid, fixed]
+  const postSize: [number, number, number] =
+    axis === 'x' ? [0.34, H, POST] : [POST, H, 0.34]
+  const lintelPos: [number, number, number] =
+    axis === 'x' ? [fixed, FLOOR_TOP + H + 0.1, (lo + hi) / 2] : [(lo + hi) / 2, FLOOR_TOP + H + 0.1, fixed]
+  const lintelSize: [number, number, number] =
+    axis === 'x' ? [0.34, 0.2, span + POST * 2] : [span + POST * 2, 0.2, 0.34]
+
+  return (
+    <group>
+      <mesh position={post(lo)} receiveShadow>
+        <boxGeometry args={postSize} />
+        <meshStandardMaterial color={FRAME_TINT} roughness={0.85} />
+      </mesh>
+      <mesh position={post(hi)} receiveShadow>
+        <boxGeometry args={postSize} />
+        <meshStandardMaterial color={FRAME_TINT} roughness={0.85} />
+      </mesh>
+      <mesh position={lintelPos} receiveShadow>
+        <boxGeometry args={lintelSize} />
+        <meshStandardMaterial color={FRAME_TINT} roughness={0.85} />
+      </mesh>
+      {/* The wall above the lintel — the opening is 2.5 tall, the room is
+          4.1, and without this you can see over the top of the doorway. */}
+      <mesh
+        position={
+          axis === 'x'
+            ? [fixed, FLOOR_TOP + H + 0.2 + (WALL_SPAN - H - 0.2) / 2, (lo + hi) / 2]
+            : [(lo + hi) / 2, FLOOR_TOP + H + 0.2 + (WALL_SPAN - H - 0.2) / 2, fixed]
+        }
+        receiveShadow
+      >
+        <boxGeometry
+          args={
+            axis === 'x'
+              ? [0.2, WALL_SPAN - H - 0.2, span]
+              : [span, WALL_SPAN - H - 0.2, 0.2]
+          }
+        />
+        <meshStandardMaterial color={WALL_TINT_ALT} roughness={0.92} />
+      </mesh>
+    </group>
+  )
+}
+
 function Wall({ spec, tint = WALL_TINT }: { spec: WallSpec; tint?: string }) {
   const len = Math.abs(spec.to - spec.from)
   if (len <= 0.01) return null // a gap that consumed the whole run — nothing to draw
@@ -270,6 +350,13 @@ export function House() {
         {junctionCaps.map((spec, i) => (
           <Wall key={`j${i}`} spec={spec} tint="#171717" />
         ))}
+
+        {/* Door frames at the five room openings — see DoorFrame. */}
+        <DoorFrame axis="x" fixed={3} from={21} to={25} />
+        <DoorFrame axis="x" fixed={-15} from={-9} to={-5} />
+        <DoorFrame axis="x" fixed={19} from={-37} to={-33} />
+        <DoorFrame axis="z" fixed={-17} from={-8} to={-4} />
+        <DoorFrame axis="x" fixed={-17} from={-38} to={-34} />
 
         {/* Room 1 (clue) — off A-B, far north-east */}
         <WallX z={21} x1={3} x2={8} />

@@ -16,6 +16,9 @@ import {
   WALL_SPAN,
   WALL_MID_Y,
   WALL_H,
+  DOOR_OPENING_H,
+  PLAYER_HALF_H,
+  EYE_OFFSET,
 } from '../src/game/geometry'
 
 let failures = 0
@@ -39,9 +42,20 @@ check('the room is tall enough to walk through', WALL_SPAN > 2.4)
 check('room height accounts for the floor sitting below zero', WALL_SPAN > WALL_H)
 
 console.log('\n--- a player of normal height fits ---')
-const EYE = 0.6 // camera offset above the body centre (Player.tsx)
-const BODY_HALF = 0.75 // capsule half-height + radius
-check('head clears the ceiling', FLOOR_TOP + BODY_HALF + EYE < CEILING_BOTTOM)
+const headY = FLOOR_TOP + PLAYER_HALF_H + EYE_OFFSET
+console.log(`  player head reaches y=${headY.toFixed(2)}`)
+check('head clears the ceiling', headY < CEILING_BOTTOM)
+// The level tests path on a 2D grid that knows nothing about height, so a
+// doorway too low to walk through would seal a room and every one of them
+// would still pass.
+check(
+  'head clears a framed doorway',
+  headY < FLOOR_TOP + DOOR_OPENING_H,
+)
+check(
+  'doorway has real headroom, not a scrape',
+  FLOOR_TOP + DOOR_OPENING_H - headY > 0.25,
+)
 
 console.log(failures ? `\n${failures} FAILURE(S)\n` : '\nRoom geometry is consistent\n')
 process.exit(failures ? 1 : 0)

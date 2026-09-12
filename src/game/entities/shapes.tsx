@@ -21,18 +21,38 @@ import * as THREE from 'three'
  *    take light, so edges, volume and depth are visible.
  */
 
-export const FLESH = '#100e0c'
-export const FLESH_DARK = '#070605'
-export const BONE = '#b9b3a4'
-export const BONE_DIM = '#6f6a5f'
+/**
+ * VALUE RANGE IS WHY THEY LOOKED BLAND.
+ *
+ * These were #100e0c — RGB(16,14,12), which is essentially black. A
+ * near-black surface has almost no range for light to shade across, so
+ * every form on it collapses to one flat value and reads as a silhouette
+ * with no interior. No amount of added geometry can show on a surface
+ * that dark; the detail was invisible rather than missing, which is why
+ * "add more detail" kept not working.
+ *
+ * They're lifted to a dark greyish-brown instead: still grim, still
+ * silhouettes hard against a lit wall, but now with enough range that the
+ * flashlight produces a gradient across a limb and the shapes read as
+ * volumes. Roughness varies per material too — uniform roughness is the
+ * other half of why a surface looks like plastic.
+ */
+export const FLESH = '#3a332b'
+export const FLESH_DARK = '#241f19'
+export const SINEW = '#4a4036'
+export const BONE = '#c8c2b2'
+export const BONE_DIM = '#847d70'
 
 /** Shared materials — one instance each rather than one per mesh, which
  * matters when three creatures have ~80 parts between them. */
 export const materials = {
-  flesh: new THREE.MeshStandardMaterial({ color: FLESH, roughness: 0.92, metalness: 0.04 }),
-  fleshDark: new THREE.MeshStandardMaterial({ color: FLESH_DARK, roughness: 0.98 }),
-  bone: new THREE.MeshStandardMaterial({ color: BONE, roughness: 0.75 }),
-  boneDim: new THREE.MeshStandardMaterial({ color: BONE_DIM, roughness: 0.85 }),
+  flesh: new THREE.MeshStandardMaterial({ color: FLESH, roughness: 0.78, metalness: 0.05 }),
+  fleshDark: new THREE.MeshStandardMaterial({ color: FLESH_DARK, roughness: 0.95 }),
+  // Slightly glossier and lighter — used for exposed tendon and the
+  // ridges along a limb, so those catch the torch when the flesh doesn't.
+  sinew: new THREE.MeshStandardMaterial({ color: SINEW, roughness: 0.45, metalness: 0.1 }),
+  bone: new THREE.MeshStandardMaterial({ color: BONE, roughness: 0.6 }),
+  boneDim: new THREE.MeshStandardMaterial({ color: BONE_DIM, roughness: 0.8 }),
 }
 
 type Vec3 = [number, number, number]
@@ -62,7 +82,7 @@ export function Bone({
   top = 0.05,
   bottom = 0.03,
   material = 'flesh',
-  sides = 6,
+  sides = 9,
 }: {
   from: Vec3
   to: Vec3
@@ -72,10 +92,49 @@ export function Bone({
   sides?: number
 }) {
   const { mid, length, quaternion } = useMemo(() => span(from, to), [from, to])
+
+  /**
+   * A lathed profile rather than a plain cylinder.
+   *
+   * A smooth taper is a tube, and tubes read as scaffolding. Real limbs
+   * swell and narrow — muscle bellies, joint knuckles, the pinch between
+   * them — and that variation along the length is most of what makes a
+   * shape look grown instead of extruded.
+   *
+   * Done with a lathe so it stays ONE mesh and one draw call. Building it
+   * out of several stacked cylinders would look the same and cost three
+   * times as much, with ~80 parts across three creatures.
+   *
+   * The bulge count and phase come from the bone's own dimensions, so
+   * every limb in the game gets a slightly different profile for free and
+   * no two segments are identical.
+   */
+  const geometry = useMemo(() => {
+    const STEPS = 9
+    const bulges = 2 + ((Math.abs(length * 7) | 0) % 2)
+    const phase = (Math.abs(top * 97) % 1) * Math.PI
+    const pts: THREE.Vector2[] = []
+    for (let i = 0; i <= STEPS; i++) {
+      const t = i / STEPS
+      const base = top + (bottom - top) * t
+      // Swell and pinch along the length, plus a slight asymmetry so the
+      // two ends don't mirror each other.
+      const swell = 1 + 0.16 * Math.sin(t * Math.PI * bulges + phase) + 0.05 * Math.sin(t * 7.3)
+      pts.push(new THREE.Vector2(Math.max(0.004, base * swell), length * (t - 0.5)))
+    }
+    const g = new THREE.LatheGeometry(pts, sides)
+    g.computeVertexNormals()
+    return g
+  }, [top, bottom, length, sides])
+
   return (
-    <mesh position={mid} quaternion={quaternion} material={materials[material]} castShadow>
-      <cylinderGeometry args={[top, bottom, length, sides]} />
-    </mesh>
+    <mesh
+      position={mid}
+      quaternion={quaternion}
+      material={materials[material]}
+      geometry={geometry}
+      castShadow
+    />
   )
 }
 
@@ -221,6 +280,73 @@ export function Grin({
         <mesh key={i} position={[tooth.x, tooth.y, 0]} rotation={[0, 0, tooth.rot]}>
           <boxGeometry args={[tooth.w, tooth.h, 0.025]} />
           <meshBasicMaterial color={color} toneMapped={false} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/**
+ * Small hard growths scattered along a line between two points.
+ *
+ * Large smooth areas are what make a creature read as a mannequin: real
+ * bodies have scale-level features that break a surface up, and without
+ * them a limb is just a shape. These are deliberately irregular in size
+ * and angle and deterministic from their own index, so a spine or a
+ * forearm gets a run of them that never repeats and never needs
+ * hand-placing.
+ *
+ * Uses the glossier `sinew` material by default, so they catch the
+ * flashlight a beat before the flesh around them does — the highlight is
+ * what actually communicates that a surface has texture.
+ */
+export function Ridges({
+  from,
+  to,
+  count = 6,
+  size = 0.035,
+  material = 'sinew',
+  spread = 0.5,
+}: {
+  from: Vec3
+  to: Vec3
+  count?: number
+  size?: number
+  material?: keyof typeof materials
+  spread?: number
+}) {
+  const items = useMemo(() => {
+    const a = new THREE.Vector3(...from)
+    const b = new THREE.Vector3(...to)
+    const out: { p: Vec3; s: Vec3; r: Vec3 }[] = []
+    for (let i = 0; i < count; i++) {
+      // Deterministic pseudo-noise: no Math.random, so a creature looks
+      // the same every frame and every run.
+      const n = (k: number) => ((Math.sin((i + 1) * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1
+      const t = (i + 0.5) / count
+      const p = a.clone().lerp(b, t)
+      const jitter = size * spread
+      out.push({
+        p: [p.x + (n(1) - 0.5) * jitter, p.y + (n(2) - 0.5) * jitter, p.z + (n(3) - 0.5) * jitter],
+        s: [size * (0.55 + n(4)), size * (0.7 + n(5) * 1.4), size * (0.55 + n(6))],
+        r: [n(7) * Math.PI, n(8) * Math.PI, n(9) * Math.PI],
+      })
+    }
+    return out
+  }, [from, to, count, size, spread])
+
+  return (
+    <group>
+      {items.map((it, i) => (
+        <mesh
+          key={i}
+          position={it.p}
+          scale={it.s}
+          rotation={it.r}
+          material={materials[material]}
+          castShadow
+        >
+          <octahedronGeometry args={[1, 0]} />
         </mesh>
       ))}
     </group>
