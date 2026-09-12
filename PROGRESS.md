@@ -89,7 +89,30 @@ static host — same fallback path that already exists for local use.
 
 ## Open — in priority order
 
-1. **NOBODY HAS EVER PLAYED A RUN END TO END.** Still true, and still
+0. **FIRST REAL PLAYTHROUGH HAPPENED (2026-09-12 ~02:00).** Leo played.
+   It found five things no test could have:
+   - **Every wall floated 0.9 above the floor** — floor top is -0.9, walls
+     spanned 0..3.2. Two implicit numbers that had to agree and didn't.
+     FIXED; walls now derive from the floor/ceiling slabs.
+   - **Monsters could never reach him** — they were locked to the patrol
+     polyline and, even hunting, only moved to where he *projected* onto
+     it. Standing in any room made him unreachable, so nothing ever
+     detected or killed him. FIXED with real navigation (`nav.ts`, BFS
+     distance field from the player, shared by all three).
+   - **They glided** — the tall one had no leg animation at all and the
+     crawler's was driven by a boolean. FIXED; gait is driven by real
+     metres/second.
+   - **Walk-through furniture.** FIXED; each prop is solid in the shape it
+     should be, with the closet open-fronted so it stays hideable.
+   - **"Not heading towards sound"** — FIXED; creatures now hunt on sight
+     (wall-blocked), on sound (through walls, longer range), or on a
+     Director STRIKE, with 6s of memory after losing you.
+   Also from his follow-ups: **geometric audio occlusion** (was
+   distance-only — a creature behind a wall sounded identical to one in
+   your corridor), and a **live vitals panel** so the biometric stack is
+   no longer invisible when it fails.
+
+1. **STILL NOBODY HAS FINISHED A RUN END TO END.** Still true, and still
    the top risk — but the level itself is now *proved* completable
    rather than assumed. `npm run test:level` builds the real collision
    geometry and flood-fills from spawn at the player's capsule radius.
@@ -123,8 +146,12 @@ static host — same fallback path that already exists for local use.
    moves most right after a scare.
 3. **Shoot the video Saturday evening**, not Sunday morning. Shot list is
    in VIDEO.md. Use **J** so it doesn't open on 60s of calibration.
-4. **MATLAB** — script is written (matlab/autonomic_model.m), Leo runs it
-   once; the game already works without it via a documented fallback.
+4. **MATLAB — OPEN, 30 seconds of Leo's time, still unclaimed.**
+   `matlab/autonomic_model.m` exists but has NEVER been run, so
+   `src/game/arousalTable.json` does not exist and the game is silently
+   using the HR-only fallback. Open MATLAB in the `matlab/` folder and
+   run `autonomic_model`. Until that file exists the MathWorks claim is a
+   script nobody executed.
 5. **Sponsors — see SPONSORS.md for exact steps.** Persona and Backboard
    are both CODED and pushed; each is waiting on values only Leo can get
    from a dashboard.
@@ -153,9 +180,13 @@ static host — same fallback path that already exists for local use.
      silently overrode the ssl config — fixed by passing components
      explicitly. The end screen now shows past runs: "It got 8 bpm
      further into you than last time."
-   - **Persona**: Leo is setting up the dashboard values now
-     (2026-09-12 ~06:35). CI already reads the two publishable ids from
-     repo variables; he sets them with `gh variable set`.
+   - **Persona**: BLOCKED, needs Leo. Only `PERSONA_API_KEY` is in
+     `.env.local`; `VITE_PERSONA_TEMPLATE_ID` and
+     `VITE_PERSONA_ENVIRONMENT_ID` are still missing, so the gate does
+     not appear at all (livenessConfigured() is false). The key also gets
+     "Must be authenticated to access this endpoint" from Persona's API —
+     likely the wrong key type or wrong environment. Deprioritised by Leo
+     in favour of the biometrics; see SPONSORS.md.
    - **All four integrations fail soft.** No sidecar, no keys, no
      network: the game plays exactly as it does now. That is deliberate,
      because judges will run the hosted build with none of it.
