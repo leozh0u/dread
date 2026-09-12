@@ -41,11 +41,18 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
       return (
         <group position={[cx, FLOOR_TOP, cz]}>
           {/* Hollow: back, sides and roof only — the front stays open. */}
+          {/* Collider positions are LOCAL to the enclosing group, exactly
+              like the meshes below. They were written in world coordinates
+              while sitting inside a group already positioned at the prop,
+              so every offset was applied twice and the colliders ended up
+              roughly twice as far from the origin as the furniture they
+              were meant to be part of — the props looked solid and you
+              walked straight through them. */}
           <RigidBody type="fixed" colliders={false}>
-            <CuboidCollider args={[hx, hy, 0.08]} position={[cx, FLOOR_TOP + hy, cz - hz]} />
-            <CuboidCollider args={[0.08, hy, hz]} position={[cx - hx, FLOOR_TOP + hy, cz]} />
-            <CuboidCollider args={[0.08, hy, hz]} position={[cx + hx, FLOOR_TOP + hy, cz]} />
-            <CuboidCollider args={[hx, 0.08, hz]} position={[cx, FLOOR_TOP + hy * 2, cz]} />
+            <CuboidCollider args={[hx, hy, 0.08]} position={[0, hy, -hz]} />
+            <CuboidCollider args={[0.08, hy, hz]} position={[-hx, hy, 0]} />
+            <CuboidCollider args={[0.08, hy, hz]} position={[hx, hy, 0]} />
+            <CuboidCollider args={[hx, 0.08, hz]} position={[0, hy * 2, 0]} />
           </RigidBody>
           {/* Carcass, drawn as panels so the inside isn't a filled block */}
           <mesh position={[0, hy, -hz]}>
@@ -106,7 +113,7 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
           <RigidBody type="fixed" colliders={false}>
             <CuboidCollider
               args={[hx * 0.85, hy * 0.6, hz * 0.85]}
-              position={[cx, FLOOR_TOP + hy * 0.6, cz]}
+              position={[0, hy * 0.6, 0]}
             />
           </RigidBody>
           <mesh position={[0, hy * 0.6, 0]} rotation={[0, 0.15, 0]}>
@@ -129,7 +136,7 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
         <group position={[cx, FLOOR_TOP, cz]}>
           {/* Top only — the space underneath is the hiding spot. */}
           <RigidBody type="fixed" colliders={false}>
-            <CuboidCollider args={[hx, 0.06, hz]} position={[cx, FLOOR_TOP + cy + hy, cz]} />
+            <CuboidCollider args={[hx, 0.06, hz]} position={[0, cy + hy, 0]} />
           </RigidBody>
           <mesh position={[0, cy + hy, 0]}>
             <boxGeometry args={[hx * 2, 0.08, hz * 2]} />
