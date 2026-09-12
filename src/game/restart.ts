@@ -21,8 +21,10 @@ export function restartRun() {
 
   const hasBaseline = usePulseStore.getState().baseline != null
   if (hasBaseline) {
+    useDirector.getState().setPhase('STALK')
     useSession.getState().start() // skip straight to 'playing'
   } else {
+    useDirector.getState().setPhase('CALIBRATING')
     useSession.getState().setStatus('calibrating')
   }
 }

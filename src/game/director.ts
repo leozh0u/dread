@@ -90,7 +90,10 @@ export const useDirector = create<DirectorState>((set, get) => ({
 
   // Deliberately does NOT touch `stats` — the bandit keeps what it learned
   // about this player across a restart. Only the in-run state resets.
-  resetForNewRun: () => set({ phase: 'STALK', monsterDistance: 1, lastScare: null }),
+  // Phase is NOT hardcoded here — restart.ts decides STALK vs CALIBRATING
+  // based on whether a baseline exists, so exactly one place makes that
+  // call instead of two that could disagree.
+  resetForNewRun: () => set({ monsterDistance: 1, lastScare: null }),
 }))
 
 /**
