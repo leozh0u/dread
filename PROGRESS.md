@@ -125,15 +125,20 @@ static host — same fallback path that already exists for local use.
    in VIDEO.md. Use **J** so it doesn't open on 60s of calibration.
 4. **MATLAB** — script is written (matlab/autonomic_model.m), Leo runs it
    once; the game already works without it via a documented fallback.
-5. **Sponsors — Leo now HAS the Persona and Backboard keys** (said so
-   2026-09-12 ~01:15). Both still need to go into `.env.local` and get
-   wired up; neither is written yet. Reminder: DREAD is a static site, so
-   anything in the client bundle is public — neither key may ship to the
-   browser. Backboard ("the house remembers you") and Persona ("prove
-   you're alive to enter") both need a decision on where the call runs.
-   Leo also has a **free Tiger Data account** (2026-09-12 ~01:20) — same
-   constraint, and it's the weakest of the three for a static site since
-   DB credentials definitely can't ship to the browser.
+5. **Sponsors — see SPONSORS.md for exact steps.** Persona and Backboard
+   are both CODED and pushed; each is waiting on values only Leo can get
+   from a dashboard.
+   - **Persona** (highest value — no prior art at any hackathon): needs a
+     sandbox `itmpl_…`, `env_…`, and API key. Template/environment ids
+     are publishable by design and ship in the bundle; the API key is
+     sidecar-only. Start screen shows "PROVE YOU ARE ALIVE" once
+     configured, always with a visible skip, and stays as plain BEGIN
+     until then — so not doing it cannot break anything.
+   - **Backboard**: proxied through the sidecar because Backboard has no
+     publishable key at all. Endpoints live; the game does not call them
+     yet. That last piece is what makes "the house remembers you" real.
+   - **Tiger Data**: same constraint, least payoff. Recommend last or not
+     at all.
 6. **Creature design still not signed off.** Rebuilt with connected
    skeletons and shaded materials after Leo's screenshots showed floating
    parts and flat cardboard shapes. Press **M** to inspect.
