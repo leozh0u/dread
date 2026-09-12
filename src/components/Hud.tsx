@@ -75,7 +75,7 @@ export function Hud() {
           top: 20,
           left: 22,
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          color: '#d8cba8',
+          color: '#c33',
           pointerEvents: 'none',
           userSelect: 'none',
           zIndex: 12,
@@ -89,8 +89,8 @@ export function Hud() {
               fontSize: 34,
               fontWeight: 300,
               letterSpacing: 1,
-              color: elevated ? '#e86b5a' : '#d8cba8',
-              textShadow: elevated ? '0 0 18px rgba(220,70,50,0.5)' : '0 0 14px rgba(0,0,0,0.8)',
+              color: elevated ? '#ff4444' : '#c33',
+              textShadow: elevated ? '0 0 18px rgba(255,60,60,0.65)' : '0 0 8px rgba(200,0,0,0.55)',
               transition: 'color 500ms linear',
               fontVariantNumeric: 'tabular-nums',
             }}
@@ -114,9 +114,9 @@ export function Hud() {
                 width: 9,
                 height: 9,
                 transform: 'rotate(45deg)',
-                border: '1px solid rgba(216,203,168,0.5)',
-                background: i < cluesCollected ? '#e8c46a' : 'transparent',
-                boxShadow: i < cluesCollected ? '0 0 10px rgba(232,196,106,0.7)' : 'none',
+                border: '1px solid rgba(204,51,51,0.6)',
+                background: i < cluesCollected ? '#e33' : 'transparent',
+                boxShadow: i < cluesCollected ? '0 0 10px rgba(238,51,51,0.8)' : 'none',
               }}
             />
           ))}
@@ -125,7 +125,7 @@ export function Hud() {
         {/* State line — only what's actually true right now */}
         <div style={{ fontSize: 11, letterSpacing: 2, marginTop: 12, opacity: 0.75 }}>
           {isHidden ? 'HIDDEN' : 'IN THE OPEN'}
-          {noise > 0.15 && <span style={{ color: '#e86b5a' }}> · LOUD</span>}
+          {noise > 0.15 && <span style={{ color: '#ff4444' }}> · LOUD</span>}
         </div>
       </div>
 
@@ -140,7 +140,7 @@ export function Hud() {
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
           fontSize: 12,
           letterSpacing: 1.5,
-          color: '#d8cba8',
+          color: '#c33',
           opacity: 0.35,
           pointerEvents: 'none',
           userSelect: 'none',

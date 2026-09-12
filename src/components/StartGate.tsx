@@ -13,8 +13,8 @@ export function StartGate({ onStart }: { onStart: () => void }) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'radial-gradient(ellipse at center, #15120a 0%, #000 75%)',
-        color: '#d8cba8',
+        background: 'radial-gradient(ellipse at center, #140505 0%, #000 75%)',
+        color: '#c33',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -31,8 +31,8 @@ export function StartGate({ onStart }: { onStart: () => void }) {
           fontWeight: 300,
           margin: 0,
           paddingLeft: 14, // optical centring against the tracking
-          color: '#e8dfc0',
-          textShadow: '0 0 40px rgba(232,196,106,0.25)',
+          color: '#d94444',
+          textShadow: '0 0 40px rgba(220,40,40,0.35)',
         }}
       >
         DREAD
@@ -64,8 +64,8 @@ export function StartGate({ onStart }: { onStart: () => void }) {
         style={{
           marginTop: 10,
           background: 'transparent',
-          border: '1px solid rgba(216,203,168,0.45)',
-          color: '#d8cba8',
+          border: '1px solid #c33',
+          color: '#c33',
           padding: '12px 40px',
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
           fontSize: 13,
