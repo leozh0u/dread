@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:level": "tsx scripts/reachability.ts"
+    "test:level": "tsx scripts/reachability.ts",
+    "test:run": "tsx scripts/fullrun.ts",
+    "test": "npm run test:level && npm run test:run"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
