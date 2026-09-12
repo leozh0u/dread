@@ -747,3 +747,49 @@ message while I was mid-edit on something else, and only the parts that
 matched what I was already doing — texture and eyes — actually got built.
 Colour, smoothness and phasing verification were never touched. Working
 them now, oldest first.
+
+---
+
+## Monster animation states (Leo: "monsters are really important")
+
+Asked for: animations for when it tracks you, runs at you, and tries to
+kill you.
+
+There was no animation state at all — just `hunting`, `attacking` and
+`closeness`. A boolean about pursuit and a distance don't tell a body how
+to hold itself, so all three creatures played one walk cycle with a couple
+of parameters nudged, and noticing you, closing on you and trying to kill
+you all looked like walking. The moments that matter most in a horror game
+were the ones with no animation of their own.
+
+`EntityState` now carries a verb — `patrol / alert / stalk / charge /
+strike` — plus a one-shot clock, a coil amount and a strike amount.
+Derived in Entity.tsx, where alertness and the lunge cycle already live,
+so the creature receives a verb rather than a pile of flags.
+
+Whole-body pose is applied in Entity.tsx so all three share it, and it is
+what carries at distance: long before you can make out a skull you can
+read whether the shape at the end of the corridor is ambling, has stopped
+and risen, or is coming at you leaning forward. It rides on top of each
+creature's own walk cycle rather than replacing it.
+
+Per creature:
+- **Crawler** — alert rears the front pair and widens the stance, the head
+  sway stops dead and snaps level, the jaw gapes; coil gathers the legs
+  under it; strike lifts the front legs and thrusts the skull forward
+- **Smile** — its arms were untouched since the project started. Idle
+  twitching is now suppressed as it commits (a thing that keeps fidgeting
+  while it comes for you doesn't look like it means it), alternate arms
+  throw opposite ways so the span nearly doubles on alert, gather tight on
+  coil, and are thrown wide on the strike
+- **Tall one** — has no face to change, so its beat is *stopping*: the
+  sway ends and the head locks square on. Its head is also the only part
+  visible at range, so it flares on acquisition — the far-away version of
+  a head snapping round
+
+### Verified / not verified
+
+Rendering and the pose blending are confirmed by screenshot, and
+`patrol` / `stalk` were observed cycling live. `alert`, `charge` and
+`strike` were NOT observed in that sample — the creatures never got line
+of sight at close range during it. Verifying those next.
