@@ -146,7 +146,15 @@ let lastPrintedValidation = null
  */
 let lastValidationMsg = null
 let framesIn = 0
+/** The clock the SDK sees — ours, always continuous. */
 let lastFrameUs = 0
+/** The last timestamp the browser sent, for computing deltas. */
+let lastSenderUs = 0
+/** Anything longer than this is treated as a pause rather than a real
+ * inter-frame interval. Comfortably under the SDK's own 2s limit. */
+const MAX_FRAME_GAP_US = 500_000
+/** 24fps, the rate the browser pump targets. */
+const NOMINAL_FRAME_US = 41_666
 
 // Only ONE connection may supply frames. A reload leaves the old socket
 // briefly alive, React's StrictMode mounts twice in dev, and a second game
@@ -427,9 +435,11 @@ wss.on('connection', (ws) => {
       const incumbentGone = !frameSource || frameSource.readyState !== 1
       if (!incumbentGone && now - lastFrameAt < SOURCE_TAKEOVER_MS) return
       frameSource = ws
-      // A new stream means a new clock; let the next frame set the
-      // baseline rather than being forced past a stale, larger timestamp.
-      lastFrameUs = 0
+      // A new stream means a new sender clock. Our own clock keeps
+      // running — it must never go backwards — so only the sender
+      // baseline is reset, and the next frame contributes one nominal
+      // interval rather than the difference between two unrelated clocks.
+      lastSenderUs = 0
       console.log('[sidecar] frame source claimed by this connection')
     }
     lastFrameAt = now
@@ -443,16 +453,42 @@ wss.on('connection', (ws) => {
       if (!width || !height) return
       if (pixels.length < width * height * 4) return
 
-      // The SDK rejects non-monotonic timestamps outright
-      // (kNonMonotonicTimestamp). Two frames can land in the same
-      // microsecond, and a tab that is throttled and then resumed can
-      // deliver slightly out-of-order times, so enforce the invariant here
-      // rather than trusting the sender.
+      /**
+       * TIMESTAMPS ARE REBASED, NOT FORWARDED.
+       *
+       * The SDK rejects non-monotonic timestamps outright, and it ALSO
+       * rejects a forward jump: "SmartSpectra detected a gap between
+       * camera frame timestamps", thrown once a gap exceeds two seconds.
+       *
+       * Both happen constantly in a browser. A backgrounded tab stops
+       * firing requestVideoFrameCallback entirely, a reload starts a new
+       * clock, and a reconnect resumes one wherever the old one left off.
+       * The observed failure was a 365-second gap after the game sat in a
+       * background tab — every subsequent frame was refused, so Presage
+       * looked permanently broken for the rest of the session even though
+       * frames were arriving normally again.
+       *
+       * Forwarding the sender's clock cannot survive that. So the sidecar
+       * keeps its OWN clock and advances it by the frame-to-frame delta,
+       * clamped to something a camera could plausibly produce. A pause of
+       * any length becomes a single ordinary frame interval, the stream
+       * the SDK sees is continuous, and the pulse estimate simply has a
+       * hole in it rather than the session dying.
+       *
+       * Clamping the delta is safe for rPPG here because the estimate is
+       * a frequency over a window: a mis-stated interval across a gap
+       * slightly distorts one window and then washes out, whereas a
+       * refused frame stream produces nothing at all, forever.
+       */
       tsUs = Math.round(tsUs)
-      if (tsUs <= lastFrameUs) tsUs = lastFrameUs + 1
-      lastFrameUs = tsUs
+      let delta = tsUs - lastSenderUs
+      if (!Number.isFinite(delta) || delta <= 0 || delta > MAX_FRAME_GAP_US) {
+        delta = NOMINAL_FRAME_US
+      }
+      lastSenderUs = tsUs
+      lastFrameUs += delta
 
-      sdk.sendFrame(pixels, width, height, width * 4, PixelFormat.kRGBA, tsUs)
+      sdk.sendFrame(pixels, width, height, width * 4, PixelFormat.kRGBA, lastFrameUs)
       framesIn++
     } catch (err) {
       // One bad frame must not kill the session mid-demo.

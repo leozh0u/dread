@@ -17,7 +17,7 @@ import {
 } from '../scareFx'
 import type { SfxName } from '../sfxBank'
 import { Creature, type EntityKind, type EntityState } from './creatures'
-import { reportEntity, claimHunt, entityEpoch, inspect } from './registry'
+import { reportEntity, claimHunt, entityEpoch, inspect, reportAnim } from './registry'
 import { PLAYER_SPEED } from '../Player'
 
 /** Per-kind movement and sound character. The three should never be
@@ -670,6 +670,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
             : 'patrol'
 
     if (anim !== state.current.anim) animStartedAt.current = t
+    reportAnim(index, anim)
 
     // Hand the creature its live state for this frame
     state.current.closeness = 1 - normalized

@@ -97,7 +97,8 @@ export function LongOne({ state }: CreatureProps) {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const { closeness, hunting, speed } = state.current
+    const { closeness, hunting, speed, anim, animT, coil, strike } = state.current
+    const alert = anim === 'alert' ? Math.sin(Math.min(1, animT / 0.85) * Math.PI) : 0
 
     // A real walk cycle (gait.ts): stance and swing rather than a sine, so
     // a foot plants and the body passes over it. Long legs, long stride.
@@ -135,19 +136,35 @@ export function LongOne({ state }: CreatureProps) {
     if (arms.current) {
       // Dead weight rather than a walker's arm swing — it hangs and is
       // carried, lagging a quarter-cycle behind the shoulders that move it.
-      arms.current.rotation.x = Math.sin(t * 0.8) * 0.07 + legSwing(g, 0.5, 0.18 * amp)
-      arms.current.rotation.z = Math.sin(t * 0.55) * 0.04
+      // Arms hang and swing while it walks; they come up as it closes.
+      arms.current.rotation.x =
+        Math.sin(t * 0.8) * 0.07 * (1 - alert) +
+        legSwing(g, 0.5, 0.18 * amp) * (1 - strike * 0.6) -
+        alert * 0.3 -
+        strike * 0.9
+      arms.current.rotation.z = Math.sin(t * 0.55) * 0.04 + coil * 0.15
     }
     if (head.current) {
-      head.current.rotation.y = Math.sin(t * 0.3) * 0.1 - shoulderTwist(g, 0.2 * amp)
+      // ALERT: the sway stops dead and the head locks square on to you.
+      // On this one that is the entire beat — it has no face to change,
+      // so the only thing it can do is stop, and stopping is enough.
+      head.current.rotation.y =
+        (Math.sin(t * 0.3) * 0.1 - shoulderTwist(g, 0.2 * amp)) * (1 - alert)
       // Cancels the body's bob: the head stays dead level while everything
       // below it rises and falls, which is the specific wrongness this
-      // creature is built around.
-      head.current.position.y = -bodyBob(g, 0.1 * amp) * 0.85
+      // creature is built around. It tips forward only to strike, and
+      // that break in the levelness is the tell that it has committed.
+      head.current.position.y = -bodyBob(g, 0.1 * amp) * 0.85 + alert * 0.08
+      head.current.rotation.x = strike * 0.45 - alert * 0.12
     }
     if (headMat.current) {
       const lit = (hunting ? 1 : 0.75) * (0.75 + closeness * 0.25)
-      headMat.current.emissiveIntensity = 0.25 + lit * 0.55
+      // A hard flare on acquisition. This creature's head is the only
+      // part of it visible at range, so brightening it is the one signal
+      // it can send down a long corridor — the far-away version of the
+      // head snapping round. Kept brief and kept on top of an otherwise
+      // dim emissive, so it reads as a change rather than as a lamp.
+      headMat.current.emissiveIntensity = 0.25 + lit * 0.55 + alert * 1.6 + strike * 0.8
     }
   })
 
@@ -325,7 +342,9 @@ export function Crawler({ state }: CreatureProps) {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const { closeness, hunting, attacking, speed } = state.current
+    const { closeness, hunting, attacking, speed, anim, animT, coil, strike } = state.current
+    // 0..1 through the one-shot "it has seen you" beat.
+    const alert = anim === 'alert' ? Math.sin(Math.min(1, animT / 0.85) * Math.PI) : 0
 
     // A quadruped trot: DIAGONAL pairs move together — front-left with
     // rear-right, front-right with rear-left. Four limbs each waving on
@@ -344,6 +363,18 @@ export function Crawler({ state }: CreatureProps) {
         c.rotation.x = legSwing(g, off, amp)
         // Legs splay outward as they lift, so the fold reads from the side.
         c.rotation.z = (i % 2 === 0 ? -1 : 1) * kneeBend(g, off) * 0.22
+        // ALERT: the front pair lifts and the whole stance widens — the
+        // spider startle, everything braced at once. Applied on top of
+        // the walk so it reads as an interruption of it.
+        const front = i < 2
+        if (alert > 0) {
+          c.rotation.x += (front ? -0.55 : 0.2) * alert
+          c.rotation.z += (i % 2 === 0 ? -1 : 1) * 0.35 * alert
+        }
+        // COIL: legs gather underneath, loading.
+        if (coil > 0) c.rotation.x += (front ? 0.4 : -0.35) * coil
+        // STRIKE: front legs come off the ground, reaching.
+        if (front && strike > 0) c.rotation.x -= 0.7 * strike
       })
     }
     if (body.current) {
@@ -354,16 +385,28 @@ export function Crawler({ state }: CreatureProps) {
       body.current.rotation.y = hipTwist(g, 0.09 * Math.min(1, speed / 3))
     }
     if (skull.current) {
-      skull.current.rotation.z = Math.sin(t * 2.1) * 0.1
-      // Head drops and levels when it's hunting — a stalking posture,
-      // rather than the idle sway it has the rest of the time.
+      // Idle sway, suppressed while hunting — a stalking head is a still
+      // head. ALERT freezes it outright and snaps it level and forward:
+      // the sway stopping is most of what makes the moment read.
       const hunt = hunting ? 1 : 0
+      const sway = Math.sin(t * 2.1) * 0.1 * (1 - alert)
+      skull.current.rotation.z = sway
       skull.current.rotation.x =
-        -0.18 + Math.sin(t * 1.5) * 0.08 * (1 - hunt * 0.7) + hunt * 0.3
+        -0.18 +
+        Math.sin(t * 1.5) * 0.08 * (1 - hunt * 0.7) * (1 - alert) +
+        hunt * 0.3 +
+        // Snaps up and level the instant it sees you, then thrusts down
+        // and forward through a strike.
+        alert * -0.42 +
+        strike * 0.5
+      // And cranes forward on its neck — the head leads, the body follows.
+      skull.current.position.z = 0.72 + alert * 0.1 + strike * 0.14 - coil * 0.08
     }
     if (jaw.current) {
-      const open = 1 + 0.15 + closeness * 0.45 + (attacking ? 0.8 : 0)
-      jaw.current.scale.y = THREE.MathUtils.lerp(jaw.current.scale.y, open, 0.15)
+      // Gapes on alert as well as on contact. A mouth that only opens
+      // when it is already killing you is a mouth nobody sees open.
+      const open = 1 + 0.15 + closeness * 0.45 + alert * 0.5 + strike * 0.7 + (attacking ? 0.8 : 0)
+      jaw.current.scale.y = THREE.MathUtils.damp(jaw.current.scale.y, open, 10, 0.016)
     }
   })
 
@@ -579,7 +622,8 @@ export function Smile({ state }: CreatureProps) {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const { attacking, closeness, speed } = state.current
+    const { attacking, closeness, speed, anim, animT, coil, strike } = state.current
+    const alert = anim === 'alert' ? Math.sin(Math.min(1, animT / 0.85) * Math.PI) : 0
 
     // This one has no legs — it's a mass that hauls itself along — so a
     // step cycle would be wrong for it. Instead it LURCHES: a hard heave
@@ -607,8 +651,32 @@ export function Smile({ state }: CreatureProps) {
         // it hangs still then snaps rather than swinging evenly
         const s = Math.sin(t * (1.9 + i * 0.55) + i * 3)
         const s2 = Math.sin(t * (0.6 + i * 0.17))
-        c.rotation.z = s * s2 * 0.3
-        c.rotation.y = Math.cos(t * (1.1 + i * 0.26) + i) * 0.2
+        // Idle twitching is suppressed as it commits: a thing that keeps
+        // fidgeting while it comes for you does not look like it means
+        // it. The arms go still, then move with purpose.
+        const idle = 1 - Math.max(alert, coil, strike) * 0.85
+        // Alternate arms throw opposite ways, so the whole span opens out
+        // rather than everything sweeping together.
+        const side = i % 2 === 0 ? -1 : 1
+
+        c.rotation.z =
+          s * s2 * 0.3 * idle +
+          // ALERT: every arm snaps outward at once — the span nearly
+          // doubles for a moment, which is this creature's whole threat
+          // display and the reason it is shaped the way it is.
+          side * 0.85 * alert +
+          // COIL: gathers them in, tight against the mass.
+          -side * 0.45 * coil +
+          // STRIKE: thrown wide again, reaching around you.
+          side * 1.0 * strike
+        c.rotation.y =
+          Math.cos(t * (1.1 + i * 0.26) + i) * 0.2 * idle +
+          // Braced forward while coiled, then driven forward on the
+          // strike — the arms lead it in.
+          coil * 0.3 * side -
+          strike * 0.55 * side
+        // And the whole arm rises as it rears.
+        c.rotation.x = alert * -0.4 + strike * -0.25
       })
     }
     // Strands hang and sway at rest, but trail backwards as it moves —
@@ -621,9 +689,11 @@ export function Smile({ state }: CreatureProps) {
       })
     }
     if (face.current) {
-      face.current.position.y = 2.35 + Math.sin(t * 0.85) * 0.045
-      const target = attacking ? 1.3 : 1 + closeness * 0.08
-      face.current.scale.setScalar(THREE.MathUtils.lerp(face.current.scale.x, target, 0.14))
+      // The face stops drifting the moment it notices you, and cranes
+      // upward. Stillness is the tell.
+      face.current.position.y = 2.35 + Math.sin(t * 0.85) * 0.045 * (1 - alert) + alert * 0.12
+      const target = attacking ? 1.3 : 1 + closeness * 0.08 + alert * 0.14 + strike * 0.2
+      face.current.scale.setScalar(THREE.MathUtils.damp(face.current.scale.x, target, 9, 0.016))
     }
   })
 

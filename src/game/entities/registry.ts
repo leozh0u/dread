@@ -30,12 +30,18 @@ export function nearestDistance() {
 
 /** Dev only: what each creature is currently reporting. Used by the
  * automated playthrough to explain a death rather than just record one. */
+const anims: string[] = ['patrol', 'patrol', 'patrol']
+export function reportAnim(index: number, anim: string) {
+  anims[index] = anim
+}
+
 export function entityReports() {
   return distances.map((d, i) => ({
     index: i,
     normalized: d,
     x: positions[i].x,
     z: positions[i].z,
+    anim: anims[i],
   }))
 }
 
