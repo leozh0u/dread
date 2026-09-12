@@ -72,9 +72,17 @@ Once configured, the start screen offers **PROVE YOU ARE ALIVE**, with a
 small always-visible "skip — just let me in". The skip is deliberate: a
 judge who can't get past a verification screen can't play the game at all.
 
-For the hosted build, the two `VITE_` ids also need to be set in the
-GitHub Actions workflow (they're public, so they can be plain `vars`, not
-secrets). Tell me when you have them and I'll wire that up.
+For the hosted build, the workflow already reads the two publishable ids
+from repository **variables** — you just need to set them once:
+
+```bash
+cd /Users/leo/Projects/dread && gh variable set VITE_PERSONA_TEMPLATE_ID && gh variable set VITE_PERSONA_ENVIRONMENT_ID
+```
+
+It prompts for each value, so nothing lands in your shell history.
+
+**Do not put `PERSONA_API_KEY` there**, or any other key. Vite inlines
+every `VITE_` value into the bundle and this is a public static site.
 
 ---
 
