@@ -205,38 +205,39 @@ sdk.on('processingStatus', (s) => {
  * to be fixed by restarting it a hundred more times.
  */
 let recovering = false
-let recoveries = 0
-const MAX_RECOVERIES = 5
 
 async function recoverSdk(why) {
   if (recovering) return
-  if (recoveries >= MAX_RECOVERIES) return
   recovering = true
-  recoveries++
-  console.warn(`[sidecar] restarting the SmartSpectra graph (${why}) — attempt ${recoveries}`)
+  console.warn(`[sidecar] SmartSpectra graph failed: ${why}`)
+  /**
+   * EXIT, RATHER THAN TRY TO REPAIR IT IN PLACE.
+   *
+   * The first version of this called stopAsync/reset/start to rebuild the
+   * graph. It wedged the whole sidecar: the SDK is a native library
+   * reached through synchronous FFI, so a call that does not return
+   * blocks Node's event loop, and once kError has the graph the teardown
+   * is exactly the call that does not return. The HTTP server stopped
+   * answering, the websocket stopped reading, and the process sat alive
+   * and useless — strictly worse than the fault it was trying to fix,
+   * because at least the fault left the rest of the sidecar running.
+   *
+   * You cannot reliably repair a wedged native library from inside the
+   * process it has wedged. A clean exit and a fresh process can, and is
+   * how this kind of thing is normally handled. The launcher restarts it
+   * (see sidecar/run.sh), and the browser reconnects on its own — the
+   * game already retries the socket every four seconds.
+   */
+  console.error('[sidecar] the SmartSpectra graph is unrecoverable in-process — exiting so the')
+  console.error('[sidecar] launcher can start a clean one. If you started this with plain')
+  console.error('[sidecar] `node sidecar/server.js`, use `sh sidecar/run.sh` instead and it')
+  console.error('[sidecar] will come back by itself.')
   try {
-    try {
-      await sdk.stopAsync?.()
-    } catch {
-      sdk.stop?.()
-    }
-    sdk.reset?.()
-    // A fresh graph means a fresh clock; nothing may carry over from the
-    // stream that died, or the first frame lands as a multi-minute jump.
-    lastFrameUs = 0
-    lastSenderUs = 0
-    sdk.useCustomInput(FrameTransform.kNone)
-    sdk.start()
-    console.log('[sidecar] graph restarted — send frames again')
-  } catch (err) {
-    console.error('[sidecar] graph restart failed:', err?.message ?? err)
-  } finally {
-    // Long enough that a persistent fault does not spin, short enough
-    // that a transient one costs a second of a demo rather than the run.
-    setTimeout(() => {
-      recovering = false
-    }, 1500)
+    await closeTimeseries()
+  } catch {
+    /* going down anyway */
   }
+  process.exit(17)
 }
 
 sdk.on('validationStatus', (code, ts, hint) => {

@@ -35,6 +35,14 @@ const DEFAULT_BASELINE = 72
 const BLIND_PHASE_MS = 22_000
 
 /**
+ * What it takes for a blind run to decide the sensor is genuinely back.
+ * Readings arrive about once per animation frame, so this is a couple of
+ * seconds of uninterrupted signal rather than a lucky estimate.
+ */
+const LATE_ACQUIRE_SAMPLES = 90
+const LATE_ACQUIRE_CONFIDENCE = 0.3
+
+/**
  * TWO CLOCKS. This is the core design constraint of the whole project.
  *
  * Slow clock: Presage pulse, averaged over ~12s. Good for "is this person
@@ -222,6 +230,49 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
     }, SENSOR_GRACE_MS)
     return () => clearTimeout(timer)
   }, [phase, setBaseline, setPhase, sessionStart])
+
+  /**
+   * LATE ACQUISITION — a blind run that gets its sight back.
+   *
+   * The watchdog gives up after 25 seconds, sets a placeholder baseline of
+   * 72 and starts the game. That is right: a judge who dismissed the
+   * camera prompt must still get a playable game. But blind then latched
+   * for the whole session, so a run that began a few seconds before the
+   * camera was ready spent its entire length comparing the player against
+   * a number that was never theirs. Every Director decision in that run —
+   * escalate, withdraw, recover — was made against a stranger's heart
+   * rate. Leo's runs were starting exactly that way.
+   *
+   * The original reasoning for latching was sound as far as it went: a
+   * baseline that was never real cannot be trusted later. The answer is
+   * not to stay blind, it is to stop using the fake baseline. Once real
+   * readings are actually arriving, a few seconds of them gives a genuine
+   * resting rate, and from that point the run is as good as one that
+   * calibrated normally.
+   *
+   * Deliberately requires several consecutive readings rather than one.
+   * A single reading arriving is not evidence the sensor is working; it
+   * is evidence that one frequency estimate cleared the confidence floor.
+   */
+  const lateSamples = useRef<number[]>([])
+  useEffect(() => {
+    if (!blind || phase === 'CALIBRATING') return
+    if (bpm == null || confidence < LATE_ACQUIRE_CONFIDENCE) {
+      // A gap resets it. Half a dozen readings scattered across a minute
+      // is a flaky signal, not a resting rate.
+      lateSamples.current = []
+      return
+    }
+    lateSamples.current.push(bpm)
+    if (lateSamples.current.length < LATE_ACQUIRE_SAMPLES) return
+
+    const sorted = [...lateSamples.current].sort((a, b) => a - b)
+    const median = Math.round(sorted[Math.floor(sorted.length / 2)])
+    lateSamples.current = []
+    console.info(`[dread] sensor came back — recalibrating baseline to ${median} bpm`)
+    setBaseline(median)
+    useSensorless.getState().setBlind(false)
+  }, [bpm, confidence, blind, phase, setBaseline])
 
   // --- Blind mode: keep the game's rhythm without a signal to react to ---
   useEffect(() => {
