@@ -6,6 +6,7 @@ import { Clue } from './Clue'
 import { HidingSpot } from './HidingSpot'
 import { Clutter } from './Clutter'
 import { Signage } from './Signage'
+import { Ceiling } from './Ceiling'
 import { playSfx } from './scareFx'
 import {
   DOOR_OPENING_H,
@@ -441,6 +442,7 @@ export function House() {
       <WallDressing />
       <Clutter />
       <Signage />
+      <Ceiling />
     </>
   )
 }
