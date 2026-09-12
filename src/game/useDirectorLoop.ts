@@ -4,13 +4,12 @@ import { useDirector, AROUSAL, type ScareType } from './director'
 import { useSession } from './session'
 
 const CALIBRATION_MS = 60_000 // Presage HRV baseline window — see plan notes
-const TICK_MS = 200
 
 /**
- * Wires live pulse readings to Director phase transitions, and separately
- * ticks the monster's distance every 200ms based on the current phase
- * (approach in STALK, retreat in WITHDRAW/RECOVER). Mount once at the
- * game root. Pure side-effect hook — no rendering.
+ * Wires live pulse readings to Director phase transitions (CALIBRATING ->
+ * STALK -> STRIKE -> WITHDRAW -> RECOVER -> ...). Mount once at the game
+ * root. Pure side-effect hook — no rendering. Monster.tsx reads `phase`
+ * directly to decide where the monster actually goes.
  */
 export function useDirectorLoop(onScare: (type: ScareType) => void) {
   const bpm = usePulseStore((s) => s.bpm)
@@ -21,8 +20,6 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
   const pickScare = useDirector((s) => s.pickScare)
   const recordScareOutcome = useDirector((s) => s.recordScareOutcome)
   const monsterDistance = useDirector((s) => s.monsterDistance)
-  const setMonsterDistance = useDirector((s) => s.setMonsterDistance)
-  const sessionStatus = useSession((s) => s.status)
   const sessionStart = useSession((s) => s.start)
 
   const calibrationStart = useRef<number | null>(null)
@@ -71,19 +68,13 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
     }
   }, [bpm, baseline, phase, setPhase, pickScare, onScare, recordScareOutcome])
 
-  // --- Continuous monster movement, independent of pulse cadence ---
-  useEffect(() => {
-    if (sessionStatus !== 'playing') return
-    const interval = setInterval(() => {
-      const d = useDirector.getState().monsterDistance
-      const p = useDirector.getState().phase
-      if (p === 'STALK') setMonsterDistance(d - 0.008)
-      else if (p === 'WITHDRAW') setMonsterDistance(d + 0.02)
-      else if (p === 'RECOVER') setMonsterDistance(d + 0.006)
-    }, TICK_MS)
-    return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionStatus])
+  // Monster position/movement (and therefore monsterDistance) is now owned
+  // by Monster.tsx's per-frame AI — it patrols/hunts/retreats based on
+  // `phase` and derives monsterDistance from its real distance to the
+  // player, rather than this loop stepping an abstract slider. See
+  // Monster.tsx for why: a scripted slider couldn't represent "the thing
+  // is somewhere specific in a real corridor," which is what let it patrol
+  // back and forth and made hiding in a room actually matter.
 
   return { monsterDistance }
 }

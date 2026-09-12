@@ -33,7 +33,7 @@ export function useCalmRoomLoop() {
       setRegulatedSeconds(next)
 
       if (next >= CALM_HOLD_SECONDS) {
-        useThreat.getState().setOutcome('escaped')
+        useThreat.getState().setOutcome('escaped_calm')
         useSession.getState().setStatus('ended')
       }
     }, TICK_S * 1000)

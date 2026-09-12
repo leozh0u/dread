@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { usePlayerPosition } from './playerPosition'
-import { useThreat } from './threat'
+import { useThreat, CLUES_REQUIRED } from './threat'
 import { useCalmRoom } from './calmRoom'
-import { CLUES, HIDING_SPOTS, CALM_ROOM, distance3, insideBox } from './triggers'
+import { useSession } from './session'
+import { CLUES, HIDING_SPOTS, CALM_ROOM, OUTSIDE, distance3, insideBox } from './triggers'
 
 const TICK_MS = 100
 
@@ -30,6 +31,17 @@ export function useTriggersLoop() {
       const inCalm = insideBox(p, CALM_ROOM)
       if (inCalm !== useCalmRoom.getState().inCalmRoom) {
         useCalmRoom.getState().setInCalmRoom(inCalm)
+      }
+
+      // Win condition #1: walk out the unlocked door. Distinct from the
+      // calm room's slower "regulate yourself" win (useCalmRoomLoop.ts).
+      if (
+        useThreat.getState().outcome === 'playing' &&
+        collected.size >= CLUES_REQUIRED &&
+        insideBox(p, OUTSIDE)
+      ) {
+        useThreat.getState().setOutcome('escaped_door')
+        useSession.getState().setStatus('ended')
       }
     }, TICK_MS)
 

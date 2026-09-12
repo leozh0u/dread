@@ -130,7 +130,70 @@ export function startAmbient() {
   growlNoise.connect(growlFilter).connect(growlPanner).connect(growlGain).connect(master())
   growlNoise.start()
 
+  // Heavy breathing, layered into the same panned/positioned chain as the
+  // growl — a slow LFO on gain gives it an inhale/exhale rhythm instead of
+  // a flat hiss, so the thing sounds like it's actually breathing
+  // somewhere specific, not just "present."
+  const breathNoise = noiseSource(audioCtx, true)
+  const breathFilter = audioCtx.createBiquadFilter()
+  breathFilter.type = 'lowpass'
+  breathFilter.frequency.value = 500
+  const breathGain = audioCtx.createGain()
+  breathGain.gain.value = 0.06
+  const breathLfo = audioCtx.createOscillator()
+  breathLfo.frequency.value = 0.35
+  const breathLfoGain = audioCtx.createGain()
+  breathLfoGain.gain.value = 0.05
+  breathLfo.connect(breathLfoGain).connect(breathGain.gain)
+  breathNoise.connect(breathFilter).connect(breathGain).connect(growlPanner)
+  breathNoise.start()
+  breathLfo.start()
+
   ambient = { droneGain, noiseGain, growlGain, growlFilter, growlPanner }
+}
+
+/** One heavy footstep — a low thud plus a breathy noise transient,
+ * positioned at the monster's exact location so its footfalls pan and
+ * attenuate correctly even though the continuous growl/breathing bed is
+ * a separate, always-on chain. */
+export function playMonsterFootstep(x: number, y: number, z: number) {
+  const audioCtx = getCtx()
+  const t0 = audioCtx.currentTime
+  const panner = audioCtx.createPanner()
+  panner.panningModel = 'HRTF'
+  panner.distanceModel = 'inverse'
+  panner.refDistance = 2
+  panner.maxDistance = 40
+  if (panner.positionX) {
+    panner.positionX.value = x
+    panner.positionY.value = y
+    panner.positionZ.value = z
+  } else {
+    panner.setPosition(x, y, z)
+  }
+  panner.connect(master())
+
+  const osc = audioCtx.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(75, t0)
+  osc.frequency.exponentialRampToValueAtTime(32, t0 + 0.16)
+  const oGain = audioCtx.createGain()
+  oGain.gain.setValueAtTime(0.3, t0)
+  oGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22)
+  osc.connect(oGain).connect(panner)
+  osc.start(t0)
+  osc.stop(t0 + 0.24)
+
+  const src = noiseSource(audioCtx)
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = 450
+  const nGain = audioCtx.createGain()
+  nGain.gain.setValueAtTime(0.14, t0)
+  nGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28)
+  src.connect(filter).connect(nGain).connect(panner)
+  src.start()
+  src.stop(t0 + 0.3)
 }
 
 /** Called every frame with the monster's world position so the growl pans
@@ -242,19 +305,41 @@ export function stopHeartbeatAudio() {
 // ---------------------------------------------------------------------------
 // Footsteps
 // ---------------------------------------------------------------------------
+let footstepLeft = true
+
+/** The player's own footsteps — alternates a faint L/R pan per step (left
+ * foot, right foot) for a subtle sense of your own body, plus a soft low
+ * thud under the noise transient so it reads as a step, not just a tap. */
 export function playFootstep() {
   const audioCtx = getCtx()
+  const t0 = audioCtx.currentTime
+  const panner = audioCtx.createStereoPanner()
+  panner.pan.value = footstepLeft ? -0.35 : 0.35
+  footstepLeft = !footstepLeft
+  panner.connect(master())
+
   const src = noiseSource(audioCtx)
   const filter = audioCtx.createBiquadFilter()
   filter.type = 'bandpass'
   filter.frequency.value = 180 + Math.random() * 80
   filter.Q.value = 0.9
   const gain = audioCtx.createGain()
-  gain.gain.setValueAtTime(0.05, audioCtx.currentTime)
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.09)
-  src.connect(filter).connect(gain).connect(master())
+  gain.gain.setValueAtTime(0.07, t0)
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09)
+  src.connect(filter).connect(gain).connect(panner)
   src.start()
-  src.stop(audioCtx.currentTime + 0.1)
+  src.stop(t0 + 0.1)
+
+  const thud = audioCtx.createOscillator()
+  thud.type = 'sine'
+  thud.frequency.setValueAtTime(90, t0)
+  thud.frequency.exponentialRampToValueAtTime(55, t0 + 0.07)
+  const thudGain = audioCtx.createGain()
+  thudGain.gain.setValueAtTime(0.05, t0)
+  thudGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09)
+  thud.connect(thudGain).connect(panner)
+  thud.start(t0)
+  thud.stop(t0 + 0.1)
 }
 
 // ---------------------------------------------------------------------------

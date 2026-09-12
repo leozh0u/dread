@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 
-export type RunOutcome = 'playing' | 'died' | 'escaped'
+// Two distinct wins: walk out the unlocked door (fast, simple), or go
+// deeper into the calm room and actually regulate your heart rate (slower,
+// the "real" demonstration of the project's impact claim). Kept as
+// separate outcomes rather than one 'escaped' so the end screen can tell
+// a different story for each.
+export type RunOutcome = 'playing' | 'died' | 'escaped_door' | 'escaped_calm'
 
 interface ThreatState {
   isHidden: boolean

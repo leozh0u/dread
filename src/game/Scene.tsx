@@ -44,7 +44,7 @@ export function Scene() {
   return (
     <Canvas
       shadows
-      camera={{ fov: 75, position: [0, 0.5, 10] }}
+      camera={{ fov: 75, position: [0, 0.5, 18] }}
       gl={{ antialias: true }}
       onCreated={({ scene }) => {
         scene.fog = new THREE.Fog('#000000', 2, 12)

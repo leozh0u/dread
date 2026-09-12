@@ -54,12 +54,20 @@ export function FearCurve() {
   return (
     <Overlay>
       <h1 style={{ fontSize: 22, letterSpacing: 2, marginBottom: 4 }}>
-        {outcome === 'died' ? 'IT FOUND YOU' : outcome === 'escaped' ? 'YOU MADE IT OUT' : 'YOUR FEAR, CHARTED'}
+        {outcome === 'died'
+          ? 'IT FOUND YOU'
+          : outcome === 'escaped_calm'
+            ? 'YOU MADE IT OUT'
+            : outcome === 'escaped_door'
+              ? 'YOU RAN FOR IT'
+              : 'YOUR FEAR, CHARTED'}
       </h1>
       <p style={{ opacity: 0.6, fontSize: 13, marginBottom: 20, maxWidth: 640 }}>
-        {outcome === 'escaped'
+        {outcome === 'escaped_calm'
           ? `You held your heart rate near baseline for ${regulatedSeconds.toFixed(1)}s straight to get that door open. That's the whole trick — everything below is what you had to come down from to do it.`
-          : 'Every mark below is a moment the house decided to push or pull — based on your pulse, read off your own webcam, nothing worn.'}
+          : outcome === 'escaped_door'
+            ? "You found your way out the moment it opened, no slower than you had to be. Faster escape, less of a story below — that's the tradeoff."
+            : 'Every mark below is a moment the house decided to push or pull — based on your pulse, read off your own webcam, nothing worn.'}
       </p>
 
       <svg width={W} height={H} style={{ background: '#0a0a0a', border: '1px solid #333' }}>

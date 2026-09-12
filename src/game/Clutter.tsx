@@ -21,29 +21,41 @@ export function Clutter() {
 
   return (
     <group>
-      {/* Swinging bare bulb over the corridor junction */}
-      <mesh position={[0, 4.6, 1]}>
+      {/* Swinging bare bulb over a corridor junction */}
+      <mesh position={[0, 4.6, 5]}>
         <cylinderGeometry args={[0.01, 0.01, 0.6, 4]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      <mesh ref={bulbMesh} position={[0, 4.2, 1]}>
+      <mesh ref={bulbMesh} position={[0, 4.2, 5]}>
         <sphereGeometry args={[0.08, 8, 8]} />
         <meshStandardMaterial color="#ffdd88" emissive="#ffcc55" emissiveIntensity={2} toneMapped={false} />
       </mesh>
-      <pointLight ref={bulb} position={[0, 4.2, 1]} color="#ffcc77" intensity={25} distance={5} />
+      <pointLight ref={bulb} position={[0, 4.2, 5]} color="#ffcc77" intensity={25} distance={5} />
+
+      {/* A second bulb further down, past the midpoint, so the whole
+          bigger corridor doesn't rely on one light source */}
+      <pointLight position={[0, 4.2, -14]} color="#ffcc77" intensity={20} distance={5} />
+      <mesh position={[0, 4.2, -14]}>
+        <sphereGeometry args={[0.07, 8, 8]} />
+        <meshStandardMaterial color="#ffdd88" emissive="#ffcc55" emissiveIntensity={2} toneMapped={false} />
+      </mesh>
 
       {/* Tilted picture frames along the corridor — abstract, not literal art */}
-      <mesh position={[2.9, 2.2, 3]} rotation={[0, -Math.PI / 2, 0.08]}>
+      <mesh position={[2.9, 2.2, 14]} rotation={[0, -Math.PI / 2, 0.08]}>
         <boxGeometry args={[0.05, 0.9, 0.7]} />
         <meshStandardMaterial color="#151515" roughness={0.7} />
       </mesh>
-      <mesh position={[-2.9, 2.4, -8]} rotation={[0, Math.PI / 2, -0.05]}>
+      <mesh position={[-2.9, 2.4, -10]} rotation={[0, Math.PI / 2, -0.05]}>
         <boxGeometry args={[0.05, 0.7, 0.5]} />
         <meshStandardMaterial color="#151515" roughness={0.7} />
       </mesh>
+      <mesh position={[2.9, 2.0, -2]} rotation={[0, -Math.PI / 2, -0.06]}>
+        <boxGeometry args={[0.05, 0.6, 0.5]} />
+        <meshStandardMaterial color="#151515" roughness={0.7} />
+      </mesh>
 
-      {/* A toppled chair near room 3, half in the corridor */}
-      <group position={[2.4, 0, -6]} rotation={[0, 0.6, Math.PI / 2.3]}>
+      {/* A toppled chair between rooms C and D */}
+      <group position={[2.2, 0, -6]} rotation={[0, 0.6, Math.PI / 2.3]}>
         <mesh position={[0, 0.4, 0]}>
           <boxGeometry args={[0.4, 0.05, 0.4]} />
           <meshStandardMaterial color="#1e1712" roughness={0.9} />
@@ -66,8 +78,8 @@ export function Clutter() {
         </mesh>
       </group>
 
-      {/* Cracked, uneven ceiling patch over room 1 — small "wrong geometry" detail */}
-      <mesh position={[5, 4.95, 6.5]} rotation={[0.05, 0.3, 0.02]}>
+      {/* Cracked, uneven ceiling patch over room A — small "wrong geometry" detail */}
+      <mesh position={[5.5, 4.95, 14]} rotation={[0.05, 0.3, 0.02]}>
         <boxGeometry args={[1.4, 0.1, 1.2]} />
         <meshStandardMaterial color="#0c0c0c" roughness={1} />
       </mesh>

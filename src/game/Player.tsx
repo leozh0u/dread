@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { RigidBody, type RapierRigidBody } from '@react-three/rapier'
-import { usePlayerPosition } from './playerPosition'
+import { RigidBody, CapsuleCollider, type RapierRigidBody } from '@react-three/rapier'
+import { usePlayerPosition, SPAWN_POINT } from './playerPosition'
 import { playFootstep } from './scareFx'
 import * as THREE from 'three'
 
@@ -35,7 +35,7 @@ function bindKeys() {
  */
 const STEP_INTERVAL_MS = 380
 
-export function Player({ start = [0, 1, 10] as [number, number, number] }) {
+export function Player({ start = SPAWN_POINT }: { start?: [number, number, number] } = {}) {
   const body = useRef<RapierRigidBody>(null!)
   const { camera } = useThree()
   const lastStep = useRef(0)
@@ -91,7 +91,7 @@ export function Player({ start = [0, 1, 10] as [number, number, number] }) {
     <RigidBody
       ref={body}
       position={start}
-      colliders="ball"
+      colliders={false}
       mass={1}
       enabledRotations={[false, false, false]}
       friction={0}
@@ -102,6 +102,12 @@ export function Player({ start = [0, 1, 10] as [number, number, number] }) {
       // clues/hiding spots/calm room are plain distance checks now, not
       // physics sensors -- see playerPosition.ts and triggers.ts.
     >
+      {/* Explicit capsule collider matching the visual capsule exactly —
+          the previous auto "ball" collider approximated the capsule with
+          its bounding sphere, which clipped corners at wall junctions and
+          was the real cause of the player occasionally phasing through
+          walls. args are [halfHeight, radius]. */}
+      <CapsuleCollider args={[0.4, 0.35]} />
       <mesh visible={false}>
         <capsuleGeometry args={[0.35, 0.8]} />
       </mesh>

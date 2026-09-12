@@ -46,6 +46,12 @@ export function Hud() {
       <div style={{ opacity: 0.7 }}>noise {Math.round(noise * 100)}%</div>
       <div style={{ opacity: 0.7 }}>clues {cluesCollected}/{CLUES_REQUIRED}</div>
 
+      <div style={{ marginTop: 10, opacity: 0.5, maxWidth: 220, fontSize: 12 }}>
+        {cluesCollected < CLUES_REQUIRED
+          ? 'find what was left behind to unlock the door'
+          : 'the door is open — run for it, or go deeper and get calm'}
+      </div>
+
       {detection > 0 && (
         <div style={{ marginTop: 8, width: 100, height: 6, background: 'rgba(255,255,255,0.1)' }}>
           <div
