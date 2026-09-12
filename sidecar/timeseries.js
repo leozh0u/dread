@@ -16,7 +16,43 @@
  * schema not created — the game plays exactly as it does now. A hackathon
  * demo must never die because a database is having a bad night.
  */
+import { readFileSync, existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+
+/**
+ * Timescale Cloud presents a certificate signed by their own private CA
+ * (O=Timescale Inc, CN=ca.timescale.com), which is self-signed and so is
+ * correctly absent from Node's public CA bundle. Without help, connecting
+ * fails with "self-signed certificate in certificate chain".
+ *
+ * The connection string Timescale hands out says `sslmode=require`, which
+ * in Postgres means encrypt but DO NOT verify the certificate — it stops
+ * passive eavesdropping and does nothing at all about an active
+ * man-in-the-middle. The usual shortcut, `rejectUnauthorized: false`, is
+ * exactly that same weak posture.
+ *
+ * So instead their CA is pinned here and verification stays ON. That is
+ * strictly stronger than what the connection string asks for: the
+ * password is only ever sent to a server holding a certificate signed by
+ * this specific CA.
+ *
+ * Honest limitation: the certificate was captured from the server itself,
+ * so this is trust-on-first-use — it can't detect an interception that
+ * was already in place at capture time. It does protect every connection
+ * afterwards. Fingerprint of what's pinned (sha256):
+ *   06:5A:75:0D:0D:64:F6:2D:AC:DC:97:9E:3B:83:D2:11:
+ *   95:40:71:EA:59:B8:F3:40:7C:4E:87:CA:68:34:64:57
+ * Valid until 2027-10-20. If Timescale rotates it this will fail loudly
+ * rather than quietly downgrading, which is the correct way round.
+ */
+function timescaleCA() {
+  const path = join(HERE, 'timescale-ca.pem')
+  return existsSync(path) ? readFileSync(path, 'utf8') : null
+}
 
 let pool = null
 let ready = false
@@ -24,6 +60,30 @@ let disabledReason = null
 
 export function timeseriesEnabled() {
   return ready
+}
+
+/**
+ * Split the connection string into explicit fields.
+ *
+ * Necessary, not tidiness: node-postgres parses `sslmode` out of a
+ * connection string and builds its own TLS options from it, which
+ * silently overrode the pinned-CA config passed alongside — the connection
+ * kept failing with "self-signed certificate in certificate chain" while
+ * the CA sat there unused. Passing the parts explicitly means the ssl
+ * block below is the only TLS configuration in play.
+ *
+ * Credentials are percent-decoded (passwords routinely contain characters
+ * that must be escaped in a URL) and never logged.
+ */
+function parseConnectionString(connectionString) {
+  const u = new URL(connectionString)
+  return {
+    host: u.hostname,
+    port: u.port ? Number(u.port) : 5432,
+    user: decodeURIComponent(u.username),
+    password: decodeURIComponent(u.password),
+    database: u.pathname.replace(/^\//, '') || 'tsdb',
+  }
 }
 
 export function timeseriesStatus() {
@@ -44,11 +104,17 @@ export async function initTimeseries(connectionString) {
     return false
   }
   try {
+    const ca = timescaleCA()
+    const conn = parseConnectionString(connectionString)
     pool = new pg.Pool({
-      connectionString,
-      // Tiger Cloud requires TLS. rejectUnauthorized stays true so this
-      // isn't quietly downgraded to an unverified connection.
-      ssl: { rejectUnauthorized: true },
+      ...conn,
+      // Verification stays ON, against Timescale's pinned CA — see the
+      // note above timescaleCA(). Without the pem we cannot verify, and
+      // rather than silently falling back to an unauthenticated
+      // connection we say so and let the caller decide.
+      ssl: ca
+        ? { ca, rejectUnauthorized: true, servername: conn.host }
+        : { rejectUnauthorized: true },
       max: 4,
       connectionTimeoutMillis: 8000,
       idleTimeoutMillis: 30_000,
@@ -87,6 +153,11 @@ export async function initTimeseries(connectionString) {
   } catch (err) {
     disabledReason = `connect failed: ${err.message}`
     console.warn('[sidecar] tigerdata disabled —', err.message)
+    if (/self-signed|unable to verify|certificate/i.test(err.message)) {
+      console.warn(
+        '[sidecar] TLS could not be verified. sidecar/timescale-ca.pem may be missing or Timescale rotated their CA.',
+      )
+    }
     pool = null
     ready = false
     return false
