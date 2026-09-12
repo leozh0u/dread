@@ -29,7 +29,7 @@ function Flashlight() {
     <>
       <spotLight
         ref={light}
-        intensity={170}
+        intensity={95}
         angle={0.42}
         penumbra={0.75}
         distance={17}
@@ -148,14 +148,28 @@ export function Scene() {
         // than pure black. Linear black fog gave a hard "wall of
         // darkness" cutoff; a warm haze that matches the walls reads as
         // depth — corridors fading out rather than ending.
-        scene.fog = new THREE.FogExp2('#0d0b06', 0.055)
+        // Denser than it was. The corridors are long, and fog density is
+        // what decides how far down one you can see a shape before you can
+        // tell what it is — that band, where something is legible as a
+        // presence but not yet as a creature, is where nearly all of the
+        // dread in this game lives. Too thin and you identify it
+        // immediately; too thick and you never see it coming at all.
+        scene.fog = new THREE.FogExp2('#0a0805', 0.075)
       }}
     >
-      <color attach="background" args={['#0d0b06']} />
+      <color attach="background" args={['#0a0805']} />
       {/* Enough ambient to read the space — the fluorescents are the real
-          light source now, so the room is lit-but-wrong rather than a
-          black void navigated by torch. */}
-      <ambientLight intensity={0.11} color="#b8a878" />
+          light source, so the room is lit-but-wrong rather than a black
+          void navigated by torch.
+          Lowered from 0.11. Ambient light is flat by definition: it
+          reaches every surface equally, so every unit of it removes
+          contrast between what the torch and the fluorescents pick out and
+          what they don't. It is the single control that most directly
+          trades atmosphere for legibility, and it was set high enough that
+          unlit corners were merely dimmer rather than genuinely dark. Low
+          enough now that the lit patches mean something, high enough that
+          a room is never an unreadable void. */}
+      <ambientLight intensity={0.065} color="#b3a475" />
       <Physics gravity={[0, -20, 0]}>
         <House />
         <Entities />
@@ -165,8 +179,12 @@ export function Scene() {
       <AutoPointerLock />
       <DevBridge />
       <EffectComposer>
-        <Noise opacity={0.06} />
-        <Vignette darkness={0.9} offset={0.3} />
+        <Noise opacity={0.075} />
+        {/* Tighter and heavier. The vignette is doing real work here
+            rather than decoration: it narrows what the player can attend
+            to at once, so things arrive from the edges instead of being
+            tracked across the screen. */}
+        <Vignette darkness={1.05} offset={0.22} />
         <ChromaticAberration offset={[0.0006, 0.0006]} />
       </EffectComposer>
     </Canvas>

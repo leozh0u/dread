@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useThreat } from './threat'
 
 export type SessionStatus = 'calibrating' | 'playing' | 'ended'
 
@@ -20,5 +21,27 @@ export const useSession = create<SessionState>((set) => ({
   status: 'calibrating',
   startedAt: null,
   setStatus: (status) => set({ status }),
-  start: () => set({ status: 'playing', startedAt: Date.now() }),
+  /**
+   * Start playing — but never resurrect a run that has already resolved.
+   *
+   * A session of 'playing' alongside an outcome of 'died' is a state with
+   * no way out of it: the HUD hides because the run is over, the end
+   * screen does not show because the session says it is not, and the
+   * player stands in the dark with no output and no button. Exactly the
+   * kind of dead end this build is not allowed to have.
+   *
+   * It was reachable through the dev keys — C and J call start()
+   * unconditionally, and those are the keys used for FILMING, so one
+   * press after a death would have produced a frozen, outputless game on
+   * camera. restartRun() is unaffected: it clears the outcome before
+   * calling this, so by the time it arrives the run really is playable.
+   */
+  start: () =>
+    set(() => {
+      if (useThreat.getState().outcome !== 'playing') {
+        console.warn('[dread] refusing to start a session on an already-ended run')
+        return {}
+      }
+      return { status: 'playing', startedAt: Date.now() }
+    }),
 }))

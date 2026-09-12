@@ -246,7 +246,8 @@ export function LongOne({ state }: CreatureProps) {
             color={BONE_FOUL}
             emissive="#23261f"
             emissiveIntensity={0.4}
-            roughness={0.82}
+            roughness={0.86}
+            vertexColors
           />
         </mesh>
         {/* Two shallow hollows where eyes should be — not glowing, just
@@ -442,7 +443,7 @@ export function Crawler({ state }: CreatureProps) {
           geometry, and narrower than it is long so it reads as a head
           rather than a ball. */}
       <group ref={skull} position={[0, 0.95, 0.72]}>
-        <mesh scale={[0.2, 0.215, 0.29]} geometry={crushedSkull(1.9)} material={materials.boneFoul} />
+        <mesh scale={[0.2, 0.215, 0.29]} geometry={crushedSkull(1.9)} material={materials.boneStained} />
         {/* Sockets. Spheres gave two round pupil-shaped holes — the
             cartoon-eye read. These are tapered pits driven back INTO the
             skull, so the torch finds an edge and then nothing, and they

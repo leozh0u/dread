@@ -4,6 +4,7 @@ import { useDirector } from './director'
 import { useSession } from './session'
 import { useThreat } from './threat'
 import { CLUES } from './triggers'
+import { restartRun } from './restart'
 
 /**
  * Shortcuts for testing and for filming. Not a cheat menu — these exist
@@ -24,6 +25,12 @@ import { CLUES } from './triggers'
 export function useDevKeys() {
   useEffect(() => {
     function skipCalibration() {
+      // If the previous run already resolved, start a fresh one first.
+      // Without this the dev key lands on a finished run and the session
+      // refuses to start (see session.ts), which is safe but looks like
+      // the key not working — and these keys exist specifically so the
+      // demo can be filmed quickly.
+      if (useThreat.getState().outcome !== 'playing') restartRun()
       const bpm = usePulseStore.getState().bpm
       // Use the live reading if there is one so the Director's deltas
       // stay meaningful; otherwise a plausible resting rate.

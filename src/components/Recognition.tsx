@@ -26,9 +26,28 @@ export function Recognition({ text }: { text: string }) {
     <div
       style={{
         position: 'fixed',
-        top: '18%',
+        /**
+         * Moved down from 18%.
+         *
+         * This line is centred across the full width, while the objective
+         * readout is a left-hand column starting at the top. At 18% of a
+         * tall window the two landed on top of each other and rendered as
+         * one unreadable smear of overlapping text — and this is the
+         * Backboard moment, the game telling you it remembers you from
+         * last time, so it is precisely the line that must not arrive
+         * looking broken.
+         *
+         * 40% sits below the objective column and well above the vitals
+         * panel in the bottom corner, with a max width so a longer
+         * sentence wraps in the middle of the screen instead of spreading
+         * under either of them.
+         */
+        top: '40%',
         left: 0,
         right: 0,
+        maxWidth: 520,
+        margin: '0 auto',
+        padding: '0 24px',
         textAlign: 'center',
         color: '#c33',
         fontFamily: 'monospace',

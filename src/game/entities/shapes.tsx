@@ -59,6 +59,15 @@ export const materials = {
   bone: new THREE.MeshStandardMaterial({ color: BONE, roughness: 0.6 }),
   boneDim: new THREE.MeshStandardMaterial({ color: BONE_DIM, roughness: 0.8 }),
   boneFoul: new THREE.MeshStandardMaterial({ color: BONE_FOUL, roughness: 0.85 }),
+  /** For crushedSkull geometry only — it multiplies the baked per-vertex
+   * staining into the base colour. Using it on a mesh with no `color`
+   * attribute would render black, so it is deliberately separate from
+   * `boneFoul` rather than a flag on it. */
+  boneStained: new THREE.MeshStandardMaterial({
+    color: BONE_FOUL,
+    roughness: 0.88,
+    vertexColors: true,
+  }),
   /** Teeth. Low roughness so the torch puts a wet highlight along the row
    * instead of lighting them evenly — that highlight is the only thing
    * that should make a mouth visible in the dark. */
@@ -101,6 +110,7 @@ export function crushedSkull(seed: number, detail = 2): THREE.BufferGeometry {
   const geo = new THREE.IcosahedronGeometry(1, detail)
   const pos = geo.attributes.position as THREE.BufferAttribute
   const v = new THREE.Vector3()
+  const displaced: number[] = []
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i)
     const d =
@@ -112,9 +122,52 @@ export function crushedSkull(seed: number, detail = 2): THREE.BufferGeometry {
       // A single low lobe that pulls one side in further than the other,
       // so the skull is visibly lopsided rather than merely bumpy.
       0.08 * Math.sin(1.3 * v.x - 0.9 * v.y + seed * 1.7)
+    displaced.push(d)
     pos.setXYZ(i, v.x * d, v.y * d, v.z * d)
   }
   geo.computeVertexNormals()
+
+  /**
+   * STAINING, BAKED INTO THE GEOMETRY.
+   *
+   * Shape alone was not enough. A lopsided faceted skull in one flat
+   * colour still reads as moulded — soap, or a prop — because real bone
+   * that has been somewhere damp is not one colour anywhere: it is
+   * blotched, and it is darker wherever dirt collects.
+   *
+   * Two terms, both free at runtime because they are baked once into a
+   * cached geometry and cost nothing per frame:
+   *
+   *   - a smooth low-frequency blotch, so the skull has light and dark
+   *     regions the eye can travel across instead of one even value
+   *   - grime in the hollows: vertices the displacement pulled INWARD are
+   *     darkened, because that is exactly where dirt sits on a real
+   *     surface. It makes the lumpen shape legible under a moving torch,
+   *     since the crevices stay dark as the highlight sweeps past
+   *
+   * This is also the cheapest available fix for the specific thing that
+   * made these creatures read as bland under a bright torch: with one flat
+   * albedo, a strong light flattens the whole form to a single value. Per
+   * vertex variation survives that, because it varies what is being lit
+   * rather than how much light lands on it.
+   */
+  const colors = new Float32Array(pos.count * 3)
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i)
+    const n = v.clone().normalize()
+    const blotch =
+      0.5 +
+      0.25 * Math.sin(5.3 * n.x + seed * 2.3) +
+      0.25 * Math.cos(4.1 * n.y - seed * 1.1) * Math.sin(3.7 * n.z + seed)
+    // displaced[i] < 1 means this vertex was pulled in: a hollow.
+    const hollow = THREE.MathUtils.clamp((displaced[i] - 0.82) / 0.36, 0, 1)
+    const shade = THREE.MathUtils.clamp(0.5 + 0.32 * blotch + 0.28 * hollow, 0.42, 1.12)
+    colors[i * 3] = shade
+    colors[i * 3 + 1] = shade
+    colors[i * 3 + 2] = shade
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+
   skullCache.set(key, geo)
   return geo
 }

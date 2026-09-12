@@ -111,9 +111,31 @@ const RECOVER_S = 0.9
 const COIL_MUL = 0.05
 const LUNGE_MUL = 2.4
 const RECOVER_MUL = 0.45
-/** Randomised gap between lunges, so the rhythm can never be counted. */
-const LUNGE_GAP_MIN_S = 2.2
-const LUNGE_GAP_MAX_S = 5.5
+/** Randomised gap between lunges, so the rhythm can never be counted.
+ *
+ * Shortening this does NOT make a chase harder or the creature faster: a
+ * full lunge cycle already averages out to the same ground a steady walk
+ * covers, and prowling is that same speed, so more frequent cycles change
+ * the texture of the approach without changing its pace. It only means the
+ * thing coming for you is doing something violent more often. */
+const LUNGE_GAP_MIN_S = 1.6
+const LUNGE_GAP_MAX_S = 4.2
+
+/* --- Twitch tuning (see the twitch refs) -----------------------------
+ * Short enough that it registers as wrongness rather than as movement.
+ * At 110ms it is roughly three frames: you cannot track it, you can only
+ * notice that something happened. */
+const TWITCH_S = 0.11
+const TWITCH_YAW_MIN = 0.16
+const TWITCH_YAW_MAX = 0.42
+/** A small drop as well as a turn — a jerk that is purely rotational
+ * reads as a look, and a jerk with a drop in it reads as a spasm. */
+const TWITCH_DROP = 0.09
+const TWITCH_GAP_MIN_S = 0.7
+const TWITCH_GAP_MAX_S = 2.6
+/** Far enough to catch one down a corridor, close enough that it is not
+ * happening at an indistinct shape on the horizon. */
+const TWITCH_RANGE = 16
 /** Too close and it has nowhere to lunge from; too far and you have time
  * to simply walk away from it, which makes the whole move read as noise. */
 const LUNGE_MIN_DIST = 2.5
@@ -213,6 +235,29 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const lungeState = useRef<'prowl' | 'coil' | 'lunge' | 'recover'>('prowl')
   const lungeUntil = useRef(0)
   const nextLungeAt = useRef(0)
+  /**
+   * THE TWITCH.
+   *
+   * The lunge is the big beat; this is the small one. Between lunges a
+   * creature still walks smoothly toward you, and smooth motion is
+   * legible — you can predict it, and anything you can predict stops being
+   * frightening quite quickly.
+   *
+   * A twitch is a single sharp jerk of the whole body, held for barely a
+   * tenth of a second and then gone: the head snaps a few degrees off its
+   * heading and drops, and it keeps walking as if nothing happened. It is
+   * far too short to react to and far too short to read as an animation.
+   * The effect is that the thing coming toward you looks WRONG in a way
+   * you cannot quite point at.
+   *
+   * Deliberately costs it nothing and gains it nothing — it does not move
+   * the creature, so it cannot make a chase unfair in either direction. It
+   * is pure presentation.
+   */
+  const twitchUntil = useRef(0)
+  const nextTwitchAt = useRef(0)
+  const twitchYaw = useRef(0)
+  const twitchDrop = useRef(0)
   const epoch = useRef(entityEpoch())
   // Mutated every frame, read by the creature's own frame loop. Never a
   // prop and never state: props would freeze (refs don't re-render) and
@@ -239,6 +284,8 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       lungeState.current = 'prowl'
       lungeUntil.current = 0
       nextLungeAt.current = 0
+      twitchUntil.current = 0
+      nextTwitchAt.current = 0
     }
 
     const phase = useDirector.getState().phase
@@ -464,9 +511,30 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       )
       facing.current = toCam
     }
-    group.current.rotation.y = facing.current
+    // --- TWITCH (see the twitch refs) ---------------------------------
+    // Only while it is aware of you and you can see it happen. A twitch
+    // down an empty corridor is wasted, and one from a creature that has
+    // not noticed you undercuts the moment it does.
+    const twitchEligible = hunting && los && toPlayer != null && toPlayer < TWITCH_RANGE
+    if (twitchEligible && t >= nextTwitchAt.current && t >= twitchUntil.current) {
+      twitchUntil.current = t + TWITCH_S
+      // Sign and size both vary, so consecutive twitches never rhyme.
+      const swing = TWITCH_YAW_MIN + Math.random() * (TWITCH_YAW_MAX - TWITCH_YAW_MIN)
+      twitchYaw.current = Math.random() < 0.5 ? -swing : swing
+      twitchDrop.current = Math.random() * TWITCH_DROP
+      nextTwitchAt.current =
+        t + TWITCH_GAP_MIN_S + Math.random() * (TWITCH_GAP_MAX_S - TWITCH_GAP_MIN_S)
+    }
+    const twitching = t < twitchUntil.current
+
+    // Applied to the RENDERED rotation only, never to `facing` itself, so
+    // a twitch can never send the creature walking off in a new direction
+    // — it jerks, and its path is untouched.
+    group.current.rotation.y = facing.current + (twitching ? twitchYaw.current : 0)
     group.current.position.y =
-      FLOOR_Y + (prof.bob > 0 ? Math.abs(Math.sin(t * 7)) * prof.bob : 0)
+      FLOOR_Y +
+      (prof.bob > 0 ? Math.abs(Math.sin(t * 7)) * prof.bob : 0) -
+      (twitching ? twitchDrop.current : 0)
 
     const realDist = distance3(player, [
       group.current.position.x,
