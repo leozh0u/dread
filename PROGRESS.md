@@ -93,10 +93,11 @@ static host — same fallback path that already exists for local use.
    (articulated capsules → angular low-poly). Leo's last word on it was
    "it looks like Baymax." Until he says otherwise, assume it still
    needs work.
-2. **Video plan.** Never actually written despite being flagged as a task
-   since early in the session ("video planning for later" — later is now).
-   Needs a shot list against HackRice's prescribed structure (30s intro /
-   2min demo / 30s technical / 30s impact).
+2. ~~**Video plan.**~~ **DONE** — written up in `VIDEO.md`: full shot
+   list against HackRice's 30s/2min/30s/30s structure, what to prioritise
+   (the hear-it-before-you-see-it beat and the Director backing-off beat),
+   production notes, and a pre-submission checklist. This was the oldest
+   open item in the whole session.
 2. **Presage on real hardware — untested.** The sidecar has never been run
    against a live camera or a real API key (this sandbox has neither).
    This is the single highest-risk unknown left: if it doesn't work on
