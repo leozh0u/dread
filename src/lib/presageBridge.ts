@@ -87,6 +87,30 @@ export class PresageFrameSender {
     this.watchdog = setInterval(() => {
       if (!this.running) return
       if (performance.now() - this.lastSentAt < 2000) return
+
+      /**
+       * SAY WHY NOTHING IS BEING SENT.
+       *
+       * The watchdog re-arms a dead pump, which is right, but it did so
+       * silently — so a page that was connected to the sidecar and
+       * capturing nothing looked, from every surface the player can see,
+       * exactly like a page that was capturing fine and waiting for a
+       * pulse. The sidecar could only report "connected but no frames",
+       * which is the symptom, not the cause: only the browser knows
+       * whether the video element has a picture in it.
+       *
+       * A video with no dimensions and a readyState below HAVE_CURRENT_DATA
+       * has no stream attached, which after a successful getUserMedia
+       * means the track ended or was taken by something else.
+       */
+      if (this.framesSent === 0 && (this.video.readyState < 2 || !this.video.videoWidth)) {
+        useSensorStatus
+          .getState()
+          .setCameraError(
+            'CAMERA NOT DELIVERING — permission was granted but no picture is arriving. ' +
+              'Another tab or app may have taken it; close those and reload.',
+          )
+      }
       if (this.vfcHandle && typeof this.video.cancelVideoFrameCallback === 'function') {
         this.video.cancelVideoFrameCallback(this.vfcHandle)
         this.vfcHandle = 0
