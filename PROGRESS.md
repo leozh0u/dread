@@ -69,6 +69,15 @@ not just text on a screen.
       the exit door didn't physically block the player (isolated collider
       fix)
 
+## Demo video plan — `VIDEO.md`
+
+Written and committed. Full shot list against HackRice's prescribed
+30s/2min/30s/30s structure, with the two genuinely differentiating beats
+flagged as priorities (finding the monster by ear; the Director visibly
+backing off when the player spikes), production notes, and a
+pre-submission checklist. **This was the oldest open item in the entire
+session** — flagged since the first hour, finally closed.
+
 ## Live build for judges
 
 **https://leozh0u.github.io/dread/** — deployed via GitHub Actions
@@ -93,12 +102,7 @@ static host — same fallback path that already exists for local use.
    (articulated capsules → angular low-poly). Leo's last word on it was
    "it looks like Baymax." Until he says otherwise, assume it still
    needs work.
-2. ~~**Video plan.**~~ **DONE** — written up in `VIDEO.md`: full shot
-   list against HackRice's 30s/2min/30s/30s structure, what to prioritise
-   (the hear-it-before-you-see-it beat and the Director backing-off beat),
-   production notes, and a pre-submission checklist. This was the oldest
-   open item in the whole session.
-2. **Presage on real hardware — untested.** The sidecar has never been run
+3. **Presage on real hardware — untested.** The sidecar has never been run
    against a live camera or a real API key (this sandbox has neither).
    This is the single highest-risk unknown left: if it doesn't work on
    Leo's laptop, the fallback estimator carries the whole demo, which is
@@ -107,7 +111,7 @@ static host — same fallback path that already exists for local use.
    Also the honest limit on "accurate heart rate" right now — the
    in-browser fallback's accuracy ceiling is what it is; the real fix is
    this key, not more client-side rPPG tuning.
-3. **Sponsor integrations not yet built** (mapped conceptually, no code):
+4. **Sponsor integrations not yet built** (mapped conceptually, no code):
    MathWorks (an autonomic HR/HRV model), ElevenLabs (voice lines layered
    on top of the procedural audio, see Done), Persona (identity gate),
    Backboard (cross-session memory — the bandit stats *do* persist across
@@ -115,15 +119,15 @@ static host — same fallback path that already exists for local use.
    Backboard API), Tiger Data (pulse history isn't stored anywhere durable
    yet, just in-memory). **Leo is checking Discord/handbook for the
    ElevenLabs key too.**
-4. **Leo's own recorded voice lines** — he floated recording his own
+5. **Leo's own recorded voice lines** — he floated recording his own
    lines and having them pitch-shifted/distorted, as an alternative to
    the generated voice line now in place (see Done below). Still open if
    he wants to actually do that instead/in addition — waiting on him to
    record and send audio.
-5. **Jumpscares** — explicitly deferred by Leo ("we can add jumpscares
+6. **Jumpscares** — explicitly deferred by Leo ("we can add jumpscares
    later"); the existing probabilistic hidden+noisy+close jumpscare stays
    as-is, not being expanded right now.
-6. **Ongoing standard, not a one-time item:** keep verifying claims by
+7. **Ongoing standard, not a one-time item:** keep verifying claims by
    direct testing, not code review alone — every real bug found this
    session (Rapier sensors, door collision, and now the wall-phasing
    collider bug) looked completely correct on paper and was only caught
