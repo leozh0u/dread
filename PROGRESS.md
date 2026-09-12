@@ -580,3 +580,72 @@ stepped out of. 142 checks.
 - Presage: pipeline proven, blocked on Leo's camera.
 - 66 Claude co-author trailers; four keys to rotate. Both need Leo.
 - MathWorks: still unclaimed, ~30 seconds of Leo's time.
+
+---
+
+## Saturday afternoon — the autonomous stretch
+
+Leo went to eat with "full reign… run an agentic loop… make everything
+better… no mistakes, be detailed, in depth, thorough", plus: darker and
+scarier, monsters quicker/jitterier, more detail/colour/texture/eyes,
+smoother movement, no phasing, market the product, and have the main
+selling features ready to demo when he's back.
+
+### Bugs found and fixed, in order of severity
+
+1. **The game could not be finished.** Every trigger volume spanned
+   y ∈ [0,3], from when the floor was at y=0. The floor is at -0.9 and
+   the player's tracked position is their capsule centre at -0.15 — below
+   all of them. Both endings and all hiding were unreachable.
+2. **The player could die at spawn without moving.** The position store
+   started at the world origin; creatures mounted six metres from it,
+   inside the seven-metre kill radius.
+3. **Fragments had a 62cm effective pickup radius**, because 0.65 of the
+   0.9 budget went on a permanent vertical gap.
+4. **`npx tsc --noEmit` was checking zero files** all session.
+5. **STRIKE existed for zero frames** — set and overwritten in one
+   synchronous block, so the creatures could never act on it and the
+   readout never showed it.
+6. **Two screens you could not get past** on a short window: the start
+   screen's BEGIN and the end screen's PLAY AGAIN, both below the fold
+   with no scrolling.
+7. **A dead-end session state** (`outcome: died` + `session: playing`)
+   reachable through the dev keys — the keys used for filming.
+8. **The fallback pulse estimator invented heart rates from noise**, and
+   lighting drift made it report 45 bpm for a clean 84 bpm signal.
+
+### The pattern in most of them
+
+Four separate bugs came from the same place: **a test that fed the system
+numbers the system never produces.** `scripts/fullrun.ts` walked the
+player at y=0.5 — the height the fragments sit at, never the height the
+player is — and so confirmed pickups, endings and hiding all worked while
+every one of them was broken in the running game.
+
+The fix that mattered was not any individual patch; it was walking the
+player at their real tracked height and watching three checks fail
+immediately.
+
+### Testing added
+
+`npm test` now runs a real typecheck first, then 183 checks:
+- `pulsetest.ts` — the rPPG estimator against synthetic signals with known
+  answers: rate recovery, noise at twice signal amplitude, lighting drift,
+  frame jitter and drops, the harmonic trap, and refusal cases swept over
+  40 seeds
+- `calmtest.ts` — the calm-room ending, which the entire impact claim
+  rests on and had never been exercised
+- the inversion, in `directortest.ts` — including that a permanently calm
+  player gets a paced cycle and a permanently frightened one is never
+  struck at
+- hiding coverage in `fullrun.ts`, at the real player height
+
+### Not reproducible
+
+Leo reported the trackpad "rotating rather than panning" twice, then
+clarified: *"everything is upside down."* The euler-order fix is live and
+verified in the running page (order YXZ, roll measured at 0.003°). The
+pitch clamp landing exactly on the YXZ singularity is a real degenerate
+case and is fixed, and Player.tsx now self-rights every frame so an
+upside-down camera cannot persist. But a full 180° flip could not be
+reproduced in simulation. **If it recurs, the cause is still unfound.**
