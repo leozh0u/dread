@@ -456,3 +456,68 @@ the creatures under an intensity-30 flood against an unlit near-white
 backdrop. Pressing M showed a creature no player would ever see. That
 staging is now a dim fill over a real wall tone, lit by the player's own
 torch, so the review tool shows the shipped thing.
+
+### Ledger update — end of midday session
+
+| # | Item | State |
+|---|---|---|
+| 1 | creatures bland | **substantially reworked, not signed off** |
+| 2 | trackpad rotate-not-pan | done (565b436) |
+| 3 | make Presage work | **pipeline proven; blocked on Leo's camera** |
+| 4 | limbs phase through walls | done (872bce8) |
+| 5 | sudden scary movements | done (7242f15) |
+| 6 | Claude co-author trailers x66 | blocked on Leo |
+| 7 | rotate 4 exposed keys | blocked on Leo |
+| 8 | nobody has played a full run | **still true** |
+
+### Presage: it works. It has never seen a face.
+
+Proven end to end by streaming synthetic frames into the sidecar over the
+same WebSocket protocol the browser uses: transport connects, frame
+source is claimed, status goes kStarting -> kRunning, and the SDK runs
+face validation and correctly reports "no face detected" on noise. The
+only missing ingredient has always been a real face in front of a real
+camera.
+
+Leo's camera never turns on — no green light. Three fixes shipped so the
+next person to hit this is told which of the causes it is:
+- start-screen pre-flight on the click, so the prompt appears at a
+  deliberate moment and a failure lands on a full page with room to
+  explain
+- Permissions API queried on mount, so a permission denied on an earlier
+  visit is stated before anything is clicked
+- Presage's own per-frame validation (kTooDark, kNoFaceFound, kFaceTooFar
+  ...) now broadcast to the browser and shown in the vitals panel. It was
+  previously printed only to the sidecar's terminal — the component that
+  knew exactly why there was no pulse was invisible to the only person
+  who could act on it.
+
+kTooDark is the most likely failure at judging, in a room we did not
+light. "TOO DARK — put a lamp on your face" recovers; an empty readout
+just looks broken.
+
+### `npx tsc --noEmit` was checking zero files
+
+The root tsconfig is a solution file with an empty `files` array, so the
+bare invocation resolves it, finds nothing, and exits 0. Every typecheck
+run against it this session was vacuous — confirmed by planting a
+deliberate type error and watching it pass. `tsc -b` is the real check
+and immediately caught a live bug (indexing the {x,y,z} player store as
+`player[0]`, which would have put NaN into a facing angle).
+
+There is now an `npm run typecheck`, and `npm test` runs it first.
+
+### Tiger Data verified, and cleaned
+
+Full round trip confirmed: batched insert, per-run aggregation
+(peak/mean/baseline via GROUP BY), and `time_bucket('1 second', …)`
+downsampling with events attached. The test rows this produced were
+deleted afterwards — the table is empty again, which incidentally
+confirms no real run has ever written a trace.
+
+### ElevenLabs audio checked for duplicates
+
+Several MP3s share a byte size exactly, which usually means a generation
+script wrote the same clip under several names. Checksummed all 19: every
+one is distinct. The matching sizes are just equal durations at constant
+bitrate.
