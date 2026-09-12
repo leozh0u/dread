@@ -7,6 +7,7 @@ import { FearCurve } from './components/FearCurve'
 import { StartGate } from './components/StartGate'
 import { useHouseMemory } from './game/useHouseMemory'
 import { Recognition } from './components/Recognition'
+import { Vitals } from './components/Vitals'
 import { Crash } from './components/Crash'
 import { MuteButton } from './components/MuteButton'
 import { BreathingPacer } from './components/BreathingPacer'
@@ -140,6 +141,7 @@ function Game() {
       <BreathingPacer />
       {sessionStatus === 'ended' && <FearCurve />}
       <MuteButton />
+      <Vitals />
       {recognition && <Recognition text={recognition} />}
       <GlLostBanner />
     </>

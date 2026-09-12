@@ -20,6 +20,8 @@
  * that is also rendering the game.
  */
 
+import { useSensorStatus } from './sensorStatus'
+
 /**
  * 480x360 at ~24fps. Presage needs enough pixels on the face to read
  * colour change in the skin, and enough frame rate that it doesn't report
@@ -194,6 +196,12 @@ export class PresageFrameSender {
 
       this.ws.send(this.packetBuf)
       this.framesSent++
+      // Publish roughly twice a second — the panel needs to show liveness,
+      // not a per-frame counter, and a store write per frame would be 24
+      // React updates a second for a number nobody reads that fast.
+      if (this.framesSent % 12 === 0) {
+        useSensorStatus.getState().setFrames(this.framesSent, this.framesDropped)
+      }
       // Say so once. "Is it even sending?" was the whole question during
       // the first live test, and there was no way to answer it from the
       // browser side.

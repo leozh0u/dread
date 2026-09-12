@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { create } from 'zustand'
 import { FallbackPulseEstimator } from './fallbackPulse'
 import { PresageFrameSender } from './presageBridge'
+import { useSensorStatus } from './sensorStatus'
 
 export type PulseSource = 'presage' | 'fallback' | 'none'
 
@@ -123,6 +124,7 @@ export function usePulseSource(videoRef: React.RefObject<HTMLVideoElement | null
         clearTimeout(connectTimeout)
         startFrameSender()
         lastPresageAt = 0
+        useSensorStatus.getState().setSidecar(true)
         // Don't tear down the fallback yet — it stays until Presage has
         // actually produced a number, not merely accepted a socket.
         graceTimer = setTimeout(() => {
@@ -145,6 +147,7 @@ export function usePulseSource(videoRef: React.RefObject<HTMLVideoElement | null
             // moment it delivers. Its loop checks this flag and exits.
             usingFallbackRef.current = false
             lastPresageAt = Date.now()
+            useSensorStatus.getState().countReading()
             setReading(msg.bpm, msg.confidence ?? 0.8, 'presage')
           }
         } catch {
@@ -154,6 +157,7 @@ export function usePulseSource(videoRef: React.RefObject<HTMLVideoElement | null
       ws.onclose = () => {
         sidecarAlive = false
         gotPresageReading = false
+        useSensorStatus.getState().setSidecar(false)
         clearTimeout(graceTimer)
         stopFrameSender()
         scheduleFallback()
