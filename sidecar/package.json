@@ -13,6 +13,7 @@
   "type": "module",
   "dependencies": {
     "@smartspectra/node-sdk": "^3.3.0",
+    "pg": "^8.23.0",
     "ws": "^8.21.3"
   },
   "allowScripts": {

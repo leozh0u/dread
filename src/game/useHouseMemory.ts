@@ -4,6 +4,8 @@ import { useSession } from './session'
 import { useThreat } from './threat'
 import { usePulseStore } from '../lib/usePulse'
 import { recallPriors, rememberRun, bestArm } from '../lib/houseMemory'
+import { startTrace, stopTrace, recordSample, flushTrace } from '../lib/pulseTrace'
+import { playerId } from '../lib/playerId'
 
 /**
  * Connects the Director's bandit to Backboard, so what the house learns
@@ -20,6 +22,36 @@ import { recallPriors, rememberRun, bestArm } from '../lib/houseMemory'
  */
 export function useHouseMemory() {
   const [recognition, setRecognition] = useState<string | null>(null)
+
+  // Tiger Data: stream the pulse trace out so a run outlives the tab.
+  // Subscribing to the store rather than polling means one row per actual
+  // reading, which is what makes it a real time series rather than a
+  // resampled approximation of one.
+  useEffect(() => {
+    const runId = `r_${Date.now().toString(36)}`
+    const pid = playerId()
+    startTrace()
+    let lastBpm: number | null = null
+    const unsubscribe = usePulseStore.subscribe((s) => {
+      if (s.bpm == null || s.bpm === lastBpm) return
+      lastBpm = s.bpm
+      recordSample({
+        t: Date.now(),
+        runId,
+        playerId: pid,
+        bpm: s.bpm,
+        confidence: s.confidence,
+        source: s.source,
+        baseline: s.baseline,
+        event: useDirector.getState().phase,
+      })
+    })
+    return () => {
+      unsubscribe()
+      stopTrace()
+      void flushTrace()
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -54,6 +86,8 @@ export function useHouseMemory() {
         peakBpm: history.length ? Math.max(...history.map((h) => h.bpm)) : null,
         baseline: usePulseStore.getState().baseline,
       }).then((ok) => console.info('[dread] house memory written:', ok))
+      // Get the tail of the trace out before the end screen sits idle.
+      void flushTrace()
     })
     return unsubscribe
   }, [])

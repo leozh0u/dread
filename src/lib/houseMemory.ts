@@ -24,6 +24,7 @@
  * key — the game plays exactly as it does today, just without a past.
  */
 import type { ScareType } from '../game/director'
+import { playerId } from './playerId'
 
 const SIDECAR = 'http://localhost:8787'
 const TIMEOUT_MS = 4000
@@ -33,20 +34,7 @@ export interface ScarePriors {
   runs: number
 }
 
-/** Stable identity for one player across sessions on this machine. */
-function playerId(): string {
-  try {
-    const existing = localStorage.getItem('dread.playerId')
-    if (existing) return existing
-    const id = `p_${Math.random().toString(36).slice(2, 10)}`
-    localStorage.setItem('dread.playerId', id)
-    return id
-  } catch {
-    // Private browsing, or storage disabled. A per-session identity still
-    // lets a single sitting work; it just won't outlive the tab.
-    return 'p_anon'
-  }
-}
+
 
 /**
  * Write this run's learned statistics back to the house.

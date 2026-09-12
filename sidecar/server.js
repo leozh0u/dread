@@ -30,6 +30,14 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'node:http'
+import {
+  initTimeseries,
+  insertSamples,
+  listRuns,
+  runTrace,
+  timeseriesStatus,
+  closeTimeseries,
+} from './timeseries.js'
 import { WebSocketServer } from 'ws'
 import {
   SmartSpectraSDK,
@@ -78,6 +86,9 @@ const API_KEY = readKey('PRESAGE_API_KEY')
 // bundle; the API key below is only for confirming an inquiry server-side.
 const PERSONA_KEY = readKey('PERSONA_API_KEY')
 const BACKBOARD_KEY = readKey('BACKBOARD_API_KEY')
+// A connection string carries a password. There is no browser-safe form of
+// this, ever — it is read here and nowhere else.
+const TIGERDATA_URL = readKey('TIGERDATA_URL')
 
 if (!API_KEY) {
   console.error('[sidecar] No PRESAGE_API_KEY found.')
@@ -273,6 +284,7 @@ const httpServer = createServer(async (req, res) => {
           confidence: lastConfidence,
           persona: Boolean(PERSONA_KEY),
           backboard: Boolean(BACKBOARD_KEY),
+          tigerdata: timeseriesStatus(),
         },
         origin,
       )
@@ -330,6 +342,27 @@ const httpServer = createServer(async (req, res) => {
       }
     }
 
+    // Tiger Data: the pulse trace, stored as the time series it is.
+    if (url.pathname === '/trace/append' && req.method === 'POST') {
+      const { samples } = await readBody(req)
+      if (!Array.isArray(samples)) return sendJson(res, 400, { ok: false }, origin)
+      const written = await insertSamples(samples)
+      return sendJson(res, 200, { ok: written > 0, written }, origin)
+    }
+
+    if (url.pathname === '/trace/runs') {
+      const playerId = url.searchParams.get('playerId')
+      if (!playerId) return sendJson(res, 400, { ok: false, reason: 'missing playerId' }, origin)
+      const runs = await listRuns(playerId)
+      return sendJson(res, 200, { ok: true, runs }, origin)
+    }
+
+    if (url.pathname === '/trace/run') {
+      const runId = url.searchParams.get('runId')
+      if (!runId) return sendJson(res, 400, { ok: false, reason: 'missing runId' }, origin)
+      return sendJson(res, 200, { ok: true, trace: await runTrace(runId) }, origin)
+    }
+
     res.writeHead(404, corsHeaders(origin))
     res.end('not found')
   } catch (err) {
@@ -359,6 +392,11 @@ httpServer.on('listening', () => {
   console.log(`[sidecar] listening on ws://localhost:${PORT}`)
   console.log(
     `[sidecar] persona=${PERSONA_KEY ? 'ready' : 'no key'} backboard=${BACKBOARD_KEY ? 'ready' : 'no key'}`,
+  )
+  // Connect in the background — a slow or unreachable database must never
+  // delay the game starting.
+  initTimeseries(TIGERDATA_URL).then((ok) =>
+    console.log(`[sidecar] tigerdata=${ok ? 'ready' : timeseriesStatus()}`),
   )
 })
 
@@ -461,6 +499,7 @@ setInterval(() => {
 process.on('SIGINT', async () => {
   console.log('\n[sidecar] shutting down')
   try {
+    await closeTimeseries()
     await sdk.destroy()
   } catch {
     /* already gone */
