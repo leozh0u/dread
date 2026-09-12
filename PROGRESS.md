@@ -89,14 +89,20 @@ static host — same fallback path that already exists for local use.
 
 ## Open — in priority order
 
-1. **NOBODY HAS EVER COMPLETED A RUN.** Not Leo, not me. Three fragments
-   across a maze, a door, two endings — never played end to end. If a
-   fragment is unreachable or a win doesn't fire, the discovery point
-   would be while filming. Verified as far as possible without playing
-   (route geometrically unobstructed, both trigger zones register, door
-   unlocks at 3 fragments) but an actual playthrough is the only proof.
-   Dev keys added to make this fast: **C** skips calibration, **K**
-   grants all fragments, **J** does both.
+1. **NOBODY HAS EVER PLAYED A RUN END TO END.** Still true, and still
+   the top risk — but the level itself is now *proved* completable
+   rather than assumed. `npm run test:level` builds the real collision
+   geometry and flood-fills from spawn at the player's capsule radius.
+   It found two genuine bugs on its first run, both room openings cut in
+   the wrong wall: the G-H alcove and the M-N branch room were each
+   sealed shut, and each gap opened into the void between corridors —
+   the player could literally walk out of the level. Both fixed; the
+   level is now verified sealed with all fragments and hiding spots
+   reachable, and door gating verified in both states.
+   What that test CANNOT prove: that it feels right, that the monster
+   doesn't trap you, that the endings fire in play. Still needs a human.
+   Dev keys make it fast: **C** skips calibration, **K** grants all
+   fragments, **J** does both.
 2. **Presage — FIXED, needs one real-face confirmation from Leo.**
    Root cause was two bugs masking each other: the sidecar called
    `useCamera()`, which captures in the sidecar's own process, and a Node
@@ -125,8 +131,9 @@ static host — same fallback path that already exists for local use.
    anything in the client bundle is public — neither key may ship to the
    browser. Backboard ("the house remembers you") and Persona ("prove
    you're alive to enter") both need a decision on where the call runs.
-   Tiger Data has the same problem and is the least valuable of the
-   three; drop it if time is short.
+   Leo also has a **free Tiger Data account** (2026-09-12 ~01:20) — same
+   constraint, and it's the weakest of the three for a static site since
+   DB credentials definitely can't ship to the browser.
 6. **Creature design still not signed off.** Rebuilt with connected
    skeletons and shaded materials after Leo's screenshots showed floating
    parts and flat cardboard shapes. Press **M** to inspect.
