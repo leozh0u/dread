@@ -98,6 +98,23 @@ const NOISE_TRIGGER = 0.12
 const HUNT_MEMORY_S = 6
 /** Creatures don't see through a closed hiding spot. */
 const HIDDEN_SIGHT_RANGE = 2.2
+
+/**
+ * How close a merely-STALKING creature will come.
+ *
+ * STALK closes on the player at patrol speed, which is right — but with
+ * nothing to stop it, it simply arrives, stands next to you, and kills
+ * you, because detection only needs line of sight. That makes STRIKE
+ * meaningless (it was already on top of you) and puts the player under
+ * unbroken lethal pressure from the first minute.
+ *
+ * So stalking holds at the edge of earshot: close enough that you hear it
+ * moving and know it's coming, far enough that it can't kill you. Closing
+ * the rest of the distance is what a STRIKE — or actually seeing you — is
+ * for. The dread and the danger become separate things, which is the
+ * whole point of a director.
+ */
+const STALK_HOLD_DIST = 11
 /** Top surface of the floor slab. Creatures are modelled feet-at-origin,
  * so this is where that origin sits. */
 const FLOOR_Y = -0.9
@@ -217,7 +234,11 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     const prevX = group.current.position.x
     const prevZ = group.current.position.z
 
-    if (hunting || retreating) {
+    // A stalking creature stops at the edge of earshot; a hunting one
+    // doesn't stop at all.
+    const holding = pursuing && !fullHunt && toPlayer != null && toPlayer < STALK_HOLD_DIST
+
+    if ((hunting && !holding) || retreating) {
       // Free navigation of the real maze. Retreating walks the same field
       // uphill, which backs away along a route that exists rather than
       // reversing into a wall.
@@ -231,6 +252,13 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       // nearestPatrolS samples the polyline 120 times, and doing that for
       // three creatures at 60fps was 21,600 polyline evaluations a second
       // for a number that only matters when a hunt ends.
+      // Holding at the edge of earshot: drift slowly rather than freezing
+      // in place, so it still reads as something alive that is waiting.
+      if (holding) {
+        here.x += Math.sin(t * 0.6 + index) * 0.35 * dt
+        here.z += Math.cos(t * 0.47 + index * 2) * 0.35 * dt
+      }
+
       resyncIn.current -= dt
       if (resyncIn.current <= 0) {
         resyncIn.current = 0.5
