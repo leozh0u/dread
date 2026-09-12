@@ -6,7 +6,7 @@
  * and picks worse scares for the rest of the session — which is exactly
  * the kind of bug that survives to judging.
  */
-import { scoreScare } from '../src/game/useDirectorLoop'
+import { scoreScare, nextPhase } from '../src/game/useDirectorLoop'
 import { useDirector } from '../src/game/director'
 
 let failures = 0
@@ -48,6 +48,48 @@ check(
   'good pulse that dropped -> negative delta survives',
   scoreScare({ bpmBefore: 80, bpmNow: 72, confidence: 0.8, flinched: false }) === 72,
 )
+
+console.log('\n--- the inversion: calm invites it in, fright pushes it away ---')
+{
+  const calm = { arousal: 0.1, recovered: true }
+  const frightened = { arousal: 0.9, recovered: false }
+  const settling = { arousal: 0.3, recovered: false }
+
+  // The claim the demo video makes in its first twenty seconds.
+  const fromStalkCalm = nextPhase({ phase: 'STALK', ...calm })
+  check('STALK + recovered -> STRIKE, and fires a scare', fromStalkCalm.phase === 'STRIKE' && fromStalkCalm.fireScare)
+
+  const fromStalkScared = nextPhase({ phase: 'STALK', ...frightened })
+  check('STALK + still frightened -> stays STALK, fires nothing', fromStalkScared.phase === 'STALK' && !fromStalkScared.fireScare)
+
+  check('STRIKE always withdraws rather than grinding you down', nextPhase({ phase: 'STRIKE', ...frightened }).phase === 'WITHDRAW')
+  check('WITHDRAW + high arousal -> stays away', nextPhase({ phase: 'WITHDRAW', ...frightened }).phase === 'WITHDRAW')
+  check('WITHDRAW + settled -> RECOVER', nextPhase({ phase: 'WITHDRAW', ...settling }).phase === 'RECOVER')
+  check('RECOVER + not yet recovered -> stays RECOVER', nextPhase({ phase: 'RECOVER', ...settling }).phase === 'RECOVER')
+  check('RECOVER + recovered -> back to STALK', nextPhase({ phase: 'RECOVER', ...calm }).phase === 'STALK')
+  check('CALIBRATING never fires a scare', !nextPhase({ phase: 'CALIBRATING', ...calm }).fireScare)
+
+  // Only one scare per cycle, or a calm player would be machine-gunned.
+  let phase: DirectorPhase = 'STALK'
+  let fires = 0
+  for (let i = 0; i < 40; i++) {
+    const r = nextPhase({ phase, ...calm })
+    if (r.fireScare) fires++
+    phase = r.phase
+  }
+  check('a permanently calm player gets a paced cycle, not a barrage', fires > 3 && fires < 15, `${fires} scares in 40 ticks`)
+
+  // And a permanently terrified one is left alone entirely.
+  phase = 'STALK'
+  fires = 0
+  for (let i = 0; i < 40; i++) {
+    const r = nextPhase({ phase, ...frightened })
+    if (r.fireScare) fires++
+    phase = r.phase
+  }
+  check('a permanently frightened player is never struck at', fires === 0)
+  check('and it settles in STALK waiting for them', phase === 'STALK')
+}
 
 console.log('\n--- the bandit learns from it ---')
 const d = useDirector.getState()
