@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { usePulseStore } from '../lib/usePulse'
 import { useDirector, type ScareType, type DirectorPhase } from './director'
 import { useSensorless } from './sensorless'
+import { duckAmbient, playSfx } from './scareFx'
 import { useSession } from './session'
 import { useBlinkStore } from '../lib/useBlinkDetection'
 import { arousalFrom, hasRecovered } from './arousal'
@@ -104,6 +105,7 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
   const sessionStart = useSession((s) => s.start)
   const blind = useSensorless((s) => s.blind)
 
+  const lastPhase = useRef<DirectorPhase | null>(null)
   const calibrationStart = useRef<number | null>(null)
   const calibrationSamples = useRef<number[]>([])
   const pendingScare = useRef<{
@@ -127,6 +129,23 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
       sessionStart()
     }
   }, [bpm, phase, setBaseline, setPhase, sessionStart])
+
+  // --- Make the adaptive loop audible ---
+  // Without this the Director's response to the player's body happened
+  // entirely off screen: the monster changed speed somewhere in the maze
+  // and nothing told you the game had reacted to you at all.
+  useEffect(() => {
+    if (lastPhase.current === phase) return
+    const prev = lastPhase.current
+    lastPhase.current = phase
+    if (prev == null) return
+
+    if (phase === 'WITHDRAW') {
+      // It got to you, and it's backing off to let that land.
+      duckAmbient(4.5)
+      if (Math.random() < 0.4) playSfx('vo-still-here', { volume: 0.5 })
+    }
+  }, [phase])
 
   // --- Watchdog: start the game even if the sensor never works ---
   useEffect(() => {

@@ -2,6 +2,21 @@ import { useState } from 'react'
 import { livenessConfigured, runLivenessCheck } from '../lib/liveness'
 
 /**
+ * This needs a keyboard, a mouse and a webcam, and the hosted link will
+ * absolutely get opened on a phone. Without this, a phone visitor gets a
+ * black screen and a game that cannot be controlled, which is a worse
+ * first impression than an honest one — and that visitor might be a
+ * judge skimming submissions between rooms.
+ */
+function isTouchOnly() {
+  if (typeof window === 'undefined') return false
+  return (
+    navigator.maxTouchPoints > 0 &&
+    !window.matchMedia('(pointer: fine)').matches
+  )
+}
+
+/**
  * Every browser blocks camera access and AudioContext until a real user
  * gesture. This screen IS that gesture — and doubles as the in-fiction
  * "the house is listening" cold open once calibration begins right after.
@@ -13,6 +28,7 @@ export function StartGate({ onStart }: { onStart: () => void }) {
   // has decided what you are.
   const [verdict, setVerdict] = useState<string | null>(null)
   const showLiveness = livenessConfigured() && verdict === null
+  const touchOnly = isTouchOnly()
 
   async function verifyThenStart() {
     setVerifying(true)
@@ -68,6 +84,25 @@ export function StartGate({ onStart }: { onStart: () => void }) {
       <p style={{ opacity: 0.45, fontSize: 12, letterSpacing: 1 }}>
         WASD move · arrow keys look · space jump · N mute
       </p>
+
+      {touchOnly && (
+        <p
+          style={{
+            color: '#ff5a5a',
+            opacity: 0.9,
+            fontSize: 12,
+            maxWidth: 420,
+            textAlign: 'center',
+            lineHeight: 1.6,
+            border: '1px solid rgba(255,90,90,0.35)',
+            padding: '8px 12px',
+          }}
+        >
+          This needs a keyboard and a webcam. Open it on a laptop — on a
+          phone you won't be able to move, and the game reads your pulse
+          off the camera.
+        </p>
+      )}
       {verdict && (
         <p style={{ color: '#c33', fontSize: 13, letterSpacing: 1, opacity: 0.9 }}>{verdict}</p>
       )}

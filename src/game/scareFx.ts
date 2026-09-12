@@ -107,6 +107,40 @@ export function isMuted() {
 export function unlockAudio() {
   const audioCtx = getCtx()
   if (audioCtx.state === 'suspended') audioCtx.resume()
+  armAudioRecovery()
+}
+
+/**
+ * Bring the audio back when the tab does.
+ *
+ * unlockAudio only ever ran on the one click that started the game, so a
+ * browser that suspended the context afterwards — backgrounding the tab
+ * is enough, and some do it on idle — left the game permanently silent
+ * with no way to recover short of a reload. In a game where audio IS the
+ * gameplay, and which a judge may well alt-tab away from mid-run, that's
+ * not a small failure.
+ *
+ * Also retried on the next click or keypress, because a browser can
+ * refuse to resume outside a user gesture.
+ */
+let recoveryArmed = false
+function armAudioRecovery() {
+  if (recoveryArmed || typeof document === 'undefined') return
+  recoveryArmed = true
+  const resume = () => {
+    const audioCtx = getCtx()
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {
+        /* needs a gesture; the listeners below will get it */
+      })
+    }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) resume()
+  })
+  window.addEventListener('focus', resume)
+  window.addEventListener('pointerdown', resume)
+  window.addEventListener('keydown', resume)
 }
 
 // ---------------------------------------------------------------------------
@@ -481,6 +515,36 @@ export function setMonsterProximity(distance: number) {
     (420 + closeness * 3600) * (lastOccluded ? 0.28 : 1),
     t + 0.2,
   )
+}
+
+/**
+ * The house holding its breath.
+ *
+ * The Director's whole premise is that it withdraws when you're
+ * frightened and closes in when you're calm — but during play that was
+ * completely imperceptible. The monster changed speed somewhere off
+ * screen and the player had no way to know the game had responded to
+ * their body at all, which means the single most interesting thing about
+ * this project was invisible while you played it.
+ *
+ * So a withdrawal is now audible: the room drops to near-silence for a
+ * few seconds. It reads as the house noticing it got to you and backing
+ * off — which is exactly what happened — and near-silence after a spike
+ * is also far more frightening than more noise would be, because it puts
+ * the player in the gap waiting for what comes next.
+ */
+export function duckAmbient(seconds = 4) {
+  if (!ambient) return
+  const audioCtx = getCtx()
+  const t = audioCtx.currentTime
+  for (const g of [ambient.droneGain, ambient.noiseGain, ambient.growlGain]) {
+    const current = g.gain.value
+    g.gain.cancelScheduledValues(t)
+    g.gain.setValueAtTime(current, t)
+    // Fast down, slow back: a held breath, not a fade-out.
+    g.gain.linearRampToValueAtTime(current * 0.12, t + 0.55)
+    g.gain.linearRampToValueAtTime(current, t + seconds)
+  }
 }
 
 /**
