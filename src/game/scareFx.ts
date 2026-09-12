@@ -261,15 +261,15 @@ function positionedPanner(audioCtx: AudioContext, x: number, y: number, z: numbe
  * positioned at the monster's exact location so its footfalls pan and
  * attenuate correctly even though the continuous growl/breathing bed is
  * a separate, always-on chain. */
-export function playMonsterFootstep(x: number, y: number, z: number) {
+export function playMonsterFootstep(x: number, y: number, z: number, pitch = 1) {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
   const panner = positionedPanner(audioCtx, x, y, z)
 
   const osc = audioCtx.createOscillator()
   osc.type = 'sine'
-  osc.frequency.setValueAtTime(75, t0)
-  osc.frequency.exponentialRampToValueAtTime(32, t0 + 0.16)
+  osc.frequency.setValueAtTime(75 * pitch, t0)
+  osc.frequency.exponentialRampToValueAtTime(32 * pitch, t0 + 0.16)
   const oGain = audioCtx.createGain()
   oGain.gain.setValueAtTime(0.3, t0)
   oGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22)
@@ -280,7 +280,7 @@ export function playMonsterFootstep(x: number, y: number, z: number) {
   const src = noiseSource(audioCtx)
   const filter = audioCtx.createBiquadFilter()
   filter.type = 'lowpass'
-  filter.frequency.value = 450
+  filter.frequency.value = 450 * pitch
   const nGain = audioCtx.createGain()
   nGain.gain.setValueAtTime(0.14, t0)
   nGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.28)

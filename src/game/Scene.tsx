@@ -4,7 +4,7 @@ import { PointerLockControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
 import { Player } from './Player'
 import { House } from './House'
-import { Monster } from './Monster'
+import { Entities } from './entities'
 import { EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { updateAudioListener } from './scareFx'
@@ -28,7 +28,7 @@ function Flashlight() {
     <>
       <spotLight
         ref={light}
-        intensity={900}
+        intensity={620}
         angle={0.4}
         penumbra={0.6}
         distance={14}
@@ -83,10 +83,10 @@ export function Scene() {
       {/* Enough ambient to read the space — the fluorescents are the real
           light source now, so the room is lit-but-wrong rather than a
           black void navigated by torch. */}
-      <ambientLight intensity={0.35} color="#b8a878" />
+      <ambientLight intensity={0.2} color="#b8a878" />
       <Physics gravity={[0, -20, 0]}>
         <House />
-        <Monster />
+        <Entities />
         <Player />
       </Physics>
       <Flashlight />

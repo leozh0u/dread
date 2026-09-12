@@ -110,7 +110,7 @@ export function Fluorescents() {
       }
       const f = fixtures[pick.i]
       light.position.set(f.position[0], f.position[1] - 0.25, f.position[2])
-      light.intensity = 13 * levelOf(f, t)
+      light.intensity = 10 * levelOf(f, t)
     }
   })
 
