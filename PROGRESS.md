@@ -793,3 +793,75 @@ Rendering and the pose blending are confirmed by screenshot, and
 `patrol` / `stalk` were observed cycling live. `alert`, `charge` and
 `strike` were NOT observed in that sample — the creatures never got line
 of sight at close range during it. Verifying those next.
+
+---
+
+## Live debugging session — Leo actually playing
+
+### His camera works. Presage was reading him.
+
+The log caught it mid-session:
+
+```
+status=kRunning — 26 frames in: sit back so your upper chest is in frame too
+sdk error 1 SmartSpectra is not in a valid state for this operation. retryable=false
+processing status: kError
+```
+
+Presage had his face and was giving real framing feedback. Then the graph
+dropped into `kError`, where it refuses every frame **forever**, and the
+sidecar's only response was to log that refusal once per frame at 24fps,
+indefinitely. From the game's side: `reading…` for the rest of the
+session, indistinguishable from a signal that has not converged.
+
+The SDK exposes stop/reset/start, so it now uses them — debounced,
+because errors arrive per-frame, and capped at five, because something
+that fails immediately on every restart will not be fixed by restarting
+it a hundred more times.
+
+Also fixed before that: a paused tab produced a multi-minute forward jump
+in frame timestamps, which the SDK refuses with "gap between camera frame
+timestamps". The sidecar now keeps its own clock and clamps the delta, so
+a pause of any length becomes one ordinary frame interval. This matters
+more than it sounds — he said he would be doing other things in Chrome
+with the game in a background tab.
+
+### "why does it say 40bpm, 40 feels too low"
+
+Because 40 was the bottom of the band and the estimator was railing
+against it. Reproduced: a signal of nothing but leaning and breathing,
+no pulse anywhere, returns **40 bpm at confidence 1.00**. Breathing is
+12–20/min and sway is slower; their energy sits below the band, and a
+windowed DFT leaks into the bottom bin.
+
+Three fixes — a running-mean high-pass at ~0.77 Hz, an edge guard, and
+harmonic rejection (a head bob at 18/min puts its third harmonic at 54,
+which is a perfectly plausible resting rate). Verified in both
+directions, since any of them could pass by rejecting everything: sway,
+breathing, walking bob and fidgeting all return null; 55 resting, 72
+under heavy sway, 76 through breathing and 130 frightened are all found.
+
+And the display was crawling — the step clamp limited the INPUT to the
+moving average, which then applied alpha of that, so the two multiplied
+to 0.6 bpm per reading. Plus the first reading anchored everything, and
+the first reading is the least reliable one there is.
+
+### The light he asked about
+
+A fragment. One of three. The light follows the nearest uncollected one,
+so picking one up moves the light away and the room goes dark — which
+read as "did I just end the game".
+
+### Audio
+
+The jump sound was a 150ms white-noise burst through a fixed high-pass,
+opened at full gain: an instant attack on noise is a click, a static
+high-pass is a hiss, and there was no low end connecting it to a body.
+Rebuilt as a scuff plus the weight leaving the floor, randomised per
+jump. It was also firing in the same frame as the landing thud when the
+key was held through a touchdown.
+
+The same instant-attack click was in the footsteps and the landing — the
+two most frequently triggered sounds in the game. Fixed there too, and
+deliberately NOT in the jump-scare stabs, where an instant attack is the
+entire point.
