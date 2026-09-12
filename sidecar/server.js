@@ -135,6 +135,19 @@ let readings = 0
 let status = 'starting'
 let lastValidation = null
 let lastPrintedValidation = null
+/**
+ * The last validation verdict, kept so it can be replayed to a client
+ * that connects afterwards.
+ *
+ * Validation is broadcast only on CHANGE, because it fires per frame and
+ * would otherwise flood the socket. But that means a browser that
+ * connects into an already-steady state — the overwhelmingly common case,
+ * since the sidecar is started first and the player then opens the game
+ * into a room that has been too dark the whole time — never hears the one
+ * message that explains why it has no pulse. The state is therefore
+ * replayed on connect as well as pushed on change.
+ */
+let lastValidationMsg = null
 let framesIn = 0
 let lastFrameUs = 0
 
@@ -159,6 +172,7 @@ sdk.on('processingStatus', (s) => {
     Object.entries(ProcessingStatus).find(([, v]) => v === s)?.[0] ?? String(s)
   status = name
   console.log('[sidecar] processing status:', name)
+  broadcast({ type: 'status', status: name })
 })
 
 sdk.on('validationStatus', (code, ts, hint) => {
@@ -172,11 +186,28 @@ sdk.on('validationStatus', (code, ts, hint) => {
   lastPrintedValidation = code
   if (code === ValidationCode.kOk) {
     console.log('[sidecar] framing OK — measuring')
+    lastValidationMsg = { type: 'validation', code, name: 'kOk', fix: null, hint: null }
+    broadcast(lastValidationMsg)
     return
   }
   const name = VALIDATION_NAME[code] ?? code
   console.log(`[sidecar] can't measure: ${VALIDATION_FIX[code] ?? name}`)
   if (hint) console.log('[sidecar]   hint:', hint)
+
+  // ...AND TELL THE BROWSER. This was only ever printed to the terminal,
+  // which meant the one component that knows exactly why there is no
+  // pulse — too dark, no face, sitting too far back, moving too much —
+  // was invisible to the person actually sitting in front of the camera.
+  // From the game's side the symptom was an indefinite "reading…", with
+  // the diagnosis sitting in a window nobody was looking at.
+  //
+  // That matters well beyond debugging: at judging, someone sits down in
+  // a room we did not light and the single most likely failure is
+  // kTooDark. The difference between the game saying "TOO DARK — put a
+  // lamp on your face" and the game saying nothing is the difference
+  // between a demo that recovers and one that just looks broken.
+  lastValidationMsg = { type: 'validation', code, name, fix: VALIDATION_FIX[code] ?? null, hint: hint ?? null }
+  broadcast(lastValidationMsg)
 })
 
 sdk.on('metrics', (buf) => {
@@ -410,6 +441,8 @@ function broadcast(msg) {
 wss.on('connection', (ws) => {
   console.log('[sidecar] game connected — waiting for frames')
   ws.send(JSON.stringify({ type: 'hello', wantFrames: true, lastPulse, lastConfidence }))
+  if (lastValidationMsg) ws.send(JSON.stringify(lastValidationMsg))
+  ws.send(JSON.stringify({ type: 'status', status }))
 
   ws.on('message', (data, isBinary) => {
     if (!isBinary) return

@@ -35,7 +35,15 @@ export function Vitals() {
   const startle = useBlinkStore((s) => s.startle)
   const framesSent = useSensorStatus((s) => s.framesSent)
   const sidecar = useSensorStatus((s) => s.sidecarConnected)
+  const validation = useSensorStatus((s) => s.validation)
   const blind = useSensorless((s) => s.blind)
+
+  // Only while it is actually a problem: kOk means framing is fine, and a
+  // stale verdict from before the player fixed it would be worse than
+  // saying nothing. Suppressed once a pulse is coming through, since by
+  // then the panel is showing the reading itself.
+  const presageFix =
+    bpm == null && validation && validation.name !== 'kOk' ? validation.fix ?? validation.name : null
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -92,6 +100,32 @@ export function Vitals() {
 
       <Bar label="conf" v={confidence} />
       <Bar label="startle" v={startle} alert />
+
+      {/* PRESAGE'S OWN DIAGNOSIS.
+          The SDK reports, per frame, exactly why it cannot get a reading
+          — too dark, no face, too far back, moving too much. That went to
+          the sidecar's terminal and nowhere else, so the player sitting in
+          front of the camera saw an indefinite "reading…" and no way to
+          tell a covered lens from a dim room.
+
+          It is deliberately the loudest thing in this panel when it is
+          not kOk, because at judging someone will sit down in a room we
+          did not light, and kTooDark is the single most likely way this
+          demo fails. */}
+      {presageFix && (
+        <div
+          style={{
+            marginTop: 7,
+            padding: '5px 6px',
+            border: '1px solid rgba(255,90,90,0.45)',
+            color: '#ff8a6a',
+            maxWidth: 190,
+            lineHeight: 1.4,
+          }}
+        >
+          {presageFix}
+        </div>
+      )}
 
       {baseline != null && (
         <div style={{ opacity: 0.4, marginTop: 5 }}>resting {baseline} bpm</div>

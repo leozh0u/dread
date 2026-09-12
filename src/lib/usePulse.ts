@@ -150,6 +150,21 @@ export function usePulseSource(videoRef: React.RefObject<HTMLVideoElement | null
             useSensorStatus.getState().countReading()
             setReading(msg.bpm, msg.confidence ?? 0.8, 'presage')
           }
+          // Presage's verdict on the framing. This is the only channel
+          // that can say WHY there is no pulse, and without it the game
+          // shows an indefinite "reading…" whether the camera is covered,
+          // the room is dark, or the player is out of frame.
+          if (msg.type === 'validation') {
+            useSensorStatus.getState().setValidation({
+              code: msg.code,
+              name: String(msg.name ?? ''),
+              fix: msg.fix ?? null,
+              at: Date.now(),
+            })
+          }
+          if (msg.type === 'status') {
+            useSensorStatus.getState().setProcessing(String(msg.status ?? ''))
+          }
         } catch {
           /* ignore malformed frame */
         }
