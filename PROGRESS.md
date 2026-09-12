@@ -966,3 +966,52 @@ player's own frame off the audio listener's forward vector. 21 new checks.
 | 66 Claude co-author trailers in a public repo | **blocked on him** |
 | video not shot | **highest risk item, blocked on him** |
 | monsters never signed off | **blocked on him** |
+
+---
+
+## Why Presage has never produced a reading — diagnosed
+
+**Every row in TimescaleDB is `source='fallback'`. 310 of them. There has
+never been a single `presage` row.** Not today, not yesterday, not once.
+
+The cause, finally:
+
+```
+physiology_inference_calculator.cc:178] Unable to resolve configured
+model path. Falling back to remote delivery if available.
+```
+
+Logged on **every** startup. And the package explains it — the platform
+binary ships seven model files:
+
+```
+face_detection_full_range   face_detection_short_range
+face_landmark               face_landmark_with_attention
+pose_detection              pose_landmark_full          pose_landmark_lite
+```
+
+All face and pose. **There is no physiology model in the package.** The
+pulse model is delivered remotely from Presage's servers, gated on the API
+key, and that delivery never succeeds.
+
+This accounts for every symptom exactly:
+
+- Face tracking works → local `face_landmark` model.
+- Framing validation works, with real specific feedback ("sit back so your
+  upper chest is in frame too") → local models.
+- `kRunning` is reached → the graph starts fine.
+- **Pulse is null forever** → the one model that produces it never arrives.
+
+So it was never a framing problem, never a lighting problem, and never
+something Leo was doing wrong. Sitting back was never going to fix it.
+
+`SmartSpectraOptions` exposes only `apiKey`, `requestedMetrics`,
+`enableAccumulatedOutput`, `logLevel`, `enableTelemetry` — **no model path
+override**, so this cannot be pointed at a local file from our side.
+
+**Most likely: the API key is not provisioned for cardiac metrics.** Next
+step is Leo asking the Presage table directly, with that exact log line.
+Five-minute conversation; it either fixes it or kills it definitively.
+
+Also confirmed: `tigerdata: "ready"` — the "not configured" seen once was
+a transient during connection setup, not a regression.
