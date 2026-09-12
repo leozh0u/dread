@@ -96,6 +96,28 @@ const SIGHT_RANGE = 14
 const HEARING_RANGE = 26
 const NOISE_TRIGGER = 0.12
 const HUNT_MEMORY_S = 6
+
+/* --- Lunge cycle tuning (see the lungeState ref for the design) -------
+ * Durations and speed multipliers are deliberately stated together,
+ * because the multipliers are only fair in combination with these
+ * durations: weighted by time they average
+ *   (0.28*0.05 + 0.55*2.4 + 0.9*0.45) / 1.73 ~= 1.0
+ * so a full cycle closes the same ground a steady walk would. Change one
+ * of these and the creature either becomes unfair or stops being
+ * frightening — change them as a set. */
+const COIL_S = 0.28
+const LUNGE_S = 0.55
+const RECOVER_S = 0.9
+const COIL_MUL = 0.05
+const LUNGE_MUL = 2.4
+const RECOVER_MUL = 0.45
+/** Randomised gap between lunges, so the rhythm can never be counted. */
+const LUNGE_GAP_MIN_S = 2.2
+const LUNGE_GAP_MAX_S = 5.5
+/** Too close and it has nowhere to lunge from; too far and you have time
+ * to simply walk away from it, which makes the whole move read as noise. */
+const LUNGE_MIN_DIST = 2.5
+const LUNGE_MAX_DIST = 11
 /** Creatures don't see through a closed hiding spot. */
 const HIDDEN_SIGHT_RANGE = 2.2
 
@@ -147,6 +169,38 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const wanderT = useRef(3 + index * 2)
   const pauseUntil = useRef(0)
   const resyncIn = useRef(0)
+  /**
+   * THE LUNGE CYCLE.
+   *
+   * Movement was a smooth sine wobble on top of a constant walk speed —
+   * unpredictable in the small, but never startling, because nothing ever
+   * happened SUDDENLY. A creature that glides toward you at a gently
+   * varying pace is a hazard to be managed; a creature that stops dead,
+   * turns its head straight at you, and then covers four metres in half a
+   * second is something else entirely.
+   *
+   * Four states, cycling while it is genuinely hunting you and close
+   * enough for it to matter:
+   *
+   *   prowl   — the normal walk
+   *   coil    — stops almost dead and snaps its head to you. This is the
+   *             part that does the work. The pause before the movement is
+   *             what makes the movement frightening; without it a lunge is
+   *             just a speed change you never notice starting.
+   *   lunge   — 2.4x, straight at you
+   *   recover — heavy and slow, and the reason this stays fair
+   *
+   * FAIRNESS IS PRESERVED BY CONSTRUCTION. The multipliers are weighted
+   * by their own durations to average almost exactly 1.0 over a full
+   * cycle, so a creature closes on you at the same average rate as
+   * before — it just does it in violent bursts instead of a glide. It can
+   * gain about a metre and a half during a lunge and gives it back during
+   * the recovery, so the chase is still winnable in the way the speed
+   * ceiling was always meant to guarantee. See PLAYER_SPEED.
+   */
+  const lungeState = useRef<'prowl' | 'coil' | 'lunge' | 'recover'>('prowl')
+  const lungeUntil = useRef(0)
+  const nextLungeAt = useRef(0)
   const epoch = useRef(entityEpoch())
   // Mutated every frame, read by the creature's own frame loop. Never a
   // prop and never state: props would freeze (refs don't re-render) and
@@ -170,6 +224,9 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       pauseUntil.current = 0
       patrolDir.current = 1
       distSinceStep.current = 0
+      lungeState.current = 'prowl'
+      lungeUntil.current = 0
+      nextLungeAt.current = 0
     }
 
     const phase = useDirector.getState().phase
@@ -223,12 +280,64 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     // Unpredictable rhythm — hitches and surges rather than a metronome.
     hitchPhase.current += dt * (0.6 + 0.4 * Math.sin(t * 0.37 + index))
     const hitch = 0.55 + 0.45 * Math.sin(hitchPhase.current * 2.3) * Math.sin(hitchPhase.current * 0.6)
+
+    // --- LUNGE CYCLE (see lungeState) ---------------------------------
+    // Only while it is actually hunting you, actually in range, and can
+    // actually see you. A lunge out of sight down a corridor is just a
+    // creature that inexplicably sped up; the whole beat depends on you
+    // watching it happen.
+    const lungeEligible =
+      fullHunt && los && toPlayer != null && toPlayer > LUNGE_MIN_DIST && toPlayer < LUNGE_MAX_DIST
+
+    if (t >= lungeUntil.current) {
+      if (lungeState.current === 'coil') {
+        lungeState.current = 'lunge'
+        lungeUntil.current = t + LUNGE_S
+        // Its voice, at the moment it commits. The sound is the tell that
+        // makes a lunge survivable if you're listening — which is the
+        // deal this whole game makes with the player.
+        playSpatialSfx(prof.close, group.current.position.x, FLOOR_Y + 1.2, group.current.position.z, {
+          volume: 1,
+          rate: 1.05 + Math.random() * 0.15,
+          occluded: false,
+        })
+      } else if (lungeState.current === 'lunge') {
+        lungeState.current = 'recover'
+        lungeUntil.current = t + RECOVER_S
+      } else if (lungeState.current === 'recover') {
+        lungeState.current = 'prowl'
+        // Randomised so you can never count the beats between them.
+        nextLungeAt.current = t + LUNGE_GAP_MIN_S + Math.random() * (LUNGE_GAP_MAX_S - LUNGE_GAP_MIN_S)
+      } else if (lungeEligible && t >= nextLungeAt.current) {
+        lungeState.current = 'coil'
+        lungeUntil.current = t + COIL_S
+      }
+    }
+    // A creature that loses sight of you mid-wind-up doesn't finish the
+    // move; it just stops, which reads as it losing you.
+    if (lungeState.current === 'coil' && !lungeEligible) {
+      lungeState.current = 'prowl'
+      nextLungeAt.current = t + 1.5
+    }
+
+    const lungeMul =
+      lungeState.current === 'coil'
+        ? COIL_MUL
+        : lungeState.current === 'lunge'
+          ? LUNGE_MUL
+          : lungeState.current === 'recover'
+            ? RECOVER_MUL
+            : 1
+    const lunging = lungeState.current === 'lunge'
+
     // Hard ceiling just above the player's own speed: a creature may
     // briefly surge past you, but can never simply outrun you in a
-    // straight line, which would make the chase a formality.
+    // straight line, which would make the chase a formality. The lunge
+    // gets a higher ceiling for the half-second it lasts — that IS the
+    // scare — and pays it straight back in the recovery.
     const effSpeed = Math.min(
-      speed * THREE.MathUtils.clamp(hitch, 0.35, 1.15),
-      PLAYER_SPEED * 1.08,
+      speed * THREE.MathUtils.clamp(hitch, 0.35, 1.15) * lungeMul,
+      PLAYER_SPEED * (lunging ? 1.7 : 1.08),
     )
 
     const prevX = group.current.position.x
@@ -324,6 +433,15 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       let d = target - facing.current
       d = Math.atan2(Math.sin(d), Math.cos(d))
       facing.current += d * Math.min(1, dt * 4)
+    }
+    // THE HEAD SNAP. Facing normally eases toward the direction of
+    // travel with a beat of inertia, which is right for walking and wrong
+    // for this: the instant a creature stops to coil, it should whip round
+    // and look straight at you. Easing turns that into a slow swivel and
+    // loses the entire beat, so while coiled or lunging the facing is set
+    // outright rather than approached.
+    if (lungeState.current === 'coil' || lunging) {
+      facing.current = Math.atan2(player.x - group.current.position.x, player.z - group.current.position.z)
     }
     // In inspect mode they turn to face you, so you see the silhouette
     // front-on rather than whichever way they happened to be walking.
