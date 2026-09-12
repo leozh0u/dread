@@ -17,24 +17,58 @@ const ROSTER = [
   { kind: 'smile' as const, startS: PATH_TOTAL_LENGTH * 0.75 },
 ]
 
-/** Only on in inspect mode (M) — lights the line-up so the designs can be
- * judged, without which they'd be black cutouts in a dim corridor. */
-function InspectLight() {
+/**
+ * Inspect mode (M) staging. The creatures are UNLIT flat-black
+ * silhouettes, so a light pointed at them does nothing — they're only
+ * visible as shapes against something brighter behind. Without a
+ * guaranteed backdrop, pressing M while facing down a dark corridor
+ * shows you almost nothing, which defeats the whole point of the tool.
+ * So inspect mode brings its own lit wall and stands them in front of it.
+ */
+function InspectStage() {
+  const backdrop = useRef<THREE.Mesh>(null!)
   const light = useRef<THREE.PointLight>(null!)
+
   useFrame(({ camera }) => {
-    if (!light.current) return
-    light.current.intensity = inspect.on ? 40 : 0
-    if (inspect.on) {
-      const dir = new THREE.Vector3()
-      camera.getWorldDirection(dir)
+    const on = inspect.on
+    if (backdrop.current) backdrop.current.visible = on
+    if (light.current) light.current.intensity = on ? 30 : 0
+    if (!on) return
+
+    const dir = new THREE.Vector3()
+    camera.getWorldDirection(dir)
+    dir.y = 0
+    dir.normalize()
+
+    // Backdrop sits behind the line-up, facing the player
+    if (backdrop.current) {
+      backdrop.current.position.set(
+        camera.position.x + dir.x * 9,
+        1.2,
+        camera.position.z + dir.z * 9,
+      )
+      backdrop.current.lookAt(camera.position.x, 1.2, camera.position.z)
+    }
+    // Light between player and creatures, aimed at the backdrop so the
+    // silhouettes read hard against it
+    if (light.current) {
       light.current.position.set(
-        camera.position.x + dir.x * 2,
-        camera.position.y + 1,
-        camera.position.z + dir.z * 2,
+        camera.position.x + dir.x * 7.5,
+        2.6,
+        camera.position.z + dir.z * 7.5,
       )
     }
   })
-  return <pointLight ref={light} color="#ffffff" intensity={0} distance={14} />
+
+  return (
+    <>
+      <mesh ref={backdrop} visible={false}>
+        <planeGeometry args={[26, 9]} />
+        <meshBasicMaterial color="#8d8a7a" toneMapped={false} side={2} />
+      </mesh>
+      <pointLight ref={light} color="#ffffff" intensity={0} distance={22} />
+    </>
+  )
 }
 
 export function Entities() {
@@ -43,7 +77,7 @@ export function Entities() {
       {ROSTER.map((e, i) => (
         <Entity key={e.kind} kind={e.kind} index={i} startS={e.startS} />
       ))}
-      <InspectLight />
+      <InspectStage />
     </>
   )
 }

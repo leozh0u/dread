@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { usePulseStore } from '../lib/usePulse'
-import { useDirector, AROUSAL, type ScareType } from './director'
+import { useDirector, type ScareType } from './director'
 import { useSession } from './session'
+import { arousalFrom, hasRecovered } from './arousal'
 
 const CALIBRATION_MS = 60_000 // Presage HRV baseline window — see plan notes
 
@@ -53,17 +54,24 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
       pendingScare.current = null
     }
 
-    if (phase === 'STALK' && delta < AROUSAL.RECOVERED_DELTA) {
+    // Arousal via the MATLAB-solved autonomic model (see arousal.ts and
+    // matlab/autonomic_model.m). HRV isn't wired through from the
+    // sidecar yet, so this currently runs on HR deviation alone — the
+    // model handles that case, it's just less discriminating.
+    const arousal = arousalFrom(delta, null)
+    const recovered = hasRecovered(delta, null)
+
+    if (phase === 'STALK' && recovered) {
       setPhase('STRIKE')
       const type = pickScare()
       pendingScare.current = { type, bpmBefore: bpm, firedAt: Date.now() }
       onScare(type)
       setPhase('WITHDRAW')
-    } else if (phase === 'WITHDRAW' && delta > AROUSAL.SCARED_DELTA) {
-      setPhase('WITHDRAW')
-    } else if (phase === 'WITHDRAW' && delta <= AROUSAL.SCARED_DELTA) {
+    } else if (phase === 'WITHDRAW' && arousal > 0.6) {
+      setPhase('WITHDRAW') // still frightened — stay away, let it land
+    } else if (phase === 'WITHDRAW' && arousal <= 0.6) {
       setPhase('RECOVER')
-    } else if (phase === 'RECOVER' && delta < AROUSAL.RECOVERED_DELTA) {
+    } else if (phase === 'RECOVER' && recovered) {
       setPhase('STALK')
     }
   }, [bpm, baseline, phase, setPhase, pickScare, onScare, recordScareOutcome])

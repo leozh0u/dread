@@ -123,7 +123,9 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       dir.y = 0
       dir.normalize()
       const right = new THREE.Vector3(-dir.z, 0, dir.x)
-      const offset = (index - 1) * 2.6
+      // 4.6 apart: the Smile's arm span is ~4.2 wide, so anything tighter
+      // has them overlapping each other in the line-up.
+      const offset = (index - 1) * 4.6
       group.current.position.x = camera.position.x + dir.x * 5 + right.x * offset
       group.current.position.z = camera.position.z + dir.z * 5 + right.z * offset
     }
@@ -138,6 +140,15 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       let d = target - facing.current
       d = Math.atan2(Math.sin(d), Math.cos(d))
       facing.current += d * Math.min(1, dt * 4)
+    }
+    // In inspect mode they turn to face you, so you see the silhouette
+    // front-on rather than whichever way they happened to be walking.
+    if (inspect.on) {
+      const toCam = Math.atan2(
+        camera.position.x - group.current.position.x,
+        camera.position.z - group.current.position.z,
+      )
+      facing.current = toCam
     }
     group.current.rotation.y = facing.current
     group.current.position.y =
