@@ -53,7 +53,15 @@ static host — same fallback path that already exists for local use.
 
 ## Open — in priority order
 
-1. **Video plan.** Never actually written despite being flagged as a task
+1. **Verify with Leo that "can't hear anything" / "haven't seen the
+   monster" are actually fixed now.** Root-caused as a real bug (ambient
+   audio was gated behind full calibration completing, which can take
+   60s or stall entirely — see Done below) and fixed, but not yet
+   confirmed on his actual machine with a real webcam. Same for the
+   pointer-lock bugs (couldn't click after dying, WASD/look sometimes
+   stopped responding) — fixed and reasoned through, not yet confirmed
+   by him live.
+2. **Video plan.** Never actually written despite being flagged as a task
    since early in the session ("video planning for later" — later is now).
    Needs a shot list against HackRice's prescribed structure (30s intro /
    2min demo / 30s technical / 30s impact).
