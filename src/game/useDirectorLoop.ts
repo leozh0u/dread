@@ -2,18 +2,72 @@ import { useEffect, useRef } from 'react'
 import { usePulseStore } from '../lib/usePulse'
 import { useDirector, type ScareType } from './director'
 import { useSession } from './session'
+import { useBlinkStore } from '../lib/useBlinkDetection'
 import { arousalFrom, hasRecovered } from './arousal'
 
 const CALIBRATION_MS = 60_000 // Presage HRV baseline window — see plan notes
 
 /**
- * Wires live pulse readings to Director phase transitions (CALIBRATING ->
+ * TWO CLOCKS. This is the core design constraint of the whole project.
+ *
+ * Slow clock: Presage pulse, averaged over ~12s. Good for "is this person
+ * actually frightened", useless for "did that just land".
+ *
+ * Fast clock: the startle response on the face, 100-300ms (see
+ * useBlinkDetection.ts). Good for "did that just land", tells you nothing
+ * about sustained arousal.
+ *
+ * The reason both are needed isn't elegance, it's that they fail in
+ * opposite places. rPPG is corrupted by motion — and the player moves most
+ * at exactly the moment a scare lands, so pulse confidence collapses
+ * precisely when the measurement matters. The face doesn't care that you
+ * moved. So: judge a scare on the face, judge the person on the pulse, and
+ * when pulse confidence collapses, lean on the face.
+ */
+export const SCARE_WINDOW_MS = 12_000
+const FLINCH_CREDIT_BPM = 9 // what a flinch is "worth" when pulse is unusable
+const LOW_CONFIDENCE = 0.35
+
+/**
+ * Turn "what the two channels saw" into the single bpm-after number the
+ * bandit learns from.
+ *
+ * Pulled out as a pure function because it decides what the Director
+ * believes about the player, and a wrong answer here is invisible — the
+ * game keeps running, it just learns the wrong thing and picks worse
+ * scares forever. Tested in scripts/directortest.ts.
+ */
+export function scoreScare(args: {
+  bpmBefore: number
+  bpmNow: number
+  confidence: number
+  flinched: boolean
+}): number {
+  const { bpmBefore, bpmNow, confidence, flinched } = args
+  const pulseUsable = confidence >= LOW_CONFIDENCE
+
+  // If Presage lost the signal — most likely precisely BECAUSE the player
+  // jumped — the bpm delta is noise, not evidence. Score off the face
+  // rather than teaching the bandit from garbage.
+  if (!pulseUsable) return bpmBefore + (flinched ? FLINCH_CREDIT_BPM : 0)
+
+  // A flinch is real evidence even when the pulse also registered, so it
+  // adds on top rather than being discarded.
+  return flinched ? bpmNow + FLINCH_CREDIT_BPM / 2 : bpmNow
+}
+
+/**
+ * Wires live biometrics to Director phase transitions (CALIBRATING ->
  * STALK -> STRIKE -> WITHDRAW -> RECOVER -> ...). Mount once at the game
  * root. Pure side-effect hook — no rendering. Monster.tsx reads `phase`
  * directly to decide where the monster actually goes.
+ *
+ * Reads BOTH clocks — see the note above SCARE_WINDOW_MS for why one isn't
+ * enough.
  */
 export function useDirectorLoop(onScare: (type: ScareType) => void) {
   const bpm = usePulseStore((s) => s.bpm)
+  const confidence = usePulseStore((s) => s.confidence)
   const baseline = usePulseStore((s) => s.baseline)
   const setBaseline = usePulseStore((s) => s.setBaseline)
   const phase = useDirector((s) => s.phase)
@@ -25,9 +79,12 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
 
   const calibrationStart = useRef<number | null>(null)
   const calibrationSamples = useRef<number[]>([])
-  const pendingScare = useRef<{ type: ScareType; bpmBefore: number; firedAt: number } | null>(
-    null,
-  )
+  const pendingScare = useRef<{
+    type: ScareType
+    bpmBefore: number
+    firedAt: number
+    flinchBaseline: number
+  } | null>(null)
 
   // --- Calibration: first 60s of readings sets resting baseline ---
   useEffect(() => {
@@ -49,8 +106,20 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
     if (phase === 'CALIBRATING' || bpm == null || baseline == null) return
     const delta = bpm - baseline
 
-    if (pendingScare.current && Date.now() - pendingScare.current.firedAt > 12_000) {
-      recordScareOutcome(pendingScare.current.type, pendingScare.current.bpmBefore, bpm)
+    // --- scoring a scare, across both clocks ---
+    const p = pendingScare.current
+    if (p && Date.now() - p.firedAt > SCARE_WINDOW_MS) {
+      // Did the face react in the moment? lastFlinchAt is a
+      // performance.now() stamp, so a change since the scare fired means a
+      // startle happened inside the window.
+      const flinched = useBlinkStore.getState().lastFlinchAt > p.flinchBaseline
+      const bpmAfter = scoreScare({
+        bpmBefore: p.bpmBefore,
+        bpmNow: bpm,
+        confidence,
+        flinched,
+      })
+      recordScareOutcome(p.type, p.bpmBefore, bpmAfter)
       pendingScare.current = null
     }
 
@@ -58,13 +127,26 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
     // matlab/autonomic_model.m). HRV isn't wired through from the
     // sidecar yet, so this currently runs on HR deviation alone — the
     // model handles that case, it's just less discriminating.
-    const arousal = arousalFrom(delta, null)
-    const recovered = hasRecovered(delta, null)
+    const slowArousal = arousalFrom(delta, null)
+    // The face can only raise arousal, never lower it. A calm face is not
+    // evidence of calm — plenty of frightened people go still — but a
+    // startled face is hard evidence of fright.
+    const startle = useBlinkStore.getState().startle
+    const arousal = Math.max(slowArousal, startle)
+    // Recovery stays a pulse decision. Coming down is a slow, physiological
+    // thing; letting a neutral face declare recovery would have the monster
+    // return the instant someone stopped grimacing.
+    const recovered = hasRecovered(delta, null) && startle < 0.3
 
     if (phase === 'STALK' && recovered) {
       setPhase('STRIKE')
       const type = pickScare()
-      pendingScare.current = { type, bpmBefore: bpm, firedAt: Date.now() }
+      pendingScare.current = {
+        type,
+        bpmBefore: bpm,
+        firedAt: Date.now(),
+        flinchBaseline: useBlinkStore.getState().lastFlinchAt,
+      }
       onScare(type)
       setPhase('WITHDRAW')
     } else if (phase === 'WITHDRAW' && arousal > 0.6) {
@@ -74,7 +156,7 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
     } else if (phase === 'RECOVER' && recovered) {
       setPhase('STALK')
     }
-  }, [bpm, baseline, phase, setPhase, pickScare, onScare, recordScareOutcome])
+  }, [bpm, confidence, baseline, phase, setPhase, pickScare, onScare, recordScareOutcome])
 
   // Monster position/movement (and therefore monsterDistance) is now owned
   // by Monster.tsx's per-frame AI — it patrols/hunts/retreats based on

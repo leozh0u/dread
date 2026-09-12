@@ -39,7 +39,7 @@ function freshStats(): Record<ScareType, ScareStat> {
  *
  * Two clocks feed it (see usePulse.ts): a slow one (Presage pulse, ~12s
  * average) drives phase transitions here; a fast one (facial expression /
- * blink, not yet wired — see TODO) is meant to catch flinches the slow
+ * blink — see useBlinkDetection.ts) catches flinches the slow
  * clock misses. For the hackathon MVP we run purely off pulse deltas
  * against a rolling baseline.
  *

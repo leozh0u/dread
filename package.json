@@ -10,8 +10,9 @@
     "preview": "vite preview",
     "test:level": "tsx scripts/reachability.ts",
     "test:run": "tsx scripts/fullrun.ts",
-    "test": "npm run test:level && npm run test:run && npm run test:memory",
-    "test:memory": "tsx scripts/memorytest.ts"
+    "test": "npm run test:level && npm run test:run && npm run test:memory && npm run test:director",
+    "test:memory": "tsx scripts/memorytest.ts",
+    "test:director": "tsx scripts/directortest.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
