@@ -2,6 +2,7 @@ import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { Bone, Plate, Joint, Chain, Glow, Grin, materials } from './shapes'
+import { advanceGait, legSwing, kneeBend, bodyBob, bodySway, shoulderTwist, hipTwist } from './gait'
 
 export type EntityKind = 'long' | 'crawler' | 'smile'
 
@@ -44,6 +45,10 @@ type Vec3 = [number, number, number]
 export function LongOne({ state }: CreatureProps) {
   const legL = useRef<THREE.Group>(null!)
   const legR = useRef<THREE.Group>(null!)
+  const shinL = useRef<THREE.Group>(null!)
+  const shinR = useRef<THREE.Group>(null!)
+  const hips = useRef<THREE.Group>(null!)
+  const torso = useRef<THREE.Group>(null!)
   const gait = useRef(0)
   const tendrils = useRef<THREE.Group>(null!)
   const head = useRef<THREE.Group>(null!)
@@ -69,22 +74,30 @@ export function LongOne({ state }: CreatureProps) {
     const t = clock.elapsedTime
     const { closeness, hunting, speed } = state.current
 
-    // Gait. Stride length is fixed by the body, so cadence has to come
-    // from how fast it is actually travelling — that's what stops it
-    // looking like it's on rails. Phase accumulates rather than being
-    // sampled from elapsed time, so a speed change doesn't snap the legs
-    // to a new position mid-step.
-    gait.current += speed * 1.15 * 0.016
-    const stride = Math.min(1, speed / 2.6)
-    const swing = Math.sin(gait.current)
-    if (legL.current) {
-      legL.current.rotation.x = swing * 0.55 * stride
-      legL.current.position.z = swing * 0.12 * stride
+    // A real walk cycle (gait.ts): stance and swing rather than a sine, so
+    // a foot plants and the body passes over it. Long legs, long stride.
+    gait.current = advanceGait(gait.current, speed, 0.016, 2.6)
+    const g = gait.current
+    // Amplitude scales in from standing, so it doesn't march on the spot.
+    const amp = Math.min(1, speed / 2.2)
+
+    if (legL.current) legL.current.rotation.x = legSwing(g, 0, 0.85 * amp)
+    if (legR.current) legR.current.rotation.x = legSwing(g, 0.5, 0.85 * amp)
+    // Knees fold during the swing so the foot clears the floor instead of
+    // scything through it — the thing that most gives away a fake walk.
+    if (shinL.current) shinL.current.rotation.x = kneeBend(g, 0) * 0.9 * amp
+    if (shinR.current) shinR.current.rotation.x = kneeBend(g, 0.5) * 0.9 * amp
+
+    if (hips.current) {
+      hips.current.position.y = bodyBob(g, 0.1 * amp)
+      hips.current.position.x = bodySway(g, 0.05 * amp)
+      hips.current.rotation.y = hipTwist(g, 0.16 * amp)
+      // Leans into its own travel — weight ahead of the feet.
+      hips.current.rotation.x = -0.04 * amp
     }
-    if (legR.current) {
-      legR.current.rotation.x = -swing * 0.55 * stride
-      legR.current.position.z = -swing * 0.12 * stride
-    }
+    // Shoulders counter-rotate against the hips, which is what stops a
+    // walking figure looking like one rigid piece being slid along.
+    if (torso.current) torso.current.rotation.y = shoulderTwist(g, 0.2 * amp)
 
     if (tendrils.current) {
       tendrils.current.children.forEach((c, i) => {
@@ -95,11 +108,18 @@ export function LongOne({ state }: CreatureProps) {
       })
     }
     if (arms.current) {
-      // Arms sway a fraction behind the body — dead weight, not walking
-      arms.current.rotation.x = Math.sin(t * 0.8) * 0.07
+      // Dead weight rather than a walker's arm swing — it hangs and is
+      // carried, lagging a quarter-cycle behind the shoulders that move it.
+      arms.current.rotation.x = Math.sin(t * 0.8) * 0.07 + legSwing(g, 0.5, 0.18 * amp)
       arms.current.rotation.z = Math.sin(t * 0.55) * 0.04
     }
-    if (head.current) head.current.rotation.y = Math.sin(t * 0.3) * 0.1
+    if (head.current) {
+      head.current.rotation.y = Math.sin(t * 0.3) * 0.1 - shoulderTwist(g, 0.2 * amp)
+      // Cancels the body's bob: the head stays dead level while everything
+      // below it rises and falls, which is the specific wrongness this
+      // creature is built around.
+      head.current.position.y = -bodyBob(g, 0.1 * amp) * 0.85
+    }
     if (headMat.current) {
       const lit = (hunting ? 1 : 0.75) * (0.75 + closeness * 0.25)
       headMat.current.emissiveIntensity = 0.25 + lit * 0.55
@@ -108,16 +128,33 @@ export function LongOne({ state }: CreatureProps) {
 
   return (
     <group>
-      {/* Legs — long, jointless, slightly knock-kneed. Pivoted at the hip
-          (y=1.24) so they swing from the top like a real leg rather than
-          rotating about the floor. */}
-      <group ref={legL} position={[0, 1.24, 0]}>
-        <Chain points={[[-0.1, -1.24, 0], [-0.13, -0.62, 0.02], [-0.08, 0, 0]]} top={0.075} bottom={0.05} />
+      {/* Legs, now jointed. Thigh pivots at the hip, shin pivots at the
+          knee inside it, so the knee can fold during the swing phase and
+          the foot clears the ground. A single rigid limb rotating from the
+          hip is what made this read as a mannequin being dragged. */}
+      <group ref={legL} position={[-0.1, 1.24, 0]}>
+        <Bone from={[0, 0, 0]} to={[-0.03, -0.62, 0.02]} top={0.078} bottom={0.06} />
+        <Joint at={[-0.03, -0.62, 0.02]} r={0.07} />
+        <group ref={shinL} position={[-0.03, -0.62, 0.02]}>
+          <Bone from={[0, 0, 0]} to={[0.02, -0.62, -0.02]} top={0.06} bottom={0.042} />
+          {/* Foot — a long flat splay. Gives the silhouette something to
+              plant on, which is most of why a stance phase reads at all. */}
+          <Plate from={[0.02, -0.62, -0.02]} to={[0.02, -0.64, 0.19]} width={0.11} depth={0.035} />
+        </group>
       </group>
-      <group ref={legR} position={[0, 1.24, 0]}>
-        <Chain points={[[0.1, -1.24, 0], [0.13, -0.62, 0.02], [0.08, 0, 0]]} top={0.075} bottom={0.05} />
+      <group ref={legR} position={[0.1, 1.24, 0]}>
+        <Bone from={[0, 0, 0]} to={[0.03, -0.62, 0.02]} top={0.078} bottom={0.06} />
+        <Joint at={[0.03, -0.62, 0.02]} r={0.07} />
+        <group ref={shinR} position={[0.03, -0.62, 0.02]}>
+          <Bone from={[0, 0, 0]} to={[-0.02, -0.62, -0.02]} top={0.06} bottom={0.042} />
+          <Plate from={[-0.02, -0.62, -0.02]} to={[-0.02, -0.64, 0.19]} width={0.11} depth={0.035} />
+        </group>
       </group>
 
+      {/* Everything above the legs rides the hips, so the bob, the weight
+          shift and the hip twist carry through the whole body instead of
+          the torso floating independently of its own legs. */}
+      <group ref={hips}>
       {/* Coat flare — a suggestion of a suit jacket, ragged at the hem */}
       {[-0.2, -0.07, 0.07, 0.2].map((x, i) => (
         <Plate
@@ -142,6 +179,9 @@ export function LongOne({ state }: CreatureProps) {
         )
       })}
 
+      {/* Torso counter-rotates against the hips. */}
+      <group ref={torso} position={[0, 2.4, 0]}>
+      <group position={[0, -2.4, 0]}>
       {/* Shoulder yoke — wide, thin, unnaturally square */}
       <Plate from={[-0.33, 2.4, 0]} to={[0.33, 2.4, 0]} width={0.16} depth={0.17} />
       <Joint at={[-0.33, 2.4, 0]} r={0.075} />
@@ -207,6 +247,9 @@ export function LongOne({ state }: CreatureProps) {
           </group>
         ))}
       </group>
+      </group>
+      </group>
+      </group>
     </group>
   )
 }
@@ -218,6 +261,7 @@ export function LongOne({ state }: CreatureProps) {
 /* ------------------------------------------------------------------ */
 export function Crawler({ state }: CreatureProps) {
   const gait = useRef(0)
+  const body = useRef<THREE.Group>(null!)
   const legs = useRef<THREE.Group>(null!)
   const skull = useRef<THREE.Group>(null!)
   const jaw = useRef<THREE.Group>(null!)
@@ -237,16 +281,31 @@ export function Crawler({ state }: CreatureProps) {
     const t = clock.elapsedTime
     const { closeness, hunting, attacking, speed } = state.current
 
-    // Skittering cadence tied to actual ground speed, plus a floor so a
-    // stationary crawler still twitches rather than freezing solid.
-    gait.current += (speed * 2.6 + 0.7) * 0.016
-    const amp = 0.35 + Math.min(1, speed / 4.4) * 0.5
+    // A quadruped trot: DIAGONAL pairs move together — front-left with
+    // rear-right, front-right with rear-left. Four limbs each waving on
+    // their own offset (what this did before) is how you get something
+    // that looks like it's treading water; diagonal pairing is what makes
+    // an animal look like it's carrying its own weight.
+    // Short stride, so it takes many quick steps — it should skitter.
+    gait.current = advanceGait(gait.current, speed + 0.35, 0.016, 0.75)
+    const g = gait.current
+    const amp = 0.4 + Math.min(1, speed / 4) * 0.55
+    // legRoots order: FL, FR, RL, RR -> diagonals share a phase.
+    const PAIR = [0, 0.5, 0.5, 0]
     if (legs.current) {
       legs.current.children.forEach((c, i) => {
-        const phase = i * 1.9
-        c.rotation.x = Math.sin(gait.current + phase) * amp * (0.75 + (i % 2) * 0.35)
-        c.rotation.z = Math.cos(gait.current * 0.7 + phase) * 0.13
+        const off = PAIR[i] ?? 0
+        c.rotation.x = legSwing(g, off, amp)
+        // Legs splay outward as they lift, so the fold reads from the side.
+        c.rotation.z = (i % 2 === 0 ? -1 : 1) * kneeBend(g, off) * 0.22
       })
+    }
+    if (body.current) {
+      // Low, scuttling bob at twice the leg frequency, and a roll toward
+      // whichever diagonal is bearing weight.
+      body.current.position.y = bodyBob(g, 0.055 * Math.min(1, speed / 3))
+      body.current.rotation.z = bodySway(g, 0.07 * Math.min(1, speed / 3))
+      body.current.rotation.y = hipTwist(g, 0.09 * Math.min(1, speed / 3))
     }
     if (skull.current) {
       skull.current.rotation.z = Math.sin(t * 2.1) * 0.1
@@ -264,6 +323,10 @@ export function Crawler({ state }: CreatureProps) {
 
   return (
     <group>
+      {/* The body rides above the legs: it bobs, rolls and twists while
+          the leg roots stay put, so the creature carries its own weight
+          rather than the whole thing sliding up and down together. */}
+      <group ref={body}>
       {/* Spine: pelvis -> ribcage -> neck, as real segments */}
       <Chain
         points={[[0, 0.5, -0.45], [0, 0.56, -0.12], [0, 0.6, 0.25], [0, 0.68, 0.52]]}
@@ -298,6 +361,8 @@ export function Crawler({ state }: CreatureProps) {
           />
         ))
       })}
+
+      </group>
 
       {/* Four spider-folded limbs — knee above the back, foot on the
           floor, fingers splayed flat. Chained so they're one limb. */}

@@ -8,6 +8,7 @@ import { Clutter } from './Clutter'
 import { Signage } from './Signage'
 import { playSfx } from './scareFx'
 import {
+  FLOOR_TOP,
   FLOOR_Y,
   FLOOR_THICK,
   SLAB_THICK,
@@ -32,6 +33,11 @@ const DOOR_Z = -48
 const WALL_TINT = '#6f6540'
 const WALL_TINT_ALT = '#665c39'
 const FLOOR_TINT = '#4a3f28'
+// Trim is darker than the wall it sits on, so it reads as a line rather
+// than as a change of material.
+const SKIRTING_TINT = '#3b3520'
+const RAIL_TINT = '#544a2c'
+const CONDUIT_TINT = '#3a3a34'
 const CEILING_TINT = '#5d5638'
 
 /**
@@ -80,19 +86,67 @@ function ExitDoor({ unlocked }: { unlocked: boolean }) {
   )
 }
 
+/**
+ * A wall, plus the trim that makes it read as built rather than extruded.
+ *
+ * Bare boxes meeting a bare floor is most of why the corridors looked
+ * flat: real interiors are full of horizontal lines at consistent heights,
+ * and their absence registers as "unfinished" long before anyone works out
+ * what's missing. Three lines, all generated from the wall itself so every
+ * one of the 88 segments gets them without hand-placement:
+ *
+ *   skirting — a board at the floor, which also hides the wall/floor seam
+ *   rail     — a dado line at waist height, the thing that makes a
+ *              corridor look institutional rather than like a tunnel
+ *   conduit  — surface-mounted pipe near the ceiling, which is what a
+ *              building like this would actually have
+ *
+ * Slightly proud of the wall face on both sides so it catches the
+ * flashlight at a different angle than the wall does — the whole point is
+ * to give the light something to break on as you sweep it along.
+ */
 function Wall({ spec, tint = WALL_TINT }: { spec: WallSpec; tint?: string }) {
   const len = Math.abs(spec.to - spec.from)
   if (len <= 0.01) return null // a gap that consumed the whole run — nothing to draw
   const mid = (spec.from + spec.to) / 2
-  const position: [number, number, number] =
-    spec.axis === 'x' ? [spec.fixed, WALL_MID_Y, mid] : [mid, WALL_MID_Y, spec.fixed]
-  const size: [number, number, number] =
-    spec.axis === 'x' ? [0.2, WALL_SPAN, len] : [len, WALL_SPAN, 0.2]
+  const alongX = spec.axis === 'z'
+  const at = (y: number): [number, number, number] =>
+    alongX ? [mid, y, spec.fixed] : [spec.fixed, y, mid]
+  const size = (thick: number, h: number): [number, number, number] =>
+    alongX ? [len, h, thick] : [thick, h, len]
+
   return (
-    <mesh position={position} receiveShadow>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color={tint} roughness={0.9} />
-    </mesh>
+    <group>
+      <mesh
+        position={alongX ? [mid, WALL_MID_Y, spec.fixed] : [spec.fixed, WALL_MID_Y, mid]}
+        receiveShadow
+      >
+        <boxGeometry args={size(0.2, WALL_SPAN)} />
+        <meshStandardMaterial color={tint} roughness={0.9} />
+      </mesh>
+
+      {/* Skirting board */}
+      <mesh position={at(FLOOR_TOP + 0.09)} receiveShadow>
+        <boxGeometry args={size(0.26, 0.18)} />
+        <meshStandardMaterial color={SKIRTING_TINT} roughness={0.95} />
+      </mesh>
+
+      {/* Dado rail */}
+      <mesh position={at(FLOOR_TOP + 1.05)} receiveShadow>
+        <boxGeometry args={size(0.24, 0.06)} />
+        <meshStandardMaterial color={RAIL_TINT} roughness={0.85} />
+      </mesh>
+
+      {/* Conduit near the ceiling */}
+      <mesh
+        position={at(CEILING_BOTTOM - 0.34)}
+        rotation={alongX ? [0, 0, Math.PI / 2] : [Math.PI / 2, 0, 0]}
+        receiveShadow
+      >
+        <cylinderGeometry args={[0.05, 0.05, len, 6]} />
+        <meshStandardMaterial color={CONDUIT_TINT} roughness={0.6} metalness={0.35} />
+      </mesh>
+    </group>
   )
 }
 
