@@ -5,6 +5,7 @@ import { useSession } from '../game/session'
 import { useThreat } from '../game/threat'
 import { useCalmRoom } from '../game/calmRoom'
 import { restartRun } from '../game/restart'
+import { PastRuns } from './PastRuns'
 
 /**
  * The session-end screen. This is the thing the "impact" beat of the demo
@@ -115,6 +116,8 @@ export function FearCurve() {
           laptop already has.
         </p>
       </div>
+
+      <PastRuns />
 
       <PlayAgainButton />
     </Overlay>
