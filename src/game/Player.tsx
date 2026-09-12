@@ -13,6 +13,9 @@ export const PLAYER_SPEED = 4
 const SPEED = PLAYER_SPEED
 const JUMP_SPEED = 6.5
 const LOOK_SPEED = 1.8 // rad/sec, arrow-key look
+/** Well below the floor (top face -0.9). Anything past this means the
+ * player is no longer in the level. */
+const FALL_LIMIT = -8
 const keys = {
   forward: false,
   back: false,
@@ -67,6 +70,8 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
   const body = useRef<RapierRigidBody>(null!)
   const { camera } = useThree()
   const lastStep = useRef(0)
+  /** Last ground the player actually stood on, for fall recovery. */
+  const lastSafe = useRef({ x: 0, y: 0.5, z: 30 })
   const wasGrounded = useRef(true)
   const fallSpeed = useRef(0)
 
@@ -136,6 +141,26 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     }
 
     const t = body.current.translation()
+
+    // Last-resort recovery. The level is sealed and the floor is a solid
+    // collider, so this should never fire — but "should never" is exactly
+    // how a player ends up falling through the world forever with no way
+    // back, which is unrecoverable in a way no other bug here is. Restore
+    // the last place they were standing rather than the spawn, so a glitch
+    // costs a moment instead of the whole run.
+    if (t.y < FALL_LIMIT) {
+      const safe = lastSafe.current
+      body.current.setTranslation({ x: safe.x, y: safe.y, z: safe.z }, true)
+      body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+      console.warn('[dread] fell out of the world — restored to last safe ground')
+      return
+    }
+    if (grounded && t.y > FALL_LIMIT) {
+      lastSafe.current.x = t.x
+      lastSafe.current.y = t.y + 0.2
+      lastSafe.current.z = t.z
+    }
+
     camera.position.set(t.x, t.y + 0.6, t.z)
     usePlayerPosition.getState().set(t.x, t.y, t.z)
   })

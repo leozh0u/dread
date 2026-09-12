@@ -6,6 +6,7 @@ import { useThreat } from '../game/threat'
 import { useCalmRoom } from '../game/calmRoom'
 import { restartRun } from '../game/restart'
 import { PastRuns } from './PastRuns'
+import { useSensorless } from '../game/sensorless'
 
 /**
  * The session-end screen. This is the thing the "impact" beat of the demo
@@ -20,11 +21,19 @@ export function FearCurve() {
   const startedAt = useSession((s) => s.startedAt)
   const outcome = useThreat((s) => s.outcome)
   const regulatedSeconds = useCalmRoom((s) => s.regulatedSeconds)
+  const blind = useSensorless((s) => s.blind)
 
   if (!startedAt || history.length < 2) {
     return (
       <Overlay>
-        <p style={{ opacity: 0.6 }}>Not enough data captured this run.</p>
+        {/* Say WHY there's no chart. "Not enough data" on its own reads as
+            the game being broken; the actual reason is almost always that
+            the camera was never allowed. */}
+        <p style={{ opacity: 0.75, maxWidth: 460, lineHeight: 1.6 }}>
+          {blind
+            ? "No pulse was ever read this run, so there's no curve to show. The house was hunting blind — allow camera access and reload to see what it can really do."
+            : 'Not enough data captured this run.'}
+        </p>
         <PlayAgainButton />
       </Overlay>
     )

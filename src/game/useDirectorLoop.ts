@@ -1,11 +1,37 @@
 import { useEffect, useRef } from 'react'
 import { usePulseStore } from '../lib/usePulse'
-import { useDirector, type ScareType } from './director'
+import { useDirector, type ScareType, type DirectorPhase } from './director'
+import { useSensorless } from './sensorless'
 import { useSession } from './session'
 import { useBlinkStore } from '../lib/useBlinkDetection'
 import { arousalFrom, hasRecovered } from './arousal'
 
 const CALIBRATION_MS = 60_000 // Presage HRV baseline window — see plan notes
+
+/**
+ * How long to wait for ANY pulse reading before giving up on the sensor
+ * and starting the game anyway.
+ *
+ * Calibration only advanced while a reading existed, and there was no
+ * timeout — so if the camera was denied, unavailable, or simply failed,
+ * bpm stayed null forever, the session never started, and the player sat
+ * in a dark maze where nothing would ever happen. A judge hitting that
+ * doesn't file a bug, they close the tab, and "allow camera access" is
+ * exactly the prompt people reflexively dismiss.
+ *
+ * The biometrics are the point of this game, but they cannot be a
+ * precondition for it running at all.
+ */
+const SENSOR_GRACE_MS = 25_000
+const DEFAULT_BASELINE = 72
+
+/**
+ * With no sensor there's no arousal to react to, so the Director would
+ * sit in one phase forever and the monster would never escalate or back
+ * off. Falling back to a slow timed cycle keeps the game's rhythm — push,
+ * strike, withdraw, recover — just without it being about *you*.
+ */
+const BLIND_PHASE_MS = 22_000
 
 /**
  * TWO CLOCKS. This is the core design constraint of the whole project.
@@ -76,6 +102,7 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
   const recordScareOutcome = useDirector((s) => s.recordScareOutcome)
   const monsterDistance = useDirector((s) => s.monsterDistance)
   const sessionStart = useSession((s) => s.start)
+  const blind = useSensorless((s) => s.blind)
 
   const calibrationStart = useRef<number | null>(null)
   const calibrationSamples = useRef<number[]>([])
@@ -100,6 +127,35 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
       sessionStart()
     }
   }, [bpm, phase, setBaseline, setPhase, sessionStart])
+
+  // --- Watchdog: start the game even if the sensor never works ---
+  useEffect(() => {
+    if (phase !== 'CALIBRATING') return
+    const timer = setTimeout(() => {
+      if (useDirector.getState().phase !== 'CALIBRATING') return
+      if (usePulseStore.getState().bpm != null) return
+      console.warn('[dread] no pulse signal — starting without it')
+      useSensorless.getState().setBlind(true)
+      setBaseline(DEFAULT_BASELINE)
+      setPhase('STALK')
+      sessionStart()
+    }, SENSOR_GRACE_MS)
+    return () => clearTimeout(timer)
+  }, [phase, setBaseline, setPhase, sessionStart])
+
+  // --- Blind mode: keep the game's rhythm without a signal to react to ---
+  useEffect(() => {
+    if (!blind || phase === 'CALIBRATING') return
+    const cycle: DirectorPhase[] = ['STALK', 'STRIKE', 'WITHDRAW', 'RECOVER']
+    let i = 0
+    const timer = setInterval(() => {
+      i = (i + 1) % cycle.length
+      const next = cycle[i]
+      setPhase(next)
+      if (next === 'STRIKE') onScare(useDirector.getState().pickScare())
+    }, BLIND_PHASE_MS)
+    return () => clearInterval(timer)
+  }, [blind, phase, setPhase, onScare])
 
   // --- Post-calibration: react to arousal relative to baseline ---
   useEffect(() => {

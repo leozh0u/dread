@@ -3,6 +3,7 @@ import { usePulseStore } from '../lib/usePulse'
 import { useBlinkStore } from '../lib/useBlinkDetection'
 import { useSensorStatus } from '../lib/sensorStatus'
 import { useSession } from '../game/session'
+import { useSensorless } from '../game/sensorless'
 
 /**
  * What the house can currently see of you.
@@ -34,6 +35,7 @@ export function Vitals() {
   const startle = useBlinkStore((s) => s.startle)
   const framesSent = useSensorStatus((s) => s.framesSent)
   const sidecar = useSensorStatus((s) => s.sidecarConnected)
+  const blind = useSensorless((s) => s.blind)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -94,7 +96,13 @@ export function Vitals() {
       {baseline != null && (
         <div style={{ opacity: 0.4, marginTop: 5 }}>resting {baseline} bpm</div>
       )}
-      {calibrating && (
+      {blind && (
+        <div style={{ opacity: 0.75, marginTop: 7, maxWidth: 190, lineHeight: 1.45, color: '#ff5a5a' }}>
+          It can't see you. It's hunting blind — allow camera access and
+          reload to play it properly.
+        </div>
+      )}
+      {calibrating && !blind && (
         <div style={{ opacity: 0.5, marginTop: 6, maxWidth: 190, lineHeight: 1.45 }}>
           Sit still. Face the light. It's learning what calm looks like on you.
         </div>
