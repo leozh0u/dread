@@ -5,7 +5,8 @@ import { FallbackPulseEstimator } from './fallbackPulse'
 export type PulseSource = 'presage' | 'fallback' | 'none'
 
 interface PulseState {
-  bpm: number | null
+  bpm: number | null // smoothed — this is what the Director and HUD read
+  rawBpm: number | null // last unsmoothed reading, debug only
   confidence: number
   source: PulseSource
   baseline: number | null // resting HR, set after calibration
@@ -14,15 +15,39 @@ interface PulseState {
   setBaseline: (bpm: number) => void
 }
 
+// Hearts don't jump 15bpm between frames. Raw rPPG output does, constantly —
+// especially the in-browser fallback estimator, which re-runs its frequency
+// scan from scratch every frame with no memory of the last reading. Two
+// layers fix this: (1) clamp how far a single new reading is allowed to move
+// the smoothed value, so one bad frame can't swing the Director's decision,
+// then (2) an exponential moving average on top of that, so the number on
+// screen settles instead of flickering. Fallback gets heavier smoothing than
+// Presage because it's the noisier of the two sources.
+const MAX_STEP_BPM = { presage: 6, fallback: 4 } as const
+const EMA_ALPHA = { presage: 0.35, fallback: 0.15 } as const
+
 export const usePulseStore = create<PulseState>((set, get) => ({
   bpm: null,
+  rawBpm: null,
   confidence: 0,
   source: 'none',
   baseline: null,
   history: [],
-  setReading: (bpm, confidence, source) => {
+  setReading: (rawBpm, confidence, source) => {
+    const prev = get().bpm
+    const maxStep = MAX_STEP_BPM[source === 'presage' ? 'presage' : 'fallback']
+    const alpha = EMA_ALPHA[source === 'presage' ? 'presage' : 'fallback']
+
+    let clamped = rawBpm
+    if (prev != null) {
+      const delta = rawBpm - prev
+      clamped = prev + Math.max(-maxStep, Math.min(maxStep, delta))
+    }
+    const smoothed = prev == null ? clamped : prev * (1 - alpha) + clamped * alpha
+    const bpm = Math.round(smoothed)
+
     const history = [...get().history, { t: Date.now(), bpm }].slice(-600) // ~keep last 10min @1hz
-    set({ bpm, confidence, source, history })
+    set({ bpm, rawBpm, confidence, source, history })
   },
   setBaseline: (bpm) => set({ baseline: bpm }),
 }))
