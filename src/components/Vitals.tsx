@@ -63,6 +63,23 @@ export function Vitals() {
         position: 'fixed',
         left: 16,
         bottom: 16,
+        /**
+         * Bounded so it can never reach the HUD.
+         *
+         * This panel grows: the camera diagnosis, the Presage framing
+         * hint and the calibration instruction all append to it, and it is
+         * pinned open for the whole of calibration regardless of the B
+         * toggle. On a short window it grew tall enough to run up the left
+         * column and render straight through the objective readout and the
+         * "the house has met you" line — the two moments in the game most
+         * worth reading — leaving all three illegible at once.
+         *
+         * Capping it against the viewport and letting it scroll internally
+         * keeps it in its own corner at any window height. 190px is the
+         * room the HUD needs above it.
+         */
+        maxHeight: 'calc(100vh - 190px)',
+        overflowY: 'auto',
         zIndex: 26,
         fontFamily: 'monospace',
         fontSize: 11,

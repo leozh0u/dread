@@ -88,7 +88,12 @@ export function stainGeometry(geo: THREE.BufferGeometry, seed: number, strength 
     const height = (v.y - bb.min.y) / spanY
     const shade =
       1 + strength * (0.26 * (blotch - 0.5) + 0.12 * (mottle - 0.5) + 0.22 * (height - 0.5))
-    const c = THREE.MathUtils.clamp(shade, 0.55, 1.3)
+    // Asymmetric on purpose: staining should DARKEN a surface far more
+    // than it lightens it. Dirt, damp and shadow subtract; there is
+    // nothing on one of these creatures that would make a patch of it
+    // brighter than clean bone. A symmetric range made limbs read paler
+    // overall, which is the opposite of what was wanted.
+    const c = THREE.MathUtils.clamp(shade, 0.48, 1.08)
     colors[i * 3] = c
     colors[i * 3 + 1] = c
     colors[i * 3 + 2] = c
@@ -323,7 +328,10 @@ export function Bone({
     // no two segments in the game are shaded alike and none of it has to
     // be placed by hand. A limb is the largest unbroken surface on these
     // creatures and was the flattest thing on screen.
-    stainGeometry(g, (Math.abs(length * 31.7 + top * 113.3) % 10) + 0.3)
+    // Stronger than the default. A limb is a long, smooth, near-cylindrical
+    // surface — the single most mannequin-like shape on the creature — so
+    // it needs the most help.
+    stainGeometry(g, (Math.abs(length * 31.7 + top * 113.3) % 10) + 0.3, 1.45)
     return g
   }, [top, bottom, length, sides])
 
