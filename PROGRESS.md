@@ -142,13 +142,28 @@ static host — same fallback path that already exists for local use.
      `BACKBOARD_ASSISTANT_ID` in `.env.local` (curl command in
      SPONSORS.md) — untested against the live API, only against mocked
      responses.
-   - **Tiger Data**: same constraint, least payoff. Recommend last or not
-     at all.
+   - **Tiger Data**: DONE. Pulse trace streams to a TimescaleDB
+     hypertable via the sidecar (a connection string carries a password,
+     so it can never ship). Needs only `TIGERDATA_URL` in `.env.local`.
+     Untested against a live database — only against the no-database
+     degradation path.
+   - **All four integrations fail soft.** No sidecar, no keys, no
+     network: the game plays exactly as it does now. That is deliberate,
+     because judges will run the hosted build with none of it.
 6. **Creature design still not signed off.** Rebuilt with connected
    skeletons and shaded materials after Leo's screenshots showed floating
    parts and flat cardboard shapes. Press **M** to inspect.
 7. **Jumpscares** — explicitly deferred by Leo.
-8. **`npm test` now exists — 47 checks.** `test:level` (flood-fills the
+8. **Blink/face sensing now drives the Director** (vision item 7, open
+   since the first day and never previously mentioned). Blink->whisper
+   was already done; blink->Director was not — the Director ran purely on
+   pulse and never read `confidence`. Now a startle channel off MediaPipe
+   blendshapes scores scares in 100-300ms, and when pulse confidence
+   collapses (which happens *because* the player jumped) the bandit
+   learns from the face instead of from a corrupted reading. This is the
+   two-clock design from the plan, and it's the honest answer to a
+   judge's "what was hard?".
+9. **`npm test` now exists.** `test:level` (flood-fills the
    real collision geometry), `test:run` (walks a full playthrough and
    both endings), `test:memory` (parses hostile Backboard responses).
    Run it before filming and before submitting.

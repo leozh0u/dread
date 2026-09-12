@@ -107,15 +107,33 @@ run the house leads with whatever spiked you last time.
 
 ---
 
-## Tiger Data — decision, not code
+## Tiger Data — code is DONE, needs 1 value from you
 
-The pulse trace is time-series by definition, so it's a natural fit. But a
-static site can't hold DB credentials, so it would have to go through the
-sidecar like Backboard. Same constraint, less payoff than the other two,
-and the fear curve already works locally without it.
+The pulse trace is a time series in the textbook sense — a heart rate
+sampled once a second with events marked against it — so it's stored in a
+hypertable doing the thing hypertables are for. It also makes a run
+outlive the tab, which the in-memory fear curve doesn't.
 
-**Recommendation: do this last, or not at all.** It's the weakest of the
-three and the deadline is Sunday 09:00.
+**Your connection string contains a password.** It can never go in the
+bundle; it's read only by the sidecar. Don't paste it in chat:
+
+```bash
+cd /Users/leo/Projects/dread && printf 'TIGERDATA_URL=your_connection_string
+' >> .env.local
+```
+
+Then restart the sidecar. It prints `tigerdata=ready` on success, or the
+exact reason it couldn't connect. The schema creates itself on first
+connect — there's no migration step to forget.
+
+Check it's storing:
+
+```bash
+curl -s http://localhost:8787/health
+```
+
+Same constraint as Backboard: it works on your laptop and in the video,
+not on the hosted build for judges, because the credentials can't ship.
 
 ---
 
