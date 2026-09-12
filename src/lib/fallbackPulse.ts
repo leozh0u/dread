@@ -273,8 +273,40 @@ export function estimatePulse(samples: GreenSample[]): FallbackReading {
   return { bpm: Math.round(bestBpm), confidence }
 }
 
+/** One region of the frame, as fractions of its width and height. */
+export type Patch = { x: number; y: number; w: number; h: number }
+
+/**
+ * Nine overlapping patches across the middle of the frame.
+ *
+ * Deliberately not a tidy grid over the whole picture. The top eighth and the
+ * bottom fifth are excluded because a webcam at desk height puts ceiling in
+ * one and desk in the other, and neither ever contains a face. The columns
+ * lean toward the centre for the same reason.
+ *
+ * They overlap so that a face landing on a boundary still fills at least one
+ * patch, rather than being split across two and weakened in both.
+ */
+const PATCHES: Patch[] = (() => {
+  const out: Patch[] = []
+  const xs = [0.18, 0.36, 0.54]
+  const ys = [0.16, 0.34, 0.52]
+  for (const y of ys) for (const x of xs) out.push({ x, y, w: 0.28, h: 0.26 })
+  return out
+})()
+
+/**
+ * Each patch is averaged down to this square before its mean is taken.
+ *
+ * Small on purpose. The value being extracted is one number per patch per
+ * frame — the mean green level — and averaging 256 pixels estimates that just
+ * as well as averaging 4096 while costing a sixteenth as much. Nine of these
+ * is fewer pixels than the single 64x64 read this replaces.
+ */
+const PATCH_PIXELS = 16
+
 export class FallbackPulseEstimator {
-  private samples: GreenSample[] = []
+  private series: GreenSample[][] = PATCHES.map(() => [])
   private video: HTMLVideoElement
   private canvas: HTMLCanvasElement
   private ctx: CanvasRenderingContext2D
@@ -282,34 +314,104 @@ export class FallbackPulseEstimator {
   constructor(video: HTMLVideoElement) {
     this.video = video
     this.canvas = document.createElement('canvas')
-    this.canvas.width = 64
-    this.canvas.height = 64
+    this.canvas.width = PATCH_PIXELS
+    this.canvas.height = PATCH_PIXELS
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })!
   }
 
-  /** Call once per animation frame while the video is playing. */
+  /**
+   * Call once per animation frame while the video is playing.
+   *
+   * WHY THIS SAMPLES NINE PLACES AND NOT ONE
+   *
+   * This used to average the green channel over one fixed rectangle — 35% to
+   * 65% across, 12% to 30% down — which assumes the player's face fills the
+   * frame and sits dead centre. Leo was told to sit back so Presage could see
+   * his upper chest, which makes the face smaller and higher, and a dump of
+   * the real signal put that box between rows 58 and 144 of a 480-row frame.
+   * That is the top third of the picture: hair, or the wall.
+   *
+   * Hair has no pulse. With no cardiac signal in the patch, the strongest
+   * thing left is slow drift — breathing, posture, the auto-exposure loop —
+   * and slow drift estimates low. Leo measured 68 by hand while the game
+   * reported 51, which is exactly the shape of that failure.
+   *
+   * Rather than guess a better rectangle, sample a GRID of them and let the
+   * estimator say which one has a heartbeat in it. That is robust to framing,
+   * to where someone sits, and to a face that moves during a run — none of
+   * which a fixed box can be. Face detection would be better still and is far
+   * too heavy to run per frame here.
+   *
+   * The cost is nine small reads instead of one, at 16x16 each rather than
+   * 64x64, so it is actually *fewer* pixels than the single patch it replaces.
+   */
   sample(now = performance.now()) {
     if (this.video.readyState < 2) return
-    // Forehead-ish ROI: center-upper quadrant of the frame.
     const vw = this.video.videoWidth
     const vh = this.video.videoHeight
     if (!vw || !vh) return
-    const sx = vw * 0.35
-    const sy = vh * 0.12
-    const sw = vw * 0.3
-    const sh = vh * 0.18
-    this.ctx.drawImage(this.video, sx, sy, sw, sh, 0, 0, 64, 64)
-    const { data } = this.ctx.getImageData(0, 0, 64, 64)
-    let gSum = 0
-    for (let i = 0; i < data.length; i += 4) gSum += data[i + 1] // green channel
-    const gMean = gSum / (data.length / 4)
-    this.samples.push({ t: now, g: gMean })
+
+    for (let i = 0; i < PATCHES.length; i++) {
+      const patch = PATCHES[i]
+      this.ctx.drawImage(
+        this.video,
+        vw * patch.x,
+        vh * patch.y,
+        vw * patch.w,
+        vh * patch.h,
+        0,
+        0,
+        PATCH_PIXELS,
+        PATCH_PIXELS,
+      )
+      const { data } = this.ctx.getImageData(0, 0, PATCH_PIXELS, PATCH_PIXELS)
+      let gSum = 0
+      for (let j = 0; j < data.length; j += 4) gSum += data[j + 1]
+      this.series[i].push({ t: now, g: gSum / (data.length / 4) })
+    }
+
     const cutoff = now - WINDOW_SECONDS * 1000
-    while (this.samples.length && this.samples[0].t < cutoff) this.samples.shift()
+    for (const series of this.series) {
+      while (series.length && series[0].t < cutoff) series.shift()
+    }
   }
 
+  /**
+   * Which patch is currently being believed, and where it is in the frame.
+   * Exposed for the diagnostic dump — knowing the estimator locked onto the
+   * player's cheek rather than the wall behind them is the whole question.
+   */
+  chosenPatch(): { index: number; patch: Patch; confidence: number } | null {
+    let best = -1
+    let bestConfidence = 0
+    for (let i = 0; i < this.series.length; i++) {
+      const { bpm, confidence } = estimatePulse(this.series[i])
+      if (bpm != null && confidence > bestConfidence) {
+        bestConfidence = confidence
+        best = i
+      }
+    }
+    if (best < 0) return null
+    return { index: best, patch: PATCHES[best], confidence: bestConfidence }
+  }
+
+  /**
+   * The best reading across every patch.
+   *
+   * "Best" is the highest confidence, and confidence is peakiness — how far
+   * the winning frequency stands above the median of the spectrum. A patch of
+   * wall produces a flat spectrum and scores near zero; a patch of lit skin
+   * produces one sharp spike. So this is not picking the highest bpm or the
+   * prettiest number, it is picking the patch that actually contains a
+   * periodic signal, which is the only defensible way to choose.
+   */
   estimate(): FallbackReading {
-    return estimatePulse(this.samples)
+    let best: FallbackReading = { bpm: null, confidence: 0 }
+    for (const series of this.series) {
+      const reading = estimatePulse(series)
+      if (reading.bpm != null && reading.confidence > best.confidence) best = reading
+    }
+    return best
   }
 
   /**
@@ -323,13 +425,20 @@ export class FallbackPulseEstimator {
    * an auto-exposure loop fighting the signal. For those the only useful
    * thing is the real samples off the real camera.
    */
-  dump(): { samples: GreenSample[]; roi: { sx: number; sy: number; sw: number; sh: number }; video: { w: number; h: number } } {
-    const vw = this.video.videoWidth
-    const vh = this.video.videoHeight
+  dump(): {
+    samples: GreenSample[]
+    patches: Patch[]
+    chosen: { index: number; patch: Patch; confidence: number } | null
+    video: { w: number; h: number }
+  } {
+    const chosen = this.chosenPatch()
     return {
-      samples: this.samples.slice(),
-      roi: { sx: vw * 0.35, sy: vh * 0.12, sw: vw * 0.3, sh: vh * 0.18 },
-      video: { w: vw, h: vh },
+      // The series the estimator is actually believing, so a dump can be
+      // re-run offline through estimatePulse and reproduce the reported bpm.
+      samples: (chosen ? this.series[chosen.index] : this.series[0]).slice(),
+      patches: PATCHES,
+      chosen,
+      video: { w: this.video.videoWidth, h: this.video.videoHeight },
     }
   }
 
