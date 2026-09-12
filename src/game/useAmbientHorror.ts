@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { pointAtArcLength, PATH_TOTAL_LENGTH } from './maze'
-import { playCreak, playScratch } from './scareFx'
+import { playCreak, playScratch, playSpatialSfx } from './scareFx'
 import { useSession } from './session'
 
 const MIN_DELAY_MS = 14_000
@@ -28,7 +28,13 @@ export function useAmbientHorror() {
       if (useSession.getState().status === 'playing') {
         const s = Math.random() * PATH_TOTAL_LENGTH
         const p = pointAtArcLength(s)
-        if (Math.random() < 0.5) playCreak(p.x, 1.5, p.z)
+        // Mostly real recordings; the synthesised creak/scratch stay in
+        // the rotation so the same four clips don't become predictable.
+        const roll = Math.random()
+        if (roll < 0.3) playSpatialSfx('scratch', p.x, 1.2, p.z, { volume: 0.8 })
+        else if (roll < 0.55) playSpatialSfx('door-groan', p.x, 1.5, p.z, { volume: 0.7 })
+        else if (roll < 0.75) playSpatialSfx('flicker', p.x, 2.6, p.z, { volume: 0.5 })
+        else if (roll < 0.88) playCreak(p.x, 1.5, p.z)
         else playScratch(p.x, 1.2, p.z)
       }
       scheduleNext()

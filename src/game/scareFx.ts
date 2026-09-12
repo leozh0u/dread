@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { ScareType } from './director'
+import { loadSfx, preloadSfx, type SfxName } from './sfxBank'
 
 interface ScareFxState {
   flashActive: boolean
@@ -129,6 +130,7 @@ let ambient: {
 
 export function startAmbient() {
   const audioCtx = getCtx()
+  preloadSfx(audioCtx)
   if (ambient) return // idempotent — restart shouldn't stack a second bed
 
   // Sub-bass drone, slowly detuned by an LFO so it never sits dead still.
@@ -255,6 +257,52 @@ function positionedPanner(audioCtx: AudioContext, x: number, y: number, z: numbe
   panner.connect(master())
   panner.connect(reverb()) // send a copy into the corridor tail
   return panner
+}
+
+/**
+ * Plays a real recorded one-shot at a world position, through the same
+ * panner + reverb chain as everything else so it sits in the space
+ * rather than on top of it. Silently does nothing if the file didn't
+ * load — never throws, never blocks.
+ */
+export function playSpatialSfx(
+  name: SfxName,
+  x: number,
+  y: number,
+  z: number,
+  { volume = 1, rate = 1 }: { volume?: number; rate?: number } = {},
+) {
+  const audioCtx = getCtx()
+  void loadSfx(audioCtx, name).then((buffer) => {
+    if (!buffer) return
+    const panner = positionedPanner(audioCtx, x, y, z)
+    const src = audioCtx.createBufferSource()
+    src.buffer = buffer
+    src.playbackRate.value = rate
+    const gain = audioCtx.createGain()
+    gain.gain.value = volume
+    src.connect(gain).connect(panner)
+    src.start()
+  })
+}
+
+/** Non-positional one-shot — for things that happen to *you* rather than
+ * somewhere in the room (jumpscares, whispers at your ear). */
+export function playSfx(name: SfxName, { volume = 1, rate = 1, pan = 0 } = {}) {
+  const audioCtx = getCtx()
+  void loadSfx(audioCtx, name).then((buffer) => {
+    if (!buffer) return
+    const src = audioCtx.createBufferSource()
+    src.buffer = buffer
+    src.playbackRate.value = rate
+    const gain = audioCtx.createGain()
+    gain.gain.value = volume
+    const panner = audioCtx.createStereoPanner()
+    panner.pan.value = pan
+    src.connect(gain).connect(panner).connect(master())
+    gain.connect(reverb())
+    src.start()
+  })
 }
 
 /** One heavy footstep — a low thud plus a breathy noise transient,
@@ -566,34 +614,19 @@ function proximityLunge() {
   osc.stop(t0 + 0.55)
 }
 
-// A real recorded voice line (generated once via Higgsfield's seed_audio
-// TTS, slowed and pitched down) instead of the browser's built-in speech
-// synthesis, which sounds robotic and varies wildly across browsers.
-// Loaded and decoded once, then reused for every whisper. Falls back to
-// SpeechSynthesis if the file can't be fetched/decoded for any reason —
-// same never-silent principle as everything else in this file.
-const WHISPER_URL = `${import.meta.env.BASE_URL}audio/whisper-open-your-eyes.wav`
-let whisperBufferPromise: Promise<AudioBuffer> | null = null
-
-function loadWhisperBuffer(audioCtx: AudioContext): Promise<AudioBuffer> {
-  if (!whisperBufferPromise) {
-    whisperBufferPromise = fetch(WHISPER_URL)
-      .then((r) => r.arrayBuffer())
-      .then((buf) => audioCtx.decodeAudioData(buf))
-  }
-  return whisperBufferPromise
-}
-
 /** Fired when the player's eyes have been closed too long (see
  * useBlinkDetection.ts) — the recorded whisper panned hard into one ear,
  * with a breathy noise-hiss layered underneath for extra presence. */
 export function playWhisper(ear: 'left' | 'right') {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
-  const panner = audioCtx.createStereoPanner()
-  panner.pan.value = ear === 'left' ? -1 : 1
-  panner.connect(master())
+  const pan = ear === 'left' ? -0.9 : 0.9
 
+  // Breathy hiss underneath, panned hard — sells "at your ear" even
+  // before the words land.
+  const panner = audioCtx.createStereoPanner()
+  panner.pan.value = pan
+  panner.connect(master())
   const src = noiseSource(audioCtx)
   const filter = audioCtx.createBiquadFilter()
   filter.type = 'bandpass'
@@ -601,37 +634,35 @@ export function playWhisper(ear: 'left' | 'right') {
   filter.Q.value = 0.6
   const gain = audioCtx.createGain()
   gain.gain.setValueAtTime(0.0001, t0)
-  gain.gain.linearRampToValueAtTime(0.08, t0 + 0.3)
+  gain.gain.linearRampToValueAtTime(0.06, t0 + 0.3)
   gain.gain.linearRampToValueAtTime(0.0001, t0 + 1.6)
   src.connect(filter).connect(gain).connect(panner)
   src.start()
   src.stop(t0 + 1.7)
 
-  loadWhisperBuffer(audioCtx)
-    .then((buffer) => {
-      const voice = audioCtx.createBufferSource()
-      voice.buffer = buffer
-      const voiceGain = audioCtx.createGain()
-      voiceGain.gain.value = 0.7
-      voice.connect(voiceGain).connect(panner)
-      voice.start()
-    })
-    .catch(() => {
-      // Couldn't fetch/decode the recording (offline, etc.) — fall back
-      // to the browser's own voice so the whisper still says something.
-      if ('speechSynthesis' in window) {
-        const utter = new SpeechSynthesisUtterance('open your eyes')
-        utter.volume = 0.5
-        utter.pitch = 0.6
-        utter.rate = 0.75
-        window.speechSynthesis.speak(utter)
-      }
-    })
+  // A real voice, pitched slightly down and hard-panned to the same ear.
+  // Rotating between lines matters: the same clip twice stops being
+  // frightening immediately.
+  const lines: SfxName[] = [
+    'vo-open-your-eyes',
+    'vo-open-your-eyes', // weighted — it's the one that fits the trigger
+    'vo-i-see-you',
+    'vo-still-here',
+    'vo-not-alone',
+  ]
+  playSfx(lines[Math.floor(Math.random() * lines.length)], {
+    volume: 0.85,
+    rate: 0.92,
+    pan,
+  })
 }
 
 /** A harsher, louder sting for the up-close "it almost got you" jumpscare —
  * distinct from the Director's four scare-type stingers below. */
 export function playJumpscareSound() {
+  // Real recording layered over the synthesised sweep — the recording
+  // has the texture, the synth has the instant attack.
+  playSfx('scare-stinger', { volume: 0.9 })
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
   const src = noiseSource(audioCtx)

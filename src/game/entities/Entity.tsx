@@ -5,7 +5,8 @@ import { useDirector } from '../director'
 import { usePlayerPosition } from '../playerPosition'
 import { distance3 } from '../triggers'
 import { pointAtArcLength, projectToArcLength, shortestArcDelta, PATH_TOTAL_LENGTH } from '../maze'
-import { setMonsterProximity, setMonsterAudioPosition, playMonsterFootstep } from '../scareFx'
+import { setMonsterProximity, setMonsterAudioPosition, playMonsterFootstep, playSpatialSfx } from '../scareFx'
+import type { SfxName } from '../sfxBank'
 import { Creature, type EntityKind, type EntityState } from './creatures'
 import { reportEntity, inspect } from './registry'
 
@@ -14,14 +15,36 @@ import { reportEntity, inspect } from './registry'
  * much of this game is played by ear. */
 const PROFILE: Record<
   EntityKind,
-  { patrol: number; hunt: number; retreat: number; stepDist: number; stepPitch: number; bob: number }
+  {
+    patrol: number
+    hunt: number
+    retreat: number
+    stepDist: number
+    stepPitch: number
+    bob: number
+    /** Its own recorded voice — idle presence, and what it does when
+     * it's hunting you. Distinct per creature so you can tell which one
+     * is near with your eyes shut. */
+    idle: SfxName
+    close: SfxName
+    voiceGap: [number, number] // seconds between vocalisations, [min, max]
+  }
 > = {
   // Tall and slow: glides, barely makes a sound, no bob at all.
-  long: { patrol: 1.5, hunt: 2.6, retreat: 2.2, stepDist: 2.4, stepPitch: 0.55, bob: 0 },
+  long: {
+    patrol: 1.5, hunt: 2.6, retreat: 2.2, stepDist: 2.4, stepPitch: 0.55, bob: 0,
+    idle: 'long-presence', close: 'long-near', voiceGap: [14, 26],
+  },
   // Low and fast: rapid skittering steps, high and light.
-  crawler: { patrol: 2.4, hunt: 4.4, retreat: 3.0, stepDist: 0.7, stepPitch: 1.8, bob: 0.06 },
+  crawler: {
+    patrol: 2.4, hunt: 4.4, retreat: 3.0, stepDist: 0.7, stepPitch: 1.8, bob: 0.06,
+    idle: 'crawler-skitter', close: 'crawler-shriek', voiceGap: [7, 15],
+  },
   // Heavy and deliberate: slow, enormous, dragging footfalls.
-  smile: { patrol: 1.2, hunt: 2.9, retreat: 2.0, stepDist: 1.9, stepPitch: 0.4, bob: 0.03 },
+  smile: {
+    patrol: 1.2, hunt: 2.9, retreat: 2.0, stepDist: 1.9, stepPitch: 0.4, bob: 0.03,
+    idle: 'smile-drag', close: 'smile-laugh', voiceGap: [10, 20],
+  },
 }
 
 const MAX_AUDIBLE_DIST = 20
@@ -51,6 +74,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const hitchPhase = useRef(index * 3)
   const attackUntil = useRef(0)
   const lastScareCount = useRef(0)
+  const nextVoice = useRef(4 + index * 5)
   // Mutated every frame, read by the creature's own frame loop. Never a
   // prop and never state: props would freeze (refs don't re-render) and
   // state would re-render three creatures at 60fps for nothing.
@@ -136,6 +160,25 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
         group.current.position.z,
         prof.stepPitch,
       )
+    }
+
+    // Vocalisations: its own voice, from its own position. Fires more
+    // often and switches to the close-range sound as it gets near, so
+    // the soundtrack of it approaching changes character rather than
+    // just getting louder.
+    if (t > nextVoice.current) {
+      const near = normalized < 0.45
+      playSpatialSfx(
+        near ? prof.close : prof.idle,
+        group.current.position.x,
+        FLOOR_Y + 1.2,
+        group.current.position.z,
+        { volume: near ? 0.9 : 0.55, rate: 0.9 + Math.random() * 0.2 },
+      )
+      const [lo, hi] = prof.voiceGap
+      // Closer = more frequent, down to a third of the idle interval
+      const scale = 0.35 + normalized * 0.65
+      nextVoice.current = t + (lo + Math.random() * (hi - lo)) * scale
     }
 
     // Attack flinch on a proximity scare
