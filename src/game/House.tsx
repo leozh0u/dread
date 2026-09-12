@@ -6,6 +6,7 @@ import { Clue } from './Clue'
 import { HidingSpot } from './HidingSpot'
 import { Clutter } from './Clutter'
 import { Signage } from './Signage'
+import { playSfx } from './scareFx'
 import { WallDressing } from './WallDressing'
 import { Fluorescents } from './Fluorescents'
 import { ExitDoorLight } from './ExitDoor'
@@ -46,6 +47,52 @@ const WALL_TINT = '#6f6540'
 const WALL_TINT_ALT = '#665c39'
 const FLOOR_TINT = '#4a3f28'
 const CEILING_TINT = '#5d5638'
+
+/**
+ * The exit door, which used to simply stop being rendered the instant the
+ * third fragment was collected — the most important moment in the game
+ * expressed as a mesh popping out of existence.
+ *
+ * Now it swings. The collider becomes a sensor immediately either way, so
+ * this is purely what the player sees: the thing that has been in your
+ * way all run grinds open on its own, and you hear it. Pivoted at its
+ * left edge rather than its centre, or it would rotate through itself.
+ *
+ * It was also 3 units tall starting at y=0, with the floor at -0.9 — the
+ * same floating gap every wall had. Spans the full opening now.
+ */
+function ExitDoor({ unlocked }: { unlocked: boolean }) {
+  const leaf = useRef<THREE.Group>(null!)
+  const opened = useRef(false)
+
+  useFrame((_, delta) => {
+    if (!leaf.current) return
+    const target = unlocked ? -1.85 : 0
+    // Heavy: eases toward open rather than snapping, so it reads as mass.
+    leaf.current.rotation.y += (target - leaf.current.rotation.y) * Math.min(1, delta * 1.4)
+    if (unlocked && !opened.current) {
+      opened.current = true
+      playSfx('door-groan', { volume: 0.9 })
+    }
+  })
+
+  // Hinged at the left edge of the 5.6-wide opening.
+  return (
+    <group position={[2 - 2.8, WALL_MID_Y, DOOR_Z]}>
+      <group ref={leaf}>
+        <mesh position={[2.8, 0, 0]} castShadow>
+          <boxGeometry args={[5.6, WALL_SPAN, 0.4]} />
+          <meshStandardMaterial color="#1a1010" roughness={0.85} />
+        </mesh>
+        {/* A handle, so the swing has something to read against */}
+        <mesh position={[5.2, -0.1, 0.24]}>
+          <boxGeometry args={[0.5, 0.09, 0.09]} />
+          <meshStandardMaterial color="#6a5a35" metalness={0.6} roughness={0.5} />
+        </mesh>
+      </group>
+    </group>
+  )
+}
 
 function Wall({ spec, tint = WALL_TINT }: { spec: WallSpec; tint?: string }) {
   const len = Math.abs(spec.to - spec.from)
@@ -239,14 +286,13 @@ export function House() {
 
       {/* Exit door — isolated RigidBody, one explicit CuboidCollider */}
       <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[2.8, 1.5, 0.2]} position={[2, 1.5, DOOR_Z]} sensor={unlocked} />
-        {!unlocked && (
-          <mesh position={[2, 1.5, DOOR_Z]}>
-            <boxGeometry args={[5.6, 3, 0.4]} />
-            <meshStandardMaterial color="#1a1010" />
-          </mesh>
-        )}
+        <CuboidCollider
+          args={[2.8, WALL_SPAN / 2, 0.2]}
+          position={[2, WALL_MID_Y, DOOR_Z]}
+          sensor={unlocked}
+        />
       </RigidBody>
+      <ExitDoor unlocked={unlocked} />
 
       {/* The fork past the door has to read as a CHOICE. Cold daylight
           east = the way out; a slow warm pulse south = the calm room.

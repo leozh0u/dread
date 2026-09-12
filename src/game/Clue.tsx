@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useThreat } from './threat'
+import { FLOOR_TOP } from './House'
 
 /**
  * A fragment: a broken length of fluorescent tube, still lit, resting
@@ -33,10 +34,15 @@ export function Clue({ id, position }: { id: string; position: [number, number, 
 
   if (collected) return null
 
-  const [x, y, z] = position
+  const [x, , z] = position
 
+  // Rests ON the floor. It was drawn at the trigger's own y minus a
+  // fudge, which put it at 0.05 while the floor's top face is at -0.9 —
+  // a broken tube "resting where it fell" hovering a metre in the air.
+  // The trigger volume stays where it is: it's a distance check against
+  // the player's standing height, not against the mesh.
   return (
-    <group position={[x, y - 0.45, z]} rotation={[0, 0.6, 0.18]}>
+    <group position={[x, FLOOR_TOP + 0.06, z]} rotation={[0, 0.6, 0.18]}>
       {/* the broken tube, lying at an angle against the floor */}
       <mesh ref={glass} rotation={[0, 0, Math.PI / 2.4]} castShadow>
         <cylinderGeometry args={[0.055, 0.055, 0.62, 8]} />

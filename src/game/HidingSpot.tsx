@@ -1,5 +1,6 @@
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import type { BoxRegion } from './triggers'
+import { FLOOR_TOP } from './House'
 
 /**
  * Whether the player counts as hidden is decided by useTriggersLoop's
@@ -23,6 +24,13 @@ import type { BoxRegion } from './triggers'
  *
  * Every collider sits inside a room or alcove, never in a corridor, so
  * none of them can block a route through the maze.
+ *
+ * All of it is based at FLOOR_TOP rather than y=0. These props were built
+ * assuming the floor was at zero; it is at -0.9, so every wardrobe, crate
+ * and table hung 0.9 units in the air — the same mistake the walls had,
+ * and the colliders inherited it. The trigger volumes in triggers.ts are
+ * deliberately left alone: they already span the player's actual standing
+ * height, and moving them would change where you count as hidden.
  */
 export function HidingSpot({ spot }: { spot: BoxRegion }) {
   const [cx, cy, cz] = spot.center
@@ -31,13 +39,13 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
   switch (spot.kind) {
     case 'closet':
       return (
-        <group position={[cx, 0, cz]}>
+        <group position={[cx, FLOOR_TOP, cz]}>
           {/* Hollow: back, sides and roof only — the front stays open. */}
           <RigidBody type="fixed" colliders={false}>
-            <CuboidCollider args={[hx, hy, 0.08]} position={[cx, hy, cz - hz]} />
-            <CuboidCollider args={[0.08, hy, hz]} position={[cx - hx, hy, cz]} />
-            <CuboidCollider args={[0.08, hy, hz]} position={[cx + hx, hy, cz]} />
-            <CuboidCollider args={[hx, 0.08, hz]} position={[cx, hy * 2, cz]} />
+            <CuboidCollider args={[hx, hy, 0.08]} position={[cx, FLOOR_TOP + hy, cz - hz]} />
+            <CuboidCollider args={[0.08, hy, hz]} position={[cx - hx, FLOOR_TOP + hy, cz]} />
+            <CuboidCollider args={[0.08, hy, hz]} position={[cx + hx, FLOOR_TOP + hy, cz]} />
+            <CuboidCollider args={[hx, 0.08, hz]} position={[cx, FLOOR_TOP + hy * 2, cz]} />
           </RigidBody>
           {/* Carcass, drawn as panels so the inside isn't a filled block */}
           <mesh position={[0, hy, -hz]}>
@@ -75,7 +83,7 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
 
     case 'curtain':
       return (
-        <group position={[cx, 0, cz]}>
+        <group position={[cx, FLOOR_TOP, cz]}>
           {Array.from({ length: 7 }).map((_, i) => {
             const x = (i / 6 - 0.5) * hx * 2
             return (
@@ -94,11 +102,11 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
 
     case 'crate':
       return (
-        <group position={[cx, 0, cz]}>
+        <group position={[cx, FLOOR_TOP, cz]}>
           <RigidBody type="fixed" colliders={false}>
             <CuboidCollider
               args={[hx * 0.85, hy * 0.6, hz * 0.85]}
-              position={[cx, hy * 0.6, cz]}
+              position={[cx, FLOOR_TOP + hy * 0.6, cz]}
             />
           </RigidBody>
           <mesh position={[0, hy * 0.6, 0]} rotation={[0, 0.15, 0]}>
@@ -118,10 +126,10 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
 
     case 'table':
       return (
-        <group position={[cx, 0, cz]}>
+        <group position={[cx, FLOOR_TOP, cz]}>
           {/* Top only — the space underneath is the hiding spot. */}
           <RigidBody type="fixed" colliders={false}>
-            <CuboidCollider args={[hx, 0.06, hz]} position={[cx, cy + hy, cz]} />
+            <CuboidCollider args={[hx, 0.06, hz]} position={[cx, FLOOR_TOP + cy + hy, cz]} />
           </RigidBody>
           <mesh position={[0, cy + hy, 0]}>
             <boxGeometry args={[hx * 2, 0.08, hz * 2]} />
@@ -143,7 +151,7 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
 
     default:
       return (
-        <mesh position={spot.center}>
+        <mesh position={[cx, FLOOR_TOP + cy, cz]}>
           <boxGeometry args={[hx * 2, hy * 2, hz * 2]} />
           <meshStandardMaterial color="#0a0a12" transparent opacity={0.15} />
         </mesh>
