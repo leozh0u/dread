@@ -123,7 +123,12 @@ export function startAmbient() {
   const growlPanner = audioCtx.createPanner()
   growlPanner.panningModel = 'HRTF'
   growlPanner.distanceModel = 'inverse'
-  growlPanner.refDistance = 3
+  // A tighter refDistance + steeper rolloff than the default exaggerates
+  // the near/far and left/right difference — real HRTF alone can be
+  // subtle on non-ideal speakers/headphones, and the whole point of this
+  // sound is "I can tell where it is."
+  growlPanner.refDistance = 1.2
+  growlPanner.rolloffFactor = 2.2
   growlPanner.maxDistance = 40
   const growlGain = audioCtx.createGain()
   growlGain.gain.value = 0
@@ -152,17 +157,17 @@ export function startAmbient() {
   ambient = { droneGain, noiseGain, growlGain, growlFilter, growlPanner }
 }
 
-/** One heavy footstep — a low thud plus a breathy noise transient,
- * positioned at the monster's exact location so its footfalls pan and
- * attenuate correctly even though the continuous growl/breathing bed is
- * a separate, always-on chain. */
-export function playMonsterFootstep(x: number, y: number, z: number) {
-  const audioCtx = getCtx()
-  const t0 = audioCtx.currentTime
+/** A one-shot positioned sound source — every "this happened over there"
+ * effect (monster footsteps, ambient creaks/scratches) shares this
+ * tuning so the whole game's spatial audio reads consistently. Tighter
+ * refDistance + steeper rolloff than the Web Audio defaults, because the
+ * point is "I can tell where that came from," not physical accuracy. */
+function positionedPanner(audioCtx: AudioContext, x: number, y: number, z: number) {
   const panner = audioCtx.createPanner()
   panner.panningModel = 'HRTF'
   panner.distanceModel = 'inverse'
-  panner.refDistance = 2
+  panner.refDistance = 1.2
+  panner.rolloffFactor = 2.2
   panner.maxDistance = 40
   if (panner.positionX) {
     panner.positionX.value = x
@@ -172,6 +177,17 @@ export function playMonsterFootstep(x: number, y: number, z: number) {
     panner.setPosition(x, y, z)
   }
   panner.connect(master())
+  return panner
+}
+
+/** One heavy footstep — a low thud plus a breathy noise transient,
+ * positioned at the monster's exact location so its footfalls pan and
+ * attenuate correctly even though the continuous growl/breathing bed is
+ * a separate, always-on chain. */
+export function playMonsterFootstep(x: number, y: number, z: number) {
+  const audioCtx = getCtx()
+  const t0 = audioCtx.currentTime
+  const panner = positionedPanner(audioCtx, x, y, z)
 
   const osc = audioCtx.createOscillator()
   osc.type = 'sine'
@@ -517,6 +533,66 @@ export function playJumpscareSound() {
   src.connect(filter).connect(gain).connect(master())
   src.start()
   src.stop(t0 + 0.45)
+}
+
+// ---------------------------------------------------------------------------
+// Ambient horror stingers — random, positioned, and NOT tied to the
+// Director or the monster's actual location. These are the "something
+// else in this house" sounds: a creak, a scratch, from a spot the monster
+// isn't. Unpredictability is the point — see useAmbientHorror.ts, which
+// fires these on a random timer at a random point in the maze.
+// ---------------------------------------------------------------------------
+
+/** A slow wooden creak — a door hinge or a floorboard settling. Long,
+ * low, with an unstable pitch that never quite resolves. */
+export function playCreak(x: number, y: number, z: number) {
+  const audioCtx = getCtx()
+  const t0 = audioCtx.currentTime
+  const panner = positionedPanner(audioCtx, x, y, z)
+
+  const osc = audioCtx.createOscillator()
+  osc.type = 'sawtooth'
+  const wobble = 60 + Math.random() * 40
+  osc.frequency.setValueAtTime(wobble, t0)
+  osc.frequency.linearRampToValueAtTime(wobble * 1.4, t0 + 0.6)
+  osc.frequency.linearRampToValueAtTime(wobble * 0.8, t0 + 1.3)
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = 500
+  const gain = audioCtx.createGain()
+  gain.gain.setValueAtTime(0.0001, t0)
+  gain.gain.linearRampToValueAtTime(0.12, t0 + 0.15)
+  gain.gain.linearRampToValueAtTime(0.0001, t0 + 1.4)
+  osc.connect(filter).connect(gain).connect(panner)
+  osc.start(t0)
+  osc.stop(t0 + 1.5)
+}
+
+/** A quick burst of scratching — claws or nails, several short irregular
+ * scrapes rather than one clean sound. */
+export function playScratch(x: number, y: number, z: number) {
+  const audioCtx = getCtx()
+  const panner = positionedPanner(audioCtx, x, y, z)
+  const scrapes = 3 + Math.floor(Math.random() * 3)
+  let cursor = audioCtx.currentTime
+
+  for (let i = 0; i < scrapes; i++) {
+    const t0 = cursor
+    const src = noiseSource(audioCtx)
+    const filter = audioCtx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 2000 + Math.random() * 2500
+    filter.Q.value = 3
+    const gain = audioCtx.createGain()
+    const dur = 0.05 + Math.random() * 0.08
+    gain.gain.setValueAtTime(0.001, t0)
+    gain.gain.linearRampToValueAtTime(0.1, t0 + dur * 0.3)
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+    src.connect(filter).connect(gain).connect(panner)
+    src.start(t0)
+    src.stop(t0 + dur + 0.02)
+    cursor += dur + 0.03 + Math.random() * 0.06
+  }
 }
 
 /** Central dispatch — called by the Director loop when it decides to strike. */

@@ -104,59 +104,40 @@ export function Clutter() {
 
   return (
     <group>
-      {/* Swinging bare bulb over a corridor junction */}
-      <mesh position={[0, 4.6, 5]}>
+      {/* Swinging bare bulb at the B junction (first real turn) */}
+      <mesh position={[0, 4.6, 8]}>
         <cylinderGeometry args={[0.01, 0.01, 0.6, 4]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      <mesh ref={bulbMesh} position={[0, 4.2, 5]}>
+      <mesh ref={bulbMesh} position={[0, 4.2, 8]}>
         <sphereGeometry args={[0.08, 8, 8]} />
         <meshStandardMaterial color="#ffdd88" emissive="#ffcc55" emissiveIntensity={2} toneMapped={false} />
       </mesh>
-      <pointLight ref={bulb} position={[0, 4.2, 5]} color="#ffcc77" intensity={25} distance={5} />
+      <pointLight ref={bulb} position={[0, 4.2, 8]} color="#ffcc77" intensity={25} distance={5} />
 
-      {/* A second bulb further down, past the midpoint, so the whole
-          bigger corridor doesn't rely on one light source */}
-      <pointLight position={[0, 4.2, -14]} color="#ffcc77" intensity={20} distance={5} />
-      <mesh position={[0, 4.2, -14]}>
+      {/* A second bulb at the far side of the loop, so the maze doesn't
+          rely on one light source */}
+      <pointLight position={[-10, 4.2, -24]} color="#ffcc77" intensity={20} distance={5} />
+      <mesh position={[-10, 4.2, -24]}>
         <sphereGeometry args={[0.07, 8, 8]} />
         <meshStandardMaterial color="#ffdd88" emissive="#ffcc55" emissiveIntensity={2} toneMapped={false} />
       </mesh>
 
-      {/* Tilted picture frames along the corridor — abstract, not literal art */}
-      <mesh position={[2.9, 2.2, 14]} rotation={[0, -Math.PI / 2, 0.08]}>
-        <boxGeometry args={[0.05, 0.9, 0.7]} />
-        <meshStandardMaterial color="#151515" roughness={0.7} />
-      </mesh>
-      <mesh position={[-2.9, 2.4, -10]} rotation={[0, Math.PI / 2, -0.05]}>
-        <boxGeometry args={[0.05, 0.7, 0.5]} />
-        <meshStandardMaterial color="#151515" roughness={0.7} />
-      </mesh>
-      <mesh position={[2.9, 2.0, -2]} rotation={[0, -Math.PI / 2, -0.06]}>
-        <boxGeometry args={[0.05, 0.6, 0.5]} />
-        <meshStandardMaterial color="#151515" roughness={0.7} />
-      </mesh>
+      {/* Posters, scratches, a sketch, a toy — placed on real corridor
+          walls throughout the maze (see maze.ts for the graph). Each is a
+          different object, not a repeated prop. */}
+      <Poster position={[-2.94, 1.7, 20]} rotY={Math.PI / 2} color="#5a2020" />
+      <Poster position={[2.94, 1.6, 12]} rotY={-Math.PI / 2} color="#3a3020" />
+      <ScratchMarks position={[8.94, 1.5, 3]} rotY={Math.PI / 2} />
+      <SketchPage position={[-6.94, 1.3, -35]} rotY={-Math.PI / 2} />
+      <Poster position={[-1.94, 1.6, -17]} rotY={Math.PI / 2} color="#2a3a2a" />
+      <SketchPage position={[1.94, 1.3, -18]} rotY={-Math.PI / 2} />
+      <Toy position={[13, -0.84, -8]} />
+      <Toy position={[-9, -0.84, -40]} />
+      <Toy position={[0, -0.84, -19]} />
 
-      {/* Posters, scratches, a sketch, a toy — the "walls have nothing on
-          them" fix. Each is a different object, not a repeated prop. */}
-      <Poster position={[2.94, 1.7, 17]} rotY={-Math.PI / 2} color="#5a2020" />
-      <Poster position={[-2.94, 1.5, 10]} rotY={Math.PI / 2} color="#2a3a2a" />
-      <Poster position={[2.94, 1.6, -12]} rotY={-Math.PI / 2} color="#3a3020" />
-      <SketchPage position={[-2.94, 1.3, -3]} rotY={Math.PI / 2} />
-      <ScratchMarks position={[-2.94, 1.5, 6]} rotY={Math.PI / 2} />
-      <ScratchMarks position={[2.94, 1.4, -16]} rotY={-Math.PI / 2} />
-      <Toy position={[1, -0.84, 10.5]} />
-      <Toy position={[-1.2, -0.84, -13]} />
-
-      {/* The west branch's dead end — small, lit just enough to see there
-          is something there, deliberately away from the monster's reach */}
-      <pointLight position={[-14, 1.6, 6]} color="#7a6a4a" intensity={14} distance={4} />
-      <Poster position={[-14.94, 1.5, 6]} rotY={Math.PI / 2} color="#403030" />
-      <SketchPage position={[-13.5, 1.2, 5.15]} rotY={0} />
-      <Toy position={[-13, -0.84, 6.3]} />
-
-      {/* A toppled chair between rooms C and D */}
-      <group position={[2.2, 0, -6]} rotation={[0, 0.6, Math.PI / 2.3]}>
+      {/* A toppled chair near the D junction */}
+      <group position={[13, 0, -6]} rotation={[0, 0.6, Math.PI / 2.3]}>
         <mesh position={[0, 0.4, 0]}>
           <boxGeometry args={[0.4, 0.05, 0.4]} />
           <meshStandardMaterial color="#1e1712" roughness={0.9} />

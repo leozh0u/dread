@@ -6,172 +6,138 @@ import { Signage } from './Signage'
 import { ExitDoorLight } from './ExitDoor'
 import { useThreat, CLUES_REQUIRED } from './threat'
 import { CLUES, HIDING_SPOTS } from './triggers'
+import { buildCorridorWalls, buildJunctionCaps, type WallSpec } from './maze'
 
 const WALL_H = 5
-const DOOR_Z = -20
+const DOOR_Z = -46
 
-/** Wall segment running along Z at a fixed X (a "side" wall). Slight per-
- * segment color variation (via `tint`) so the corridor doesn't read as one
- * flat repeated material. */
-function WallZ({
-  x,
-  z1,
-  z2,
-  y = WALL_H / 2,
-  tint = '#1a1a1a',
-}: {
-  x: number
-  z1: number
-  z2: number
-  y?: number
-  tint?: string
-}) {
-  const len = Math.abs(z2 - z1)
-  const cz = (z1 + z2) / 2
+function Wall({ spec, tint = '#1a1a1a' }: { spec: WallSpec; tint?: string }) {
+  const len = Math.abs(spec.to - spec.from)
+  if (len <= 0.01) return null // a gap that consumed the whole run — nothing to draw
+  const mid = (spec.from + spec.to) / 2
+  const position: [number, number, number] =
+    spec.axis === 'x' ? [spec.fixed, WALL_H / 2, mid] : [mid, WALL_H / 2, spec.fixed]
+  const size: [number, number, number] = spec.axis === 'x' ? [0.2, WALL_H, len] : [len, WALL_H, 0.2]
   return (
-    <mesh position={[x, y, cz]} receiveShadow>
-      <boxGeometry args={[0.2, WALL_H, len]} />
+    <mesh position={position} receiveShadow>
+      <boxGeometry args={size} />
       <meshStandardMaterial color={tint} roughness={0.9} />
     </mesh>
   )
 }
 
-/** Wall segment running along X at a fixed Z (an "end" wall). */
-function WallX({
-  z,
-  x1,
-  x2,
-  y = WALL_H / 2,
-  tint = '#1a1a1a',
-}: {
-  z: number
-  x1: number
-  x2: number
-  y?: number
-  tint?: string
-}) {
+/** Wall segment running along X at a fixed Z — kept for the hand-placed
+ * rooms/branch/exit stub, which aren't part of the graph generator. */
+function WallX({ z, x1, x2, y = WALL_H / 2 }: { z: number; x1: number; x2: number; y?: number }) {
   const len = Math.abs(x2 - x1)
   const cx = (x1 + x2) / 2
   return (
     <mesh position={[cx, y, z]} receiveShadow>
       <boxGeometry args={[len, WALL_H, 0.2]} />
-      <meshStandardMaterial color={tint} roughness={0.9} />
+      <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+    </mesh>
+  )
+}
+
+function WallZ({ x, z1, z2, y = WALL_H / 2 }: { x: number; z1: number; z2: number; y?: number }) {
+  const len = Math.abs(z2 - z1)
+  const cz = (z1 + z2) / 2
+  return (
+    <mesh position={[x, y, cz]} receiveShadow>
+      <boxGeometry args={[0.2, WALL_H, len]} />
+      <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
     </mesh>
   )
 }
 
 /**
- * The whole playable space — a longer spine corridor with four alcove
- * rooms (was three, tighter), a locked door, and a calm room beyond it.
- * Bigger than the original build end to end: corridor spawn-to-door is
- * 38 units (was 34), calm room is 14 deep (was 12). Structural walls
- * live in one RigidBody with auto "cuboid" colliders — confirmed solid
- * via direct physics-position sampling. The player's collider is now an
- * explicit CapsuleCollider (see Player.tsx) matching its visual capsule,
- * which fixed a real corner-clipping/wall-phasing bug the previous
- * bounding-sphere ("ball") auto-collider had.
+ * The level, as a real maze: a graph of junctions and corridors (see
+ * maze.ts) instead of one straight spine with alcoves off it. Real turns,
+ * a loop the player can use to lose the monster (B <-> D has two routes),
+ * dead ends, and four rooms + a branch hanging off specific corridors.
+ * The monster (Monster.tsx) walks the loop + exit spur and can never
+ * leave it, so every room here is genuinely safe ground, not just
+ * implied to be.
  *
- * Clue pickups, hiding spots, the calm room, and the outside-the-door
- * escape zone are NOT physics colliders — see playerPosition.ts and
- * triggers.ts for why (Rapier sensor events never fired in extensive
- * testing); they're checked by plain distance math in useTriggersLoop
- * against the single shared layout in triggers.ts.
- *
- *           +x
- *            |  [Room A]  z 12..16          (clue 1, closet)
- *  corridor  |==open==
- *   z:       |
- *  -20..20   |  [Room B]  z 4..8   (-x side) (clue 2, curtain)
- *            |==open==
- *            |  [Room C]  z -4..0            (clue 3, crate)
- *            |==open==
- *            |  [Room D]  z -8..-12 (-x side) (empty — just space, a
- *            |            second closet to hide in)
- *  ---- ExitDoor @ z=-20, OUTSIDE zone just beyond it ----
- *  [Calm room]  z -20..-34
+ * Structural walls (corridors + junction caps, from maze.ts's generator)
+ * plus the hand-placed rooms/branch/exit all live in one shared RigidBody
+ * with auto "cuboid" colliders — the pattern already confirmed solid via
+ * direct physics-position sampling earlier in the project. The exit door
+ * is its own isolated RigidBody (mixing it into the shared one silently
+ * drops its collider — see commit history).
  */
 export function House() {
   const collected = useThreat((s) => s.cluesCollected.size)
   const unlocked = collected >= CLUES_REQUIRED
+  const corridorWalls = buildCorridorWalls()
+  const junctionCaps = buildJunctionCaps()
 
   return (
     <>
       <RigidBody type="fixed" colliders="cuboid">
-        {/* one floor slab under the whole level */}
-        <mesh position={[0, -1, -7]} receiveShadow>
-          <boxGeometry args={[18, 0.2, 60]} />
-          <meshStandardMaterial color="#141414" />
-        </mesh>
-        {/* extra floor patch under the west branch passage/dead end */}
-        <mesh position={[-11.5, -1, 6]} receiveShadow>
-          <boxGeometry args={[7, 0.2, 2]} />
+        {/* one floor slab under the whole maze */}
+        <mesh position={[1, -1, -19.5]} receiveShadow>
+          <boxGeometry args={[44, 0.2, 92]} />
           <meshStandardMaterial color="#141414" />
         </mesh>
 
-        {/* +x corridor wall, gaps at Room A (12..16) and Room C (-4..0) */}
-        <WallZ x={3} z1={16} z2={20} tint="#1c1a17" />
-        <WallZ x={3} z1={0} z2={12} tint="#191919" />
-        <WallZ x={3} z1={-20} z2={-4} tint="#171a1c" />
+        {corridorWalls.map((spec, i) => (
+          <Wall key={`c${i}`} spec={spec} />
+        ))}
+        {junctionCaps.map((spec, i) => (
+          <Wall key={`j${i}`} spec={spec} tint="#171717" />
+        ))}
 
-        {/* -x corridor wall, gaps at Room B (4..8) and Room D (-8..-12) */}
-        <WallZ x={-3} z1={8} z2={20} tint="#1a1a1c" />
-        <WallZ x={-3} z1={-8} z2={4} tint="#1c1917" />
-        <WallZ x={-3} z1={-20} z2={-12} tint="#191a1a" />
+        {/* Room 1 (clue: photograph, closet) — off the A-B corridor */}
+        <WallX z={14} x1={3} x2={8} />
+        <WallX z={18} x1={3} x2={8} />
+        <WallZ x={8} z1={14} z2={18} />
 
-        {/* Room A (right, x 3..8, z 12..16) */}
-        <WallX z={12} x1={3} x2={8} />
-        <WallX z={16} x1={3} x2={8} />
-        <WallZ x={8} z1={12} z2={16} />
+        {/* Room 2 (clue: journal page, curtain) — off C-D */}
+        <WallX z={-2} x1={15} x2={20} />
+        <WallX z={2} x1={15} x2={20} />
+        <WallZ x={20} z1={-2} z2={2} />
 
-        {/* Room B (left, x -8..-3, z 4..8) — far wall has a gap: a narrow
-            branch passage leads off it, west to a forgotten dead end. This
-            is the maze-like non-linearity — not every path is the main
-            spine, and the monster (confined to the spine) can never
-            follow you down it. */}
-        <WallX z={4} x1={-8} x2={-3} />
-        <WallX z={8} x1={-8} x2={-3} />
-        <WallZ x={-8} z1={4} z2={5} />
-        <WallZ x={-8} z1={7} z2={8} />
-        <WallX z={5} x1={-15} x2={-8} />
-        <WallX z={7} x1={-15} x2={-8} />
-        <WallZ x={-15} z1={5} z2={7} />
+        {/* Room 3 (clue: house key, crate) — off G-H */}
+        <WallX z={-32} x1={-18} x2={-13} />
+        <WallX z={-28} x1={-18} x2={-13} />
+        <WallZ x={-18} z1={-32} z2={-28} />
 
-        {/* Room C (right, x 3..8, z -4..0) */}
-        <WallX z={-4} x1={3} x2={8} />
-        <WallX z={0} x1={3} x2={8} />
-        <WallZ x={8} z1={-4} z2={0} />
+        {/* Room 4 (hiding only, table) — off H-I */}
+        <WallZ x={-4} z1={-37} z2={-32} />
+        <WallZ x={0} z1={-37} z2={-32} />
+        <WallX z={-32} x1={-4} x2={0} />
 
-        {/* Room D (left, x -8..-3, z -8..-12) */}
-        <WallX z={-8} x1={-8} x2={-3} />
-        <WallX z={-12} x1={-8} x2={-3} />
-        <WallZ x={-8} z1={-12} z2={-8} />
+        {/* Branch dead end — off F-G, a narrow passage nobody has to take */}
+        <WallZ x={-2} z1={-21} z2={-14} />
+        <WallZ x={2} z1={-21} z2={-14} />
+        <WallX z={-14} x1={-2} x2={2} />
 
-        {/* Calm room enclosure (z -34..-20, x -4..4) */}
-        <WallZ x={-4} z1={-34} z2={-20} tint="#12181a" />
-        <WallZ x={4} z1={-34} z2={-20} tint="#12181a" />
-        <WallX z={-34} x1={-4} x2={4} tint="#0f1416" />
+        {/* Short stub from junction I down to the exit door */}
+        <WallZ x={1} z1={DOOR_Z} z2={-43} />
+        <WallZ x={7} z1={DOOR_Z} z2={-43} />
+
+        {/* Beyond the door: a short "outside" foyer (the fast escape —
+            reaching this counts as win condition #1) then the calm room
+            enclosure deeper in (win condition #2, the slower one) — same
+            width as the door itself, no taper needed. */}
+        <WallZ x={1} z1={-63} z2={DOOR_Z} />
+        <WallZ x={7} z1={-63} z2={DOOR_Z} />
+        <WallX z={-63} x1={1} x2={7} />
       </RigidBody>
 
-      {/* Exit door -- its own isolated RigidBody with colliders={false} and
-          ONE explicit CuboidCollider, deliberately not mixed into the wall
-          RigidBody above (mixing an auto-cuboid RigidBody with an explicit
-          child collider silently dropped the explicit one — see commit
-          history). Confirmed solid via direct physics-position sampling. */}
+      {/* Exit door — isolated RigidBody, one explicit CuboidCollider */}
       <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[2.8, 1.5, 0.2]} position={[0, 1.5, DOOR_Z]} sensor={unlocked} />
+        <CuboidCollider args={[2.8, 1.5, 0.2]} position={[4, 1.5, DOOR_Z]} sensor={unlocked} />
         {!unlocked && (
-          <mesh position={[0, 1.5, DOOR_Z]}>
+          <mesh position={[4, 1.5, DOOR_Z]}>
             <boxGeometry args={[5.6, 3, 0.4]} />
             <meshStandardMaterial color="#1a1010" />
           </mesh>
         )}
       </RigidBody>
 
-      {/* A hint of exterior light beyond the door once it's open — sells
-          "there is an outside" as a real, reachable place, not a bluff. */}
-      {unlocked && (
-        <pointLight position={[0, 2, DOOR_Z - 3]} color="#7a8fb0" intensity={40} distance={8} />
-      )}
+      {unlocked && <pointLight position={[4, 2, DOOR_Z - 3]} color="#7a8fb0" intensity={40} distance={8} />}
 
       {CLUES.map((clue) => (
         <Clue key={clue.id} id={clue.id} position={clue.position} label={clue.label} />
@@ -180,7 +146,7 @@ export function House() {
         <HidingSpot key={i} spot={spot} />
       ))}
 
-      <ExitDoorLight position={[0, 1.5, DOOR_Z]} />
+      <ExitDoorLight position={[4, 1.5, DOOR_Z]} />
       <Clutter />
       <Signage />
     </>

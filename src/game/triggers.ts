@@ -4,9 +4,10 @@
  * player's position against it. Kept in one place so the visual and the
  * logic can never drift apart.
  *
- * Map layout (bigger than the original 3-room build — see PROGRESS.md):
- * spine corridor x=0 from z=18 (spawn) to z=-20 (exit door), four alcove
- * rooms alternating sides, calm room beyond the door z=-20..-34.
+ * Coordinates match the maze graph in maze.ts — see that file for the
+ * junction layout. Each clue/hiding room hangs off a specific corridor
+ * edge (A-B, C-D, G-H, H-I); the exit door and calm room are beyond
+ * junction I's south exit.
  */
 
 export interface ClueDef {
@@ -26,29 +27,28 @@ export interface BoxRegion {
 }
 
 export const CLUES: ClueDef[] = [
-  { id: 'clue-1', position: [5.5, 0.5, 14], radius: 0.9, label: "a child's photograph" },
-  { id: 'clue-2', position: [-5.5, 0.5, 6], radius: 0.9, label: 'a torn journal page' },
-  { id: 'clue-3', position: [5.5, 0.5, -2], radius: 0.9, label: 'a rusted house key' },
+  { id: 'clue-1', position: [5.5, 0.5, 16], radius: 0.9, label: "a child's photograph" },
+  { id: 'clue-2', position: [17.5, 0.5, 0], radius: 0.9, label: 'a torn journal page' },
+  { id: 'clue-3', position: [-15.5, 0.5, -30], radius: 0.9, label: 'a rusted house key' },
 ]
 
 export const HIDING_SPOTS: BoxRegion[] = [
-  { center: [7, 1, 14], half: [0.6, 1, 0.6], kind: 'closet' },
-  { center: [-7, 1, 6], half: [0.7, 1, 0.5], kind: 'curtain' },
-  { center: [7, 1, -2], half: [0.6, 0.9, 0.6], kind: 'crate' },
-  { center: [-6.5, 1, -10], half: [0.9, 1, 0.6], kind: 'closet' },
-  { center: [0, 0.7, -16], half: [0.9, 0.55, 0.6], kind: 'table' },
+  { center: [7, 1, 16], half: [0.6, 1, 0.6], kind: 'closet' },
+  { center: [19, 1, 0], half: [0.7, 1, 0.5], kind: 'curtain' },
+  { center: [-17, 1, -30], half: [0.6, 0.9, 0.6], kind: 'crate' },
+  { center: [-2, 0.7, -34.5], half: [0.9, 0.55, 0.6], kind: 'table' },
 ]
 
 /** Beyond the unlocked door — reaching here is win condition #1, "escape,"
  * distinct from the calm room's slower "regulate yourself" win. */
 export const OUTSIDE: BoxRegion = {
-  center: [0, 1.5, -21.5],
-  half: [2.8, 1.5, 1.2],
+  center: [4, 1.5, -47.5],
+  half: [2.8, 1.5, 1.4],
 }
 
 export const CALM_ROOM: BoxRegion = {
-  center: [0, 1.5, -27],
-  half: [3.5, 1.5, 6.5],
+  center: [4, 1.5, -56],
+  half: [2.8, 1.5, 6.5],
 }
 
 export function distance3(

@@ -4,16 +4,12 @@ import * as THREE from 'three'
 import { useDirector } from './director'
 import { usePlayerPosition } from './playerPosition'
 import { distance3 } from './triggers'
+import { pointAtArcLength, projectToArcLength, shortestArcDelta, PATH_TOTAL_LENGTH } from './maze'
 import { setMonsterProximity, setMonsterAudioPosition, playMonsterFootstep } from './scareFx'
 
-const SKIN = '#0d0d0d'
+const SKIN = '#0a0908'
+const SKIN_DARK = '#050504'
 const EYE = '#ff2222'
-
-// Confined to the corridor spine — it never enters the alcove rooms, which
-// is what makes ducking into one actually safer rather than cosmetic.
-const Z_MAX = 16
-const Z_MIN = -19
-const X_BOUND = 2.5
 
 const PATROL_SPEED = 1.7
 const HUNT_SPEED = 3.2
@@ -23,22 +19,27 @@ const STEP_DISTANCE = 1.1 // world units between footstep sounds
 
 /**
  * A real articulated creature that is ALWAYS somewhere and ALWAYS moving —
- * patrolling back and forth along the corridor when it isn't actively
- * hunting, cutting straight toward the player's real position when the
- * Director calls for it (STALK/STRIKE), retreating along the corridor
- * when it calls for withdrawal. It never leaves the corridor bounds, so
- * the alcove rooms (and their hiding spots) are genuinely out of its
- * reach, not just visually implied to be.
+ * walking the maze's main loop and exit spur (see maze.ts) as arc-length
+ * progress along that polyline, so it patrols a real winding, looping
+ * route rather than a single straight corridor. It never leaves that
+ * path, so the alcove rooms off it (and the loop's shortcut) are
+ * genuinely out of its reach, not just visually implied to be.
  *
- * director.ts's phase still owns *when* it hunts vs. retreats (that's the
- * whole pulse-driven mechanic); this component owns *where it actually
- * is* in the world, and feeds a real-distance-derived proximity value
- * back into monsterDistance so HUD/audio/stealth-detection all react to
- * where the thing genuinely is rather than a scripted slider.
+ * Visual/animation design leans on a few well-established horror-animation
+ * principles rather than just "more motion" (see commit message for
+ * sources): asymmetric limb timing instead of a mirrored walk cycle, an
+ * unpredictable rhythm (brief hitches and speed-ups, not a metronome), a
+ * center of mass that leans too far forward, and a gaze that lags behind
+ * the body's facing — it's still looking at you a beat after it turns,
+ * not perfectly locked on. The body actually rotates to face its direction
+ * of travel now (it didn't before, which read as a sliding puppet); only
+ * the head/eyes independently track the player.
  */
 export function Monster() {
   const scareLog = useDirector((s) => s.scareLog)
   const group = useRef<THREE.Group>(null!)
+  const bodyPivot = useRef<THREE.Group>(null!)
+  const torso = useRef<THREE.Group>(null!)
   const leftArm = useRef<THREE.Mesh>(null!)
   const rightArm = useRef<THREE.Mesh>(null!)
   const leftLeg = useRef<THREE.Mesh>(null!)
@@ -50,8 +51,11 @@ export function Monster() {
   const lastScareCount = useRef(0)
   const attackUntil = useRef(0)
   const attackStart = useRef(0)
-  const patrolDir = useRef(1)
+  const pathS = useRef(30) // arc-length progress along maze.ts's MONSTER_PATH
   const distSinceStep = useRef(0)
+  const facing = useRef(0) // current body yaw, radians
+  const gazeYaw = useRef(0) // head yaw, lags `facing` toward the player
+  const hitchPhase = useRef(0) // accumulates at a noise-modulated rate -> unpredictable rhythm
 
   useFrame(({ clock }, delta) => {
     if (!group.current) return
@@ -61,42 +65,76 @@ export function Monster() {
     const player = usePlayerPosition.getState()
 
     let speed = PATROL_SPEED
-    let targetX = group.current.position.x
-    let targetZ = group.current.position.z
+    let mode: 'hunt' | 'retreat' | 'patrol' = 'patrol'
 
     if (phase === 'STALK' || phase === 'STRIKE') {
       speed = HUNT_SPEED
-      targetZ = player.z
-      targetX = THREE.MathUtils.clamp(player.x, -X_BOUND, X_BOUND)
+      mode = 'hunt'
     } else if (phase === 'WITHDRAW') {
       speed = RETREAT_SPEED
-      const away = group.current.position.z >= player.z ? 1 : -1
-      targetZ = THREE.MathUtils.clamp(group.current.position.z + away * 12, Z_MIN, Z_MAX)
-      targetX = 0
-    } else {
-      // CALIBRATING / RECOVER: keep patrolling, back and forth, never idle.
-      targetZ = patrolDir.current > 0 ? Z_MAX : Z_MIN
-      targetX = Math.sin(t * 0.4) * 1.6
-      if (Math.abs(group.current.position.z - targetZ) < 0.6) patrolDir.current *= -1
+      mode = 'retreat'
     }
 
     const prevX = group.current.position.x
     const prevZ = group.current.position.z
 
-    const diffZ = targetZ - prevZ
-    const stepZ = Math.sign(diffZ) * Math.min(Math.abs(diffZ), speed * dt)
-    group.current.position.z = THREE.MathUtils.clamp(prevZ + stepZ, Z_MIN, Z_MAX)
-    group.current.position.x = THREE.MathUtils.lerp(prevX, targetX, Math.min(1, dt * 2))
+    // Unpredictable rhythm: a slow noise-ish oscillator that occasionally
+    // stalls the effective speed near zero for a beat, then releases —
+    // a hitch, not a steady metronome gait. Never fully stops the hunt.
+    hitchPhase.current += dt * (0.6 + 0.4 * Math.sin(t * 0.37))
+    const hitch = 0.55 + 0.45 * Math.sin(hitchPhase.current * 2.3) * Math.sin(hitchPhase.current * 0.6)
+    const effSpeed = speed * THREE.MathUtils.clamp(hitch, 0.35, 1.15)
 
-    const moved = Math.hypot(
-      group.current.position.x - prevX,
-      group.current.position.z - prevZ,
-    )
+    // Movement is arc-length progress along the maze's patrol polyline
+    // (see maze.ts) — this is what lets it walk a real winding, looping
+    // route with the exact same "move a number toward a target number"
+    // logic as the old single-corridor version needed.
+    if (mode === 'hunt') {
+      const targetS = projectToArcLength(player)
+      const delta2 = shortestArcDelta(pathS.current, targetS)
+      pathS.current += Math.sign(delta2) * Math.min(Math.abs(delta2), effSpeed * dt)
+    } else if (mode === 'retreat') {
+      const playerS = projectToArcLength(player)
+      const towardPlayer = shortestArcDelta(pathS.current, playerS)
+      const away = towardPlayer >= 0 ? -1 : 1 // step opposite of whichever direction closes distance
+      pathS.current += away * effSpeed * dt
+    } else {
+      // CALIBRATING / RECOVER: keep walking the loop forward, never idle.
+      pathS.current += effSpeed * dt
+    }
+    pathS.current = ((pathS.current % PATH_TOTAL_LENGTH) + PATH_TOTAL_LENGTH) % PATH_TOTAL_LENGTH
+
+    const pos = pointAtArcLength(pathS.current)
+    group.current.position.x = pos.x
+    group.current.position.z = pos.z
+
+    const dx = group.current.position.x - prevX
+    const dz = group.current.position.z - prevZ
+    const moved = Math.hypot(dx, dz)
     distSinceStep.current += moved
     if (distSinceStep.current > STEP_DISTANCE) {
       distSinceStep.current = 0
       playMonsterFootstep(group.current.position.x, group.current.position.y, group.current.position.z)
     }
+
+    // Body faces its direction of travel (a beat of inertia, not instant —
+    // an instant snap reads as a puppet on a string).
+    if (moved > 0.001) {
+      const targetFacing = Math.atan2(dx, dz)
+      let delta2 = targetFacing - facing.current
+      delta2 = Math.atan2(Math.sin(delta2), Math.cos(delta2)) // shortest angular path
+      facing.current += delta2 * Math.min(1, dt * 4)
+    }
+    if (bodyPivot.current) bodyPivot.current.rotation.y = facing.current
+
+    // The head/gaze tracks the player independently of the body, lagging
+    // behind — it's still catching up to looking at you, which is more
+    // unsettling than either perfect tracking or no tracking at all.
+    const toPlayerYaw = Math.atan2(player.x - group.current.position.x, player.z - group.current.position.z)
+    let gazeDelta = toPlayerYaw - facing.current - gazeYaw.current
+    gazeDelta = Math.atan2(Math.sin(gazeDelta), Math.cos(gazeDelta))
+    gazeYaw.current += gazeDelta * Math.min(1, dt * 1.5)
+    gazeYaw.current = THREE.MathUtils.clamp(gazeYaw.current, -1.1, 1.1)
 
     // Real proximity, derived from actual position — drives HUD/stealth
     // detection (useThreatLoop reads monsterDistance) and audio, all from
@@ -123,88 +161,135 @@ export function Monster() {
     }
 
     const attacking = t < attackUntil.current
-    const walkSpeed = phase === 'STALK' || phase === 'STRIKE' ? 9 : 6
-    const swing = Math.sin(t * walkSpeed) * 0.6
+    const hunting = phase === 'STALK' || phase === 'STRIKE'
+    const walkSpeed = (hunting ? 9 : 6) * THREE.MathUtils.clamp(hitch, 0.5, 1.3)
+    // Asymmetric gait: legs/arms on a slightly different rate and phase
+    // offset per side instead of a mirrored sine — a limp, not a stride.
+    const swingL = Math.sin(t * walkSpeed) * 0.65
+    const swingR = Math.sin(t * walkSpeed * 1.18 + 0.6) * 0.5
 
     if (attacking) {
       const p = (t - attackStart.current) / 0.55
       const lunge = Math.sin(Math.min(1, p) * Math.PI)
       group.current.position.z += lunge * 3.5
-      group.current.rotation.x = -lunge * 0.25
-      if (leftArm.current) leftArm.current.rotation.x = -1.8 * lunge
-      if (rightArm.current) rightArm.current.rotation.x = -1.8 * lunge
+      if (torso.current) torso.current.rotation.x = -lunge * 0.3
+      if (leftArm.current) leftArm.current.rotation.x = -1.9 * lunge
+      if (rightArm.current) rightArm.current.rotation.x = -1.7 * lunge
     } else {
-      group.current.rotation.x = THREE.MathUtils.lerp(group.current.rotation.x, 0, 0.1)
-      if (leftArm.current) leftArm.current.rotation.x = swing
-      if (rightArm.current) rightArm.current.rotation.x = -swing
+      // Wrong center of mass: leans noticeably forward, more so while
+      // hunting, like it's always about to fall onto you.
+      const lean = hunting ? 0.32 : 0.16
+      if (torso.current) torso.current.rotation.x = THREE.MathUtils.lerp(torso.current.rotation.x, lean, 0.08)
+      if (leftArm.current) leftArm.current.rotation.x = swingL
+      if (rightArm.current) rightArm.current.rotation.x = -swingR
     }
 
-    if (leftLeg.current) leftLeg.current.rotation.x = -swing
-    if (rightLeg.current) rightLeg.current.rotation.x = swing
+    if (leftLeg.current) leftLeg.current.rotation.x = -swingL
+    if (rightLeg.current) rightLeg.current.rotation.x = swingR
 
     if (head.current) {
-      head.current.rotation.y = Math.sin(t * 1.7) * 0.15
-      head.current.rotation.z = Math.sin(t * 2.3) * 0.05
+      head.current.rotation.y = gazeYaw.current
+      head.current.rotation.z = Math.sin(t * 2.1) * 0.06
     }
-    group.current.position.y = 0.9 + Math.abs(Math.sin(t * walkSpeed)) * 0.08
+    group.current.position.y = 0.9 + Math.abs(Math.sin(t * walkSpeed)) * 0.07
 
     const closeness = 1 - normalized
-    const eyeIntensity = 1.5 + closeness * 6 + (attacking ? 4 : 0)
+    const eyeIntensity = 1.8 + closeness * 6.5 + (attacking ? 4 : 0)
     if (eyeL.current) (eyeL.current.material as THREE.MeshStandardMaterial).emissiveIntensity = eyeIntensity
-    if (eyeR.current) (eyeR.current.material as THREE.MeshStandardMaterial).emissiveIntensity = eyeIntensity
+    if (eyeR.current)
+      (eyeR.current.material as THREE.MeshStandardMaterial).emissiveIntensity = eyeIntensity * 0.85 // asymmetric eyes — not perfectly even
   })
 
   return (
     <group ref={group} position={[0, 0.9, -6]}>
-      {/* Torso — tall, hunched, asymmetric-ish via slight taper */}
-      <mesh position={[0, 0, 0]} castShadow>
-        <capsuleGeometry args={[0.32, 1.0, 4, 8]} />
-        <meshStandardMaterial color={SKIN} roughness={0.95} />
-      </mesh>
+      {/* Faint cold backlight — without this the creature is pure black
+          silhouette against pure black fog and just disappears. This
+          isn't meant to illuminate it, just barely separate its outline
+          from the dark behind it. */}
+      <pointLight position={[0, 1.1, -0.5]} color="#3a3a55" intensity={2.2} distance={2.2} />
 
-      {/* Head, tilted forward like it's always peering */}
-      <group ref={head} position={[0, 0.95, 0.05]} rotation={[0.3, 0, 0]}>
-        <mesh castShadow>
-          <sphereGeometry args={[0.24, 12, 12]} />
-          <meshStandardMaterial color={SKIN} roughness={0.9} />
-        </mesh>
-        <mesh ref={eyeL} position={[-0.09, 0.02, 0.2]}>
-          <sphereGeometry args={[0.035, 8, 8]} />
-          <meshStandardMaterial color={EYE} emissive={EYE} emissiveIntensity={2} toneMapped={false} />
-        </mesh>
-        <mesh ref={eyeR} position={[0.09, 0.02, 0.2]}>
-          <sphereGeometry args={[0.035, 8, 8]} />
-          <meshStandardMaterial color={EYE} emissive={EYE} emissiveIntensity={2} toneMapped={false} />
-        </mesh>
-        <pointLight color={EYE} intensity={3} distance={1.5} position={[0, 0, 0.2]} />
-      </group>
+      <group ref={bodyPivot}>
+        <group ref={torso}>
+          {/* Torso — tall, hunched, slightly asymmetric taper */}
+          <mesh position={[0.02, 0, 0]} castShadow scale={[0.95, 1, 1.08]}>
+            <capsuleGeometry args={[0.32, 1.0, 4, 8]} />
+            <meshStandardMaterial color={SKIN} roughness={0.97} />
+          </mesh>
 
-      {/* Arms — long, thin, wrong proportions on purpose */}
-      <group position={[-0.38, 0.55, 0]}>
-        <mesh ref={leftArm} position={[0, -0.55, 0]} castShadow>
-          <capsuleGeometry args={[0.07, 1.0, 4, 6]} />
-          <meshStandardMaterial color={SKIN} roughness={0.95} />
-        </mesh>
-      </group>
-      <group position={[0.38, 0.55, 0]}>
-        <mesh ref={rightArm} position={[0, -0.55, 0]} castShadow>
-          <capsuleGeometry args={[0.07, 1.0, 4, 6]} />
-          <meshStandardMaterial color={SKIN} roughness={0.95} />
-        </mesh>
-      </group>
+          {/* Spine ridge — a row of small back spikes, uneven heights */}
+          {[0.55, 0.3, 0.05, -0.2].map((y, i) => (
+            <mesh
+              key={i}
+              position={[0, y, -0.28]}
+              rotation={[-0.5 - i * 0.05, 0, 0]}
+              scale={[1, 0.8 + (i % 2) * 0.3, 1]}
+            >
+              <coneGeometry args={[0.05, 0.22, 5]} />
+              <meshStandardMaterial color={SKIN_DARK} roughness={1} />
+            </mesh>
+          ))}
 
-      {/* Legs */}
-      <group position={[-0.14, -0.55, 0]}>
-        <mesh ref={leftLeg} position={[0, -0.4, 0]} castShadow>
-          <capsuleGeometry args={[0.1, 0.75, 4, 6]} />
-          <meshStandardMaterial color={SKIN} roughness={0.95} />
-        </mesh>
-      </group>
-      <group position={[0.14, -0.55, 0]}>
-        <mesh ref={rightLeg} position={[0, -0.4, 0]} castShadow>
-          <capsuleGeometry args={[0.1, 0.75, 4, 6]} />
-          <meshStandardMaterial color={SKIN} roughness={0.95} />
-        </mesh>
+          {/* Head — asymmetric: squashed sphere + jaw wedge, offset eyes */}
+          <group ref={head} position={[0, 0.95, 0.05]} rotation={[0.25, 0, 0]}>
+            <mesh castShadow scale={[0.85, 1.05, 1]}>
+              <sphereGeometry args={[0.24, 12, 12]} />
+              <meshStandardMaterial color={SKIN} roughness={0.92} />
+            </mesh>
+            <mesh position={[0, -0.14, 0.1]} rotation={[0.3, 0, 0]}>
+              <coneGeometry args={[0.14, 0.22, 6]} />
+              <meshStandardMaterial color={SKIN_DARK} roughness={0.95} />
+            </mesh>
+            <mesh ref={eyeL} position={[-0.1, 0.03, 0.19]}>
+              <sphereGeometry args={[0.038, 8, 8]} />
+              <meshStandardMaterial color={EYE} emissive={EYE} emissiveIntensity={2} toneMapped={false} />
+            </mesh>
+            <mesh ref={eyeR} position={[0.08, -0.01, 0.2]}>
+              <sphereGeometry args={[0.028, 8, 8]} />
+              <meshStandardMaterial color={EYE} emissive={EYE} emissiveIntensity={2} toneMapped={false} />
+            </mesh>
+            <pointLight color={EYE} intensity={3} distance={1.5} position={[0, 0, 0.2]} />
+          </group>
+
+          {/* Arms — long, thin, wrong proportions, clawed hands */}
+          <group position={[-0.38, 0.55, 0]}>
+            <mesh ref={leftArm} position={[0, -0.55, 0]} castShadow>
+              <capsuleGeometry args={[0.07, 1.0, 4, 6]} />
+              <meshStandardMaterial color={SKIN} roughness={0.97} />
+              {[-0.06, 0, 0.06].map((x, i) => (
+                <mesh key={i} position={[x, -0.62, 0.03]} rotation={[1.4, 0, 0]}>
+                  <coneGeometry args={[0.018, 0.13, 5]} />
+                  <meshStandardMaterial color={SKIN_DARK} roughness={1} />
+                </mesh>
+              ))}
+            </mesh>
+          </group>
+          <group position={[0.38, 0.55, 0]}>
+            <mesh ref={rightArm} position={[0, -0.55, 0]} castShadow>
+              <capsuleGeometry args={[0.07, 1.0, 4, 6]} />
+              <meshStandardMaterial color={SKIN} roughness={0.97} />
+              {[-0.06, 0, 0.06].map((x, i) => (
+                <mesh key={i} position={[x, -0.62, 0.03]} rotation={[1.4, 0, 0]}>
+                  <coneGeometry args={[0.018, 0.13, 5]} />
+                  <meshStandardMaterial color={SKIN_DARK} roughness={1} />
+                </mesh>
+              ))}
+            </mesh>
+          </group>
+
+          {/* Legs */}
+          <group position={[-0.14, -0.55, 0]}>
+            <mesh ref={leftLeg} position={[0, -0.4, 0]} castShadow>
+              <capsuleGeometry args={[0.1, 0.75, 4, 6]} />
+              <meshStandardMaterial color={SKIN} roughness={0.97} />
+            </mesh>
+          </group>
+          <group position={[0.14, -0.55, 0]}>
+            <mesh ref={rightLeg} position={[0, -0.4, 0]} castShadow>
+              <capsuleGeometry args={[0.1, 0.75, 4, 6]} />
+              <meshStandardMaterial color={SKIN} roughness={0.97} />
+            </mesh>
+          </group>
+        </group>
       </group>
     </group>
   )

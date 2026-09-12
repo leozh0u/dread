@@ -69,10 +69,15 @@ export function Scene() {
   return (
     <Canvas
       shadows
-      camera={{ fov: 75, position: [0, 0.5, 18] }}
+      camera={{ fov: 75, position: [0, 0.5, 23] }}
       gl={{ antialias: true }}
       onCreated={({ scene }) => {
-        scene.fog = new THREE.Fog('#000000', 2, 12)
+        // Exponential fog instead of linear: linear fog has a fixed
+        // near/far band and reads as a harsh "wall of black" right at the
+        // far distance. Exponential falls off as a smooth curve — still
+        // properly dark for horror, but the transition into blackness is
+        // gradual instead of a visible cutoff line.
+        scene.fog = new THREE.FogExp2('#000000', 0.052)
       }}
     >
       <color attach="background" args={['#000']} />
