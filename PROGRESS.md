@@ -716,3 +716,34 @@ Also confirmed the hosted build plays: the corridor renders, the HUD and
 vitals panel work, MediaPipe loads from CDN (`FACE tracked`), and the
 pulse falls back correctly with `LINK local only`, since there is no
 sidecar behind a static site.
+
+---
+
+## LEDGER RECONCILIATION — every request this session
+
+Checked back against his actual words, not against what felt done.
+
+| # | Asked, in his words | State |
+|---|---|---|
+| 1 | "the monsters were still very bland, no details" (4x) | heads, staining, eyes, exposure — **not signed off by him** |
+| 2 | trackpad "rotate rather than pan" → "everything is upside down" | degenerate case fixed + self-righting; **full flip never reproduced** |
+| 3 | "can you get the presage to work" | pipeline proven end to end; **blocked on his camera** |
+| 4 | "the walking animation of the monsters phases through the walls" | clearance-aware nav shipped; **never visually verified** |
+| 5 | "more sudden scary movements" | done — lunge cycle + twitch |
+| 6 | "the camera also isn't on. atleast theres no green light" | diagnosis shipped; **blocked on him** |
+| 7 | "make sure presage works, and the other sponsors do as well" | all four verified; Persona also fixed on the hosted build |
+| 8 | "even more dark… monsters move quicker, or more jittery" | done |
+| 9 | "plan how to market the product… exposure therapy" | VIDEO.md rewritten to the brief |
+| 10a | "more actual detail, like **colours, patterns**" | **OPEN — staining is greyscale. No colour was added at all.** |
+| 10b | "make sure the game and **movements are smoother**" | **OPEN — not addressed** |
+| 10c | "and **no phasing bugs** etc" | **OPEN — fix shipped, not verified** |
+| 11 | "main selling features ready to demo and explain" | VIDEO.md + DEVPOST.md |
+| 12 | 66 Claude co-author trailers | **blocked on him** |
+| 13 | four exposed API keys to rotate | **blocked on him** |
+| 14 | MathWorks, ~30 seconds of his time | **blocked on him** |
+
+**Three items were quietly not done.** 10a, 10b and 10c all arrived in one
+message while I was mid-edit on something else, and only the parts that
+matched what I was already doing — texture and eyes — actually got built.
+Colour, smoothness and phasing verification were never touched. Working
+them now, oldest first.
