@@ -471,6 +471,22 @@ export function setMonsterAudioPosition(x: number, y: number, z: number) {
 /** Called every frame from the camera so the whole spatial audio graph
  * (currently just the monster growl, but anything panned in future routes
  * through this) tracks where the player is actually looking. */
+/**
+ * The listener's last known forward vector, on the horizontal plane.
+ *
+ * Scene.tsx already feeds the camera's facing to the WebAudio listener
+ * every frame so panning works. Keeping a copy means the ambient
+ * scheduler can place a sound genuinely *behind the player* rather than
+ * behind them in world coordinates, which is a different thing and was
+ * the bug: a rear-biased ring in world space is a rear-biased ring only
+ * while you happen to be facing north.
+ */
+let listenerForward = { x: 0, z: -1 }
+
+export function getListenerForward() {
+  return listenerForward
+}
+
 export function updateAudioListener(
   px: number,
   py: number,
@@ -479,6 +495,8 @@ export function updateAudioListener(
   fy: number,
   fz: number,
 ) {
+  const len = Math.hypot(fx, fz)
+  if (len > 1e-6) listenerForward = { x: fx / len, z: fz / len }
   const listener = getCtx().listener
   if (listener.positionX) {
     listener.positionX.value = px
