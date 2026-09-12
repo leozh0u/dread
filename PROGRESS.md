@@ -734,9 +734,9 @@ Checked back against his actual words, not against what felt done.
 | 7 | "make sure presage works, and the other sponsors do as well" | all four verified; Persona also fixed on the hosted build |
 | 8 | "even more dark… monsters move quicker, or more jittery" | done |
 | 9 | "plan how to market the product… exposure therapy" | VIDEO.md rewritten to the brief |
-| 10a | "more actual detail, like **colours, patterns**" | **OPEN — staining is greyscale. No colour was added at all.** |
-| 10b | "make sure the game and **movements are smoother**" | **OPEN — not addressed** |
-| 10c | "and **no phasing bugs** etc" | **OPEN — fix shipped, not verified** |
+| 10a | "more actual detail, like **colours, patterns**" | done — hue correlated with the shading, plus directional striation |
+| 10b | "make sure the game and **movements are smoother**" | done — every easing is frame-rate independent now |
+| 10c | "and **no phasing bugs** etc" | done — measured: 0.66m → 1.26m clearance on the worst route |
 | 11 | "main selling features ready to demo and explain" | VIDEO.md + DEVPOST.md |
 | 12 | 66 Claude co-author trailers | **blocked on him** |
 | 13 | four exposed API keys to rotate | **blocked on him** |
