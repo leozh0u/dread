@@ -865,3 +865,30 @@ The same instant-attack click was in the footsteps and the landing — the
 two most frequently triggered sounds in the game. Fixed there too, and
 deliberately NOT in the jump-scare stabs, where an instant attack is the
 entire point.
+
+---
+
+## LEDGER — reconciled again
+
+| Asked, in his words | State |
+|---|---|
+| "monsters were still very bland" (raised 4x) | heads, colour, texture, eyes, poses — **never signed off by him** |
+| "add more animations… tracks you, runs towards you, tries to kill you" | done, tested |
+| "the jumping sound sounds bad" | done |
+| "why does it say 40bpm… feels too low" | done — it was his breathing |
+| "how do i make presage work" | **his camera works; SDK recovery shipped; needs him to sit back** |
+| "is that the finish? is there even a finish?" | answered — fragment, 1 of 3, two endings |
+| trackpad "everything is upside down" | **edge case fixed, full flip NEVER REPRODUCED** |
+| Persona | dropped, at his call — a healthcare team will use it better |
+| MathWorks, ~30s of his time | **blocked on him** |
+| rotate 4 exposed API keys | **blocked on him** |
+| 66 Claude co-author trailers in a public repo | **blocked on him** |
+
+### Acting on the oldest actionable item next
+
+Blind mode latches for the whole session once the 25s watchdog fires, and
+Leo's runs are starting before his camera is ready — so a run gets a fake
+baseline of 72 and keeps it even after Presage starts delivering real
+readings. Every Director comparison in that run is then against a number
+that was never his. That is the thing most likely to make the biometrics
+feel like they are not working, even once they are.
