@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useThreat } from './threat'
-import { FLOOR_TOP } from './House'
+import { FLOOR_TOP } from './geometry'
 
 /**
  * A fragment: a broken length of fluorescent tube, still lit, resting

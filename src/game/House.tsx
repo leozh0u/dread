@@ -7,6 +7,14 @@ import { HidingSpot } from './HidingSpot'
 import { Clutter } from './Clutter'
 import { Signage } from './Signage'
 import { playSfx } from './scareFx'
+import {
+  FLOOR_Y,
+  FLOOR_THICK,
+  SLAB_THICK,
+  CEILING_BOTTOM,
+  WALL_SPAN,
+  WALL_MID_Y,
+} from './geometry'
 import { WallDressing } from './WallDressing'
 import { Fluorescents } from './Fluorescents'
 import { ExitDoorLight } from './ExitDoor'
@@ -16,33 +24,11 @@ import { buildCorridorWalls, buildJunctionCaps, type WallSpec } from './maze'
 
 // Low, oppressive ceiling — Backrooms interiors are office-height, not
 // cathedral-height, and the low ceiling is half of why they feel wrong.
-const WALL_H = 3.2
 const DOOR_Z = -48
 
 // Mono-yellow: aged wallpaper over damp carpet. The whole palette is one
 // sickly hue with small value shifts, which is what makes the space read
 // as endless and same-y rather than as designed rooms.
-/**
- * Where the room actually starts and stops.
- *
- * These used to be implicit and they did not agree. The floor slab sits at
- * y=-1 with thickness 0.2, so its top face is -0.9 — but walls were placed
- * at WALL_H/2 with height WALL_H, spanning 0 to 3.2. Every wall in the
- * level therefore floated 0.9 units above the floor, with a visible strip
- * of nothing underneath it, light leaking through, and a gap you could see
- * the void through.
- *
- * Derived from the slabs now, so the walls cannot drift from the floor
- * again if either moves.
- */
-const FLOOR_Y = -1
-const FLOOR_THICK = 0.2
-const SLAB_THICK = 0.2
-export const FLOOR_TOP = FLOOR_Y + FLOOR_THICK / 2 // -0.9
-const CEILING_BOTTOM = WALL_H // ceiling slab is centred at WALL_H
-const WALL_SPAN = CEILING_BOTTOM - FLOOR_TOP // full floor-to-ceiling height
-const WALL_MID_Y = (FLOOR_TOP + CEILING_BOTTOM) / 2
-
 const WALL_TINT = '#6f6540'
 const WALL_TINT_ALT = '#665c39'
 const FLOOR_TINT = '#4a3f28'

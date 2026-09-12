@@ -1,6 +1,6 @@
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import type { BoxRegion } from './triggers'
-import { FLOOR_TOP } from './House'
+import { FLOOR_TOP } from './geometry'
 
 /**
  * Whether the player counts as hidden is decided by useTriggersLoop's
