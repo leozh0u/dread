@@ -44,35 +44,45 @@ not just text on a screen.
 
 ## Open — in priority order
 
-1. **Audio.** Only placeholder WebAudio tones exist (a drone + oscillator
-   stingers). Leo asked explicitly for "incredibly immersive" sound. This
-   is the single biggest gap between what's built and what's needed.
-   Needs either ElevenLabs (sound design + a voice) or pasted audio assets
-   — **waiting on Leo** for an API key or files.
-2. **Visuals.** Monster is still a black box placeholder. Level geometry
+1. **Visuals.** Monster is still a black box placeholder. Level geometry
    is blocky (deliberately, for scope — darkness/fog hides it — but the
    monster itself needs at least a silhouette, ideally a cheap rigged
    Mixamo model).
-3. **Video plan.** Never actually written despite being flagged as a task
+2. **Video plan.** Never actually written despite being flagged as a task
    since early in the session ("video planning for later" — later is now).
    Needs a shot list against HackRice's prescribed structure (30s intro /
    2min demo / 30s technical / 30s impact).
-4. **Presage on real hardware — untested.** The sidecar has never been run
+3. **Presage on real hardware — untested.** The sidecar has never been run
    against a live camera or a real API key (this sandbox has neither).
    This is the single highest-risk unknown left: if it doesn't work on
    Leo's laptop, the fallback estimator carries the whole demo, which is
    noisier. Needs testing on Leo's actual machine ASAP, not the night
-   before submission.
-5. **Sponsor integrations not yet built** (mapped conceptually, no code):
-   MathWorks (an autonomic HR/HRV model), ElevenLabs (audio, see #1),
-   Persona (identity gate), Backboard (cross-session memory — the bandit
-   stats *do* persist across a restart right now, which is a start, but
-   nothing calls the actual Backboard API), Tiger Data (pulse history
-   isn't stored anywhere durable yet, just in-memory).
-6. **Ongoing standard, not a one-time item:** keep verifying claims by
+   before submission. **Leo is checking Discord/handbook for the key.**
+4. **Sponsor integrations not yet built** (mapped conceptually, no code):
+   MathWorks (an autonomic HR/HRV model), ElevenLabs (voice lines layered
+   on top of the procedural audio below, see Done), Persona (identity
+   gate), Backboard (cross-session memory — the bandit stats *do* persist
+   across a restart right now, which is a start, but nothing calls the
+   actual Backboard API), Tiger Data (pulse history isn't stored anywhere
+   durable yet, just in-memory). **Leo is checking Discord/handbook for
+   ElevenLabs key too.**
+5. **Ongoing standard, not a one-time item:** keep verifying claims by
    direct testing, not code review alone — this session's two real bugs
    (sensors, door collision) both looked completely correct on paper and
    were only caught by actually driving the player through them.
+
+## Done — audio (this pass)
+
+- [x] **Real procedural sound design, zero API keys needed.** Heartbeat
+      that audibly "lub-dub"s in sync with the player's live bpm; a
+      continuous monster growl bed that gets louder and tonally closer as
+      it approaches; footsteps on movement; four distinct textured scare
+      stingers (screech/stab/lunge/silence) instead of one generic tone;
+      a harsher dedicated jumpscare sound. All synthesized at runtime
+      (WebAudio noise buffers + filters + envelopes) — verified by direct
+      module injection in-browser (no exceptions, confirmed against
+      console). ElevenLabs, if the key turns up, layers voice lines on
+      top of this later; the game was never blocked on it.
 
 ## Explicitly dropped (not forgotten, decided against)
 
