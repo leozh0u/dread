@@ -72,7 +72,13 @@ export const BONE_FOUL = '#6d6659'
  *   - a downward bias, because on anything that has stood a long time in a
  *     damp place, dirt collects low and light falls from above
  */
-export function stainGeometry(geo: THREE.BufferGeometry, seed: number, strength = 1) {
+export function stainGeometry(
+  geo: THREE.BufferGeometry,
+  seed: number,
+  strength = 1,
+  /** How far the hue is allowed to move. Bone wants less than flesh. */
+  tint = 1,
+) {
   const pos = geo.attributes.position as THREE.BufferAttribute
   const colors = new Float32Array(pos.count * 3)
   const v = new THREE.Vector3()
@@ -86,17 +92,69 @@ export function stainGeometry(geo: THREE.BufferGeometry, seed: number, strength 
     const mottle =
       0.5 + 0.5 * Math.sin(17.3 * v.x + seed * 3.1) * Math.sin(15.1 * v.z - seed * 2.2)
     const height = (v.y - bb.min.y) / spanY
+
+    /**
+     * STRIATION. The "patterns" half of the request.
+     *
+     * Blotch and mottle are both isotropic — they vary the same way in
+     * every direction, which produces clouds. Real organic surfaces are
+     * full of DIRECTIONAL structure: the grain of muscle, stretched skin,
+     * the banding where something has grown unevenly. A high-frequency
+     * term that varies along one axis only reads as that grain, and it is
+     * the difference between a dirty surface and a surface that grew.
+     */
+    const striation = Math.sin(v.y * 38 + v.x * 6 + seed * 5.1)
+
     const shade =
-      1 + strength * (0.26 * (blotch - 0.5) + 0.12 * (mottle - 0.5) + 0.22 * (height - 0.5))
+      1 +
+      strength *
+        (0.26 * (blotch - 0.5) +
+          0.12 * (mottle - 0.5) +
+          0.22 * (height - 0.5) +
+          0.05 * striation)
     // Asymmetric on purpose: staining should DARKEN a surface far more
     // than it lightens it. Dirt, damp and shadow subtract; there is
     // nothing on one of these creatures that would make a patch of it
     // brighter than clean bone. A symmetric range made limbs read paler
     // overall, which is the opposite of what was wanted.
     const c = THREE.MathUtils.clamp(shade, 0.48, 1.08)
-    colors[i * 3] = c
-    colors[i * 3 + 1] = c
-    colors[i * 3 + 2] = c
+
+    /**
+     * COLOUR, which this was missing entirely.
+     *
+     * Every one of these terms was being written to r, g and b equally,
+     * so the whole system could only ever produce a greyer or lighter
+     * version of one base colour. Grey variation on a grey base is stone
+     * or plaster. Living tissue is never neutral — it is jaundiced where
+     * it is stretched thin, it bruises purple, and it goes dark red-brown
+     * wherever blood or dirt has settled into a crease.
+     *
+     * So the same noise that decides the shading also decides a HUE, and
+     * the two are correlated on purpose:
+     *   - hollows, which are already darkened, go red-brown, because that
+     *     is where fluid collects and dries
+     *   - raised, exposed surfaces go sallow yellow, like skin pulled
+     *     tight over something
+     *   - a slow third term drifts patches toward a sick green
+     *
+     * Kept deliberately quiet. These are dark creatures seen for a second
+     * at a time under one weak torch; saturated colour on them would read
+     * as cartoon paint, and the point is only that the surface stops
+     * being neutral.
+     */
+    const wet = THREE.MathUtils.clamp(1 - (shade - 0.55) / 0.5, 0, 1) // 1 in the hollows
+    const dry = 1 - wet
+    const rot = THREE.MathUtils.clamp(0.5 + 0.5 * Math.sin(2.1 * v.x - 1.7 * v.z + seed * 0.9), 0, 1)
+
+    // Multipliers per channel, averaging ~1 so this shifts hue without
+    // changing how bright the surface reads.
+    const r = 1 + tint * (0.17 * wet + 0.09 * dry - 0.08 * rot)
+    const g = 1 + tint * (-0.05 * wet + 0.03 * dry + 0.07 * rot)
+    const b = 1 + tint * (-0.15 * wet - 0.12 * dry + 0.02 * rot)
+
+    colors[i * 3] = c * r
+    colors[i * 3 + 1] = c * g
+    colors[i * 3 + 2] = c * b
   }
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
   return geo
@@ -331,7 +389,10 @@ export function Bone({
     // Stronger than the default. A limb is a long, smooth, near-cylindrical
     // surface — the single most mannequin-like shape on the creature — so
     // it needs the most help.
-    stainGeometry(g, (Math.abs(length * 31.7 + top * 113.3) % 10) + 0.3, 1.45)
+    // Bone-family materials get much less hue movement than flesh: a
+    // yellowed, blood-stained bone is right, a purple one is not.
+    const boneish = material === 'bone' || material === 'boneDim' || material === 'boneFoul'
+    stainGeometry(g, (Math.abs(length * 31.7 + top * 113.3) % 10) + 0.3, 1.45, boneish ? 0.5 : 1.5)
     return g
   }, [top, bottom, length, sides])
 

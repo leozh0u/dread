@@ -462,8 +462,8 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
         }
       } else {
         // Close enough that the straight line is inside the corridor.
-        here.x += (pos.x - here.x) * Math.min(1, dt * 3)
-        here.z += (pos.z - here.z) * Math.min(1, dt * 3)
+        here.x = THREE.MathUtils.damp(here.x, pos.x, 3, dt)
+        here.z = THREE.MathUtils.damp(here.z, pos.z, 3, dt)
       }
     }
 
@@ -491,7 +491,21 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       const target = Math.atan2(dx, dz)
       let d = target - facing.current
       d = Math.atan2(Math.sin(d), Math.cos(d))
-      facing.current += d * Math.min(1, dt * 4)
+      /**
+       * FRAME-RATE INDEPENDENT, which `* Math.min(1, dt * k)` is not.
+       *
+       * That form converges at a rate that depends on how often it is
+       * called: at 60fps a step of dt*4 is 0.067 of the remaining angle,
+       * at 30fps it is 0.133 — so the same creature turns at a visibly
+       * different speed on a slower machine, and any frame-rate hitch
+       * produces a jerk in the turn rather than a pause in it. On a
+       * judge's laptop rather than a dev machine, that is the difference
+       * between a creature that swings its head and one that snaps it.
+       *
+       * `damp` is lerp against 1 - e^(-lambda*dt), which converges at the
+       * same real-world rate whatever the frame rate.
+       */
+      facing.current = THREE.MathUtils.damp(facing.current, facing.current + d, 4, dt)
     }
     // THE HEAD SNAP. Facing normally eases toward the direction of
     // travel with a beat of inertia, which is right for walking and wrong

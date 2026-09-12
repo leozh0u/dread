@@ -211,7 +211,11 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     if (walking) stepPhase.current += (planarSpeed * dtClamped) / STRIDE
     const sp = stepPhase.current * Math.PI * 2
     // Amplitude eases in and out so starting and stopping don't snap.
-    bobAmount.current += ((walking ? 1 : 0) - bobAmount.current) * Math.min(1, dtClamped * 6)
+    // Frame-rate independent — see the note in entities/Entity.tsx. The
+    // old form eased in at a rate that depended on the frame rate, so the
+    // head bob faded in faster on a fast machine and the camera felt
+    // different to walk on depending on what was rendering.
+    bobAmount.current = THREE.MathUtils.damp(bobAmount.current, walking ? 1 : 0, 6, dtClamped)
     const a = bobAmount.current
 
     // Vertical dips twice per stride (once per foot), lateral once — the
@@ -220,14 +224,17 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     const bobX = Math.sin(sp * 0.5) * 0.022 * a
 
     // Landing dip recovers over about a quarter second.
-    landDip.current *= Math.max(0, 1 - dtClamped * 7)
+    // Also frame-rate independent: a multiplicative decay of (1 - dt*k)
+    // per frame recovers at a different speed on different machines, and
+    // at very low frame rates can go negative and invert the dip.
+    landDip.current *= Math.exp(-7 * dtClamped)
 
     // Idle sway: breathing, so standing still isn't perfectly static.
     const idle = (1 - a) * Math.sin(clock.elapsedTime * 1.1) * 0.006
 
     // Roll into a strafe. Tiny — enough to feel, not enough to notice.
     const strafe = right.dot(new THREE.Vector3(vel.x, 0, vel.z)) / Math.max(SPEED, 0.001)
-    cameraRoll.current += (strafe * -0.016 - cameraRoll.current) * Math.min(1, dtClamped * 5)
+    cameraRoll.current = THREE.MathUtils.damp(cameraRoll.current, strafe * -0.016, 5, dtClamped)
     camera.rotation.z = cameraRoll.current + Math.sin(sp * 0.5) * 0.004 * a
 
     // Last-resort recovery. The level is sealed and the floor is a solid

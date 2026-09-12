@@ -527,7 +527,7 @@ export function Smile({ state }: CreatureProps) {
       // cardboard cartons, which is the specific thing "no detail, no
       // textures" was describing.
       const indexed = new THREE.BoxGeometry(...size)
-      const geometry = stainGeometry(indexed.toNonIndexed(), i * 1.7 + 0.4, 1.25)
+      const geometry = stainGeometry(indexed.toNonIndexed(), i * 1.7 + 0.4, 1.25, 1.5)
       indexed.dispose()
       out.push({
         pos: [(r - 0.5) * 0.85, 0.35 + i * 0.21, (r2 - 0.5) * 0.35] as Vec3,

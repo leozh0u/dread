@@ -9,13 +9,13 @@
  * level, that it arrives rather than circling, and — most importantly —
  * that it never once occupies a cell the geometry says is solid.
  */
-import { updateNavField, navStep, navStepToward, navDistance, hasLineOfSight, navDebug } from '../src/game/nav'
+import { updateNavField, navStep, navStepToward, navDistance, hasLineOfSight, navDebug, clearanceAt } from '../src/game/nav'
 import { CLUES, HIDING_SPOTS, distance3 } from '../src/game/triggers'
 import { MONSTER_PATH } from '../src/game/maze'
 
 let failures = 0
-const check = (label: string, ok: boolean) => {
-  console.log(`${ok ? '  ok  ' : '  FAIL'}  ${label}`)
+const check = (label: string, ok: boolean, detail = '') => {
+  console.log(`${ok ? '  ok  ' : '  FAIL'}  ${label}${detail ? '  — ' + detail : ''}`)
   if (!ok) failures++
 }
 
@@ -120,6 +120,88 @@ console.log('\n--- the patrol route itself is walkable ---')
   let bad = 0
   for (const p of MONSTER_PATH) if (navDistance(p.x, p.z) == null) bad++
   check(`all ${MONSTER_PATH.length} patrol waypoints sit in open space`, bad === 0)
+}
+
+
+/* ------------------------------------------------------------------ */
+/* LIMBS, NOT CENTRES                                                   */
+/* ------------------------------------------------------------------ */
+/**
+ * Leo: "the walking animation of the monsters phases through the walls."
+ *
+ * Everything above checks that a creature's CENTRE stays out of solid
+ * geometry, which was already true and is not the property that matters.
+ * Only the centre is on the grid; the Crawler's legs splay about 0.7m to
+ * each side. A centre that legally clears a wall by 0.65m still drags
+ * half the creature through it.
+ *
+ * The fix was to prefer the roomiest of the moves that make progress,
+ * rather than the shortest. So the test is not "does it stay legal" but
+ * "does it take the wide line" — measured against the old shortest-path
+ * behaviour over the same routes, which is the thing that actually
+ * changed.
+ */
+console.log('\n--- limb clearance: creatures walk down the middle, not along the wall ---')
+{
+  const routes: [string, [number, number], [number, number]][] = [
+    ['spawn corridor', [0, 26], [0, 4]],
+    ['west leg', [-2, 0], [-17, -6]],
+    ['south run', [2, -20], [2, -44]],
+  ]
+
+  let neverWorse = true
+  let improvedSomewhere = false
+  let worstMean = Infinity
+  for (const [name, from, to] of routes) {
+    updateNavField(to[0], to[1])
+    // The shipped walker, which prefers room among downhill moves.
+    const wide = walkPath(from, to, true)
+    // The old one: strictly shortest, which hugs every inside corner.
+    const tight = walkPath(from, to, false)
+    if (!wide.length || !tight.length) {
+      check(`${name}: both walkers produce a route`, false)
+      continue
+    }
+    const meanWide = wide.reduce((a, b) => a + b, 0) / wide.length
+    const meanTight = tight.reduce((a, b) => a + b, 0) / tight.length
+    worstMean = Math.min(worstMean, meanWide)
+    // Never worse is the invariant; strictly better is only possible
+    // where there was room to be better. A dead-straight corridor already
+    // gives both walkers the maximum the field can express, so demanding
+    // an improvement there would be demanding one that cannot exist.
+    if (meanWide < meanTight - 1e-9) neverWorse = false
+    if (meanWide > meanTight + 1e-9) improvedSomewhere = true
+    check(
+      `${name}: never a tighter line than the shortest path`,
+      meanWide >= meanTight - 1e-9,
+      `${meanWide.toFixed(2)}m vs ${meanTight.toFixed(2)}m of clearance`,
+    )
+  }
+  check('never tighter on any route', neverWorse)
+  check('and materially wider where there is room to be', improvedSomewhere)
+  // The Crawler is the widest creature that has to fit down a corridor;
+  // its legs reach about 0.7m. Below that it is visibly clipping.
+  check(
+    'mean clearance clears the Crawler\'s leg span everywhere',
+    worstMean >= 0.7,
+    `worst route averaged ${worstMean.toFixed(2)}m`,
+  )
+}
+
+/** Walk downhill on the current field, returning clearance at each step. */
+function walkPath(from: [number, number], to: [number, number], preferRoom: boolean) {
+  const out: number[] = []
+  let x = from[0]
+  let z = from[1]
+  for (let i = 0; i < 4000; i++) {
+    if (Math.hypot(x - to[0], z - to[1]) < 0.6) break
+    const step = navStep(x, z, preferRoom)
+    if (!step) break
+    x += step.x * 0.25
+    z += step.z * 0.25
+    out.push(clearanceAt(x, z))
+  }
+  return out
 }
 
 console.log('\n--- a creature can always reach a hiding player (hiding is not invulnerability) ---')

@@ -249,9 +249,13 @@ export function navDistance(x: number, z: number): number | null {
  * if already there / no route. Picks the lowest-valued neighbouring cell,
  * which on a BFS field is always a step along a shortest path.
  */
-export function navStep(x: number, z: number): { x: number; z: number } | null {
+export function navStep(
+  x: number,
+  z: number,
+  preferRoom = true,
+): { x: number; z: number } | null {
   if (!playerField) return null
-  return stepOnField(playerField.cells, x, z)
+  return stepOnField(playerField.cells, x, z, preferRoom)
 }
 
 /**
@@ -274,7 +278,15 @@ export function navStepToward(
   return stepOnField(fieldFor(target).cells, x, z)
 }
 
-function stepOnField(field: Uint16Array, x: number, z: number): { x: number; z: number } | null {
+function stepOnField(
+  field: Uint16Array,
+  x: number,
+  z: number,
+  /** False reproduces the old shortest-path descent, which hugs every
+   * inside corner. Only scripts/navtest.ts passes false, to measure what
+   * the clearance preference actually buys — see that test. */
+  preferRoom = true,
+): { x: number; z: number } | null {
   if (!blocked) return null
   const c = nearestOpen(cellX(x), cellZ(z))
   if (c < 0) return null
@@ -306,7 +318,7 @@ function stepOnField(field: Uint16Array, x: number, z: number): { x: number; z: 
       if (blocked[n]) continue
       if (di && dj && (blocked[idx(i + di, j)] || blocked[idx(i, j + dj)])) continue
       if (field[n] >= here) continue
-      const room = clearance ? clearance[n] : 0
+      const room = preferRoom && clearance ? clearance[n] : 0
       if (room > bestRoom || (room === bestRoom && field[n] < bestField)) {
         bestRoom = room
         bestField = field[n]
@@ -350,6 +362,28 @@ export function hasLineOfSight(ax: number, az: number, bx: number, bz: number): 
  * is the number that actually means something: cells connected to the
  * current field's target, i.e. places a creature can really stand.
  */
+/**
+ * How much open space there is around a point, in metres, capped.
+ *
+ * Exported so the clearance behaviour can be TESTED rather than asserted.
+ * "The creature's centre is in open space" was already covered and is not
+ * the property that matters here: only the centre is on the grid, while
+ * the Crawler's legs splay about 0.7m each side and the Smile braces on
+ * an arm span over four metres wide. A centre that legally clears a wall
+ * by 0.65m still drags half a creature through it, which is what "the
+ * walking animation phases through the walls" was.
+ */
+export function clearanceAt(x: number, z: number): number {
+  if (!blocked) {
+    blocked = buildGrid()
+    clearance = buildClearance(blocked)
+  }
+  const i = cellX(x)
+  const j = cellZ(z)
+  if (!inBounds(i, j) || !clearance) return 0
+  return clearance[idx(i, j)] * CELL
+}
+
 export function navDebug() {
   if (!blocked) {
     blocked = buildGrid()

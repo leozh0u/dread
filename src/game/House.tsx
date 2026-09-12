@@ -75,7 +75,11 @@ function ExitDoor({ unlocked }: { unlocked: boolean }) {
     if (!leaf.current) return
     const target = unlocked ? -1.85 : 0
     // Heavy: eases toward open rather than snapping, so it reads as mass.
-    leaf.current.rotation.y += (target - leaf.current.rotation.y) * Math.min(1, delta * 1.4)
+    // Frame-rate independent — see entities/Entity.tsx. This is the exit
+    // door swinging open, which is the last thing the player sees on a
+    // winning run and the closing shot of the demo video, so it should
+    // not open at a different speed depending on the machine.
+    leaf.current.rotation.y = THREE.MathUtils.damp(leaf.current.rotation.y, target, 1.4, delta)
     if (unlocked && !opened.current) {
       opened.current = true
       playSfx('door-groan', { volume: 0.9 })
