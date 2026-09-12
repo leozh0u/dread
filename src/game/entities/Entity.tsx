@@ -17,7 +17,7 @@ import {
 } from '../scareFx'
 import type { SfxName } from '../sfxBank'
 import { Creature, type EntityKind, type EntityState } from './creatures'
-import { reportEntity, claimHunt, inspect } from './registry'
+import { reportEntity, claimHunt, entityEpoch, inspect } from './registry'
 import { PLAYER_SPEED } from '../Player'
 
 /** Per-kind movement and sound character. The three should never be
@@ -130,6 +130,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const wanderT = useRef(3 + index * 2)
   const pauseUntil = useRef(0)
   const resyncIn = useRef(0)
+  const epoch = useRef(entityEpoch())
   // Mutated every frame, read by the creature's own frame loop. Never a
   // prop and never state: props would freeze (refs don't re-render) and
   // state would re-render three creatures at 60fps for nothing.
@@ -139,6 +140,21 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     if (!group.current) return
     const t = clock.elapsedTime
     const dt = Math.min(delta, 0.1)
+
+    // A new run: go back to where this creature starts, and forget the
+    // player entirely.
+    if (epoch.current !== entityEpoch()) {
+      epoch.current = entityEpoch()
+      pathS.current = startS
+      const home = pointAtArcLength(startS)
+      group.current.position.x = home.x
+      group.current.position.z = home.z
+      alertUntil.current = 0
+      pauseUntil.current = 0
+      patrolDir.current = 1
+      distSinceStep.current = 0
+    }
+
     const phase = useDirector.getState().phase
     const player = usePlayerPosition.getState()
     const prof = PROFILE[kind]
@@ -165,14 +181,27 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
 
     if (canSee || heard) alertUntil.current = t + HUNT_MEMORY_S
 
-    const directorHunt = phase === 'STALK' || phase === 'STRIKE'
+    // STALK is the Director's DEFAULT phase after calibration — it is
+    // where the game sits most of the time, waiting for the player to
+    // recover enough to be worth striking at. Treating it as a full hunt
+    // meant something was sprinting after the player permanently from the
+    // first minute, which leaves the escalation nowhere to go and makes
+    // "it found me" meaningless because it had never lost you.
+    //
+    // So STALK closes on you at PATROL speed: slow, inexorable, and
+    // escapable. Full pursuit is reserved for the two things that should
+    // earn it — the Director committing to a STRIKE, or the creature
+    // genuinely seeing or hearing you.
     const alerted = t < alertUntil.current
-    // Only the closest alerted creature actually gets to come for you —
-    // see claimHunt. The rest keep patrolling, which is both fairer and
+    const wantsPlayer = alerted || phase === 'STRIKE' || phase === 'STALK'
+    // Only the closest interested creature actually comes for you — see
+    // claimHunt. The rest keep patrolling, which is both fairer and
     // considerably more frightening.
-    const hunting = claimHunt(index, alerted || directorHunt)
+    const pursuing = claimHunt(index, wantsPlayer)
+    const fullHunt = pursuing && (alerted || phase === 'STRIKE')
+    const hunting = pursuing
     const retreating = phase === 'WITHDRAW' && !alerted
-    const speed = hunting ? prof.hunt : retreating ? prof.retreat : prof.patrol
+    const speed = fullHunt ? prof.hunt : retreating ? prof.retreat : prof.patrol
 
     // Unpredictable rhythm — hitches and surges rather than a metronome.
     hitchPhase.current += dt * (0.6 + 0.4 * Math.sin(t * 0.37 + index))
@@ -352,7 +381,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
 
     // Hand the creature its live state for this frame
     state.current.closeness = 1 - normalized
-    state.current.hunting = hunting
+    state.current.hunting = fullHunt
     state.current.speed = moved / Math.max(dt, 0.0001)
     state.current.attacking = attacking
   })

@@ -4,6 +4,7 @@ import { useDirector } from './director'
 import { useSession } from './session'
 import { usePulseStore } from '../lib/usePulse'
 import { usePlayerPosition } from './playerPosition'
+import { resetEntities } from './entities/registry'
 
 /**
  * Resets everything needed for another run, without a page reload and
@@ -18,6 +19,9 @@ export function restartRun() {
   useCalmRoom.getState().reset()
   useDirector.getState().resetForNewRun()
   usePlayerPosition.getState().requestSpawn()
+  // Send the creatures back to their patrol starts and clear their alerts,
+  // or the run begins with whatever killed you still on top of you.
+  resetEntities()
 
   const hasBaseline = usePulseStore.getState().baseline != null
   if (hasBaseline) {

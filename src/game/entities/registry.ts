@@ -55,6 +55,22 @@ export function claimHunt(index: number, wantsToHunt: boolean): boolean {
   return best === index
 }
 
+/**
+ * Bumped by restartRun(). The Entity components are never unmounted
+ * between runs, so without this a creature keeps the position and alert
+ * state it had at the moment it killed you — meaning the new run can
+ * begin with it already hunting and standing next to the spawn, which is
+ * a death loop the player cannot escape and would read as the game being
+ * broken rather than hard.
+ */
+let epoch = 0
+export function resetEntities() {
+  epoch++
+}
+export function entityEpoch() {
+  return epoch
+}
+
 /** Dev aid: press M to line all three up in front of the player, lit, so
  * their designs can be compared directly instead of hunted for. */
 export const inspect = { on: false }
