@@ -686,3 +686,33 @@ Two things learned about the harness rather than the game:
 - The nav grid keeps the exit door solid forever, so nothing can path
   OUTSIDE. That is right for creatures — they should not follow you out —
   but it means reaching the exit has to be waypointed by hand.
+
+### Persona was missing from the hosted build entirely
+
+The build a judge actually opens showed **BEGIN**, not "PROVE YOU ARE
+ALIVE". `livenessConfigured()` was false there, because the two
+publishable Persona ids were never set in CI — `gh variable list` and
+`gh secret list` were both empty. The deploy workflow already referenced
+`vars.VITE_PERSONA_TEMPLATE_ID` and `vars.VITE_PERSONA_ENVIRONMENT_ID`
+correctly; nothing had ever been put in them.
+
+So the sponsor challenge with **zero prior art at any hackathon** — the
+one with the best odds on the board — was invisible to anyone following
+the link.
+
+Set both as repository *variables* (not secrets, deliberately: they are
+publishable by design, Vite inlines them into a public bundle, and
+Persona's real protection is the dashboard domain allowlist), redeployed,
+and confirmed on the live site:
+
+- the gate now reads **PROVE YOU ARE ALIVE**
+- clicking it opens the Persona flow from `leozh0u.github.io`, so the
+  domain allowlist is correct
+- the environment is **Sandbox**, with a "Pass verifications" toggle —
+  which is exactly right for judging: anyone can complete the flow
+  without entering real identity documents
+
+Also confirmed the hosted build plays: the corridor renders, the HUD and
+vitals panel work, MediaPipe loads from CDN (`FACE tracked`), and the
+pulse falls back correctly with `LINK local only`, since there is no
+sidecar behind a static site.
