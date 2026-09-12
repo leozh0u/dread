@@ -1,3 +1,6 @@
+import { useRef } from 'react'
+import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { Clue } from './Clue'
 import { HidingSpot } from './HidingSpot'
@@ -77,6 +80,19 @@ function WallZ({ x, z1, z2, y = WALL_H / 2 }: { x: number; z1: number; z2: numbe
  * is its own isolated RigidBody (mixing it into the shared one silently
  * drops its collider — see commit history).
  */
+/** Slow warm pulse deep in the calm-room passage — visible from the fork,
+ * paced at roughly a resting breath so it reads as an invitation to slow
+ * down rather than another alarm. */
+function CalmBeacon() {
+  const light = useRef<THREE.PointLight>(null!)
+  useFrame(({ clock }) => {
+    if (!light.current) return
+    // ~10s cycle: the same pace as the breathing pacer asks for
+    light.current.intensity = 16 + Math.sin(clock.elapsedTime * 0.63) * 9
+  })
+  return <pointLight ref={light} position={[2, 2, -58]} color="#4a9a86" intensity={16} distance={14} />
+}
+
 export function House() {
   const collected = useThreat((s) => s.cluesCollected.size)
   const unlocked = collected >= CLUES_REQUIRED
@@ -87,15 +103,15 @@ export function House() {
     <>
       <RigidBody type="fixed" colliders="cuboid">
         {/* one floor slab under the whole maze */}
-        <mesh position={[2, -1, -16]} receiveShadow>
-          <boxGeometry args={[52, 0.2, 104]} />
+        <mesh position={[2, -1, -17]} receiveShadow>
+          <boxGeometry args={[52, 0.2, 106]} />
           <meshStandardMaterial color={FLOOR_TINT} roughness={1} />
         </mesh>
 
         {/* Ceiling — the level had none, which is a large part of why it
             read as a void rather than an interior. Low and close. */}
-        <mesh position={[2, WALL_H, -16]} receiveShadow>
-          <boxGeometry args={[52, 0.2, 104]} />
+        <mesh position={[2, WALL_H, -17]} receiveShadow>
+          <boxGeometry args={[52, 0.2, 106]} />
           <meshStandardMaterial color={CEILING_TINT} roughness={1} />
         </mesh>
 
@@ -135,12 +151,24 @@ export function House() {
         <WallZ x={-1} z1={DOOR_Z} z2={-45} />
         <WallZ x={5} z1={DOOR_Z} z2={-45} />
 
-        {/* Beyond the door: a short "outside" foyer (the fast escape —
-            reaching this counts as win condition #1) then the calm room
-            enclosure deeper in (win condition #2, the slower one). */}
-        <WallZ x={-1} z1={-65} z2={DOOR_Z} />
-        <WallZ x={5} z1={-65} z2={DOOR_Z} />
-        <WallX z={-65} x1={-1} x2={5} />
+        {/* Beyond the door is a CHOICE, not a corridor. The exit to
+            safety branches east; the calm room continues south. This
+            matters: when the escape zone sat directly behind the door,
+            stepping through it always fired the fast win instantly and
+            the calm room could never be reached at all — which silently
+            removed the biofeedback finale, i.e. the entire point of the
+            project. Both endings have to be reachable to be a choice. */}
+        <WallZ x={-1} z1={-68} z2={DOOR_Z} />
+        <WallZ x={5} z1={-68} z2={-52} />
+        <WallZ x={5} z1={-50} z2={DOOR_Z} />
+
+        {/* East passage: the way out */}
+        <WallX z={-50} x1={5} x2={11} />
+        <WallX z={-52} x1={5} x2={11} />
+        <WallZ x={11} z1={-52} z2={-50} />
+
+        {/* Calm room, deeper south */}
+        <WallX z={-68} x1={-1} x2={5} />
       </RigidBody>
 
       {/* Exit door — isolated RigidBody, one explicit CuboidCollider */}
@@ -154,7 +182,12 @@ export function House() {
         )}
       </RigidBody>
 
-      {unlocked && <pointLight position={[2, 2, DOOR_Z - 3]} color="#7a8fb0" intensity={40} distance={8} />}
+      {/* The fork past the door has to read as a CHOICE. Cold daylight
+          east = the way out; a slow warm pulse south = the calm room.
+          Without this the lit exit is the only visible option and nobody
+          ever finds the finale the whole project is built around. */}
+      {unlocked && <pointLight position={[9, 2, -51]} color="#7a8fb0" intensity={45} distance={9} />}
+      {unlocked && <CalmBeacon />}
 
       {CLUES.map((clue) => (
         <Clue key={clue.id} id={clue.id} position={clue.position} />

@@ -44,12 +44,12 @@ export const HIDING_SPOTS: BoxRegion[] = [
 /** Beyond the unlocked door — reaching here is win condition #1, "escape,"
  * distinct from the calm room's slower "regulate yourself" win. */
 export const OUTSIDE: BoxRegion = {
-  center: [2, 1.5, -49.5],
-  half: [2.8, 1.5, 1.4],
+  center: [8, 1.5, -51],
+  half: [2.5, 1.5, 0.9],
 }
 
 export const CALM_ROOM: BoxRegion = {
-  center: [2, 1.5, -58],
+  center: [2, 1.5, -61],
   half: [2.8, 1.5, 6.5],
 }
 

@@ -49,7 +49,7 @@ export function Hud() {
       <div style={{ marginTop: 10, opacity: 0.5, maxWidth: 220, fontSize: 12 }}>
         {cluesCollected < CLUES_REQUIRED
           ? 'find what was left behind to unlock the door'
-          : 'the door is open — run for it, or go deeper and get calm'}
+          : 'the door is open — outside is east, something quieter lies deeper'}
       </div>
 
       {detection > 0 && (

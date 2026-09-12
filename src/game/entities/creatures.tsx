@@ -5,6 +5,9 @@ import { Slab, Limb, Glow, Grin, VOID } from './shapes'
 
 export type EntityKind = 'long' | 'crawler' | 'smile'
 
+const DULL_BONE = new THREE.Color('#8d897e')
+const LIT_BONE = new THREE.Color('#f2efe6')
+
 /**
  * Live per-frame state, passed as a mutable object rather than props.
  *
@@ -57,10 +60,10 @@ export function LongOne({ state }: CreatureProps) {
     // covering ground is the entire trick with this one.
     if (head.current) head.current.rotation.y = Math.sin(t * 0.3) * 0.12
     if (headMat.current) {
-      const target = hunting ? 1 : 0.72
-      headMat.current.color.setScalar(
-        THREE.MathUtils.lerp(headMat.current.color.r, target * (0.75 + closeness * 0.25), 0.05),
-      )
+      // Brighten toward bone-white as it hunts / closes, keeping the hue
+      // rather than washing to flat grey (setScalar would).
+      const target = (hunting ? 1 : 0.78) * (0.8 + closeness * 0.2)
+      headMat.current.color.lerpColors(DULL_BONE, LIT_BONE, THREE.MathUtils.clamp(target, 0, 1))
     }
   })
 
