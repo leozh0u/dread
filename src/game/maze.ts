@@ -121,7 +121,11 @@ const EDGE_GAPS: Record<string, EdgeGap[]> = {
   'A-B': [{ side: 'right', from: 21, to: 25 }], // Room 1 (clue) — far north-east
   'F-G': [{ side: 'left', from: -9, to: -5 }], // Room 2 (clue) — far west
   'K-L': [{ side: 'right', from: -37, to: -33 }], // Room 3 (clue) — far south-east
-  'G-H': [{ side: 'right', from: -8, to: -4 }], // hiding alcove
+  // 'left' is the z-3 wall (z=-17) on this horizontal corridor, which is
+  // the side the alcove is actually built on. It was 'right' (z=-11),
+  // which sealed the alcove AND cut a hole into the empty space between
+  // corridors — the player could walk out of the level entirely.
+  'G-H': [{ side: 'left', from: -8, to: -4 }], // hiding alcove
   'M-N': [{ side: 'left', from: -38, to: -34 }], // branch dead end
 }
 

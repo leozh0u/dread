@@ -38,7 +38,7 @@ export const HIDING_SPOTS: BoxRegion[] = [
   { center: [-19, 1, -7], half: [0.7, 1, 0.5], kind: 'curtain' },
   { center: [23, 1, -35], half: [0.6, 0.9, 0.6], kind: 'crate' },
   { center: [-6, 0.7, -19], half: [0.9, 0.55, 0.6], kind: 'table' }, // alcove off G-H
-  { center: [-18, 1, -36], half: [0.6, 1, 0.6], kind: 'closet' }, // branch dead end
+  { center: [-19.5, 1, -36], half: [0.6, 1, 0.6], kind: 'closet' }, // branch dead end
 ]
 
 /** Beyond the unlocked door — reaching here is win condition #1, "escape,"

@@ -183,9 +183,13 @@ export function House() {
         <WallX z={-21} x1={-8} x2={-4} />
 
         {/* Branch dead end — off M-N, a passage nobody has to take */}
-        <WallZ x={-20} z1={-38} z2={-34} />
-        <WallZ x={-16} z1={-38} z2={-34} />
-        <WallX z={-38} x1={-20} x2={-16} />
+        {/* M-N is a VERTICAL corridor (x=-14), so its opening is in the
+            x=-17 wall spanning z=-38..-34. This room was built in a
+            horizontal orientation, which sealed it off completely and
+            left the corridor gap opening into the void. */}
+        <WallZ x={-22} z1={-38} z2={-34} />
+        <WallX z={-38} x1={-22} x2={-17} />
+        <WallX z={-34} x1={-22} x2={-17} />
 
         {/* Short stub from junction O down to the exit door */}
         <WallZ x={-1} z1={DOOR_Z} z2={-45} />
