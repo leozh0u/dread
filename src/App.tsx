@@ -5,7 +5,12 @@ import { Hud } from './components/Hud'
 import { ScreenFlash } from './components/ScreenFlash'
 import { FearCurve } from './components/FearCurve'
 import { StartGate } from './components/StartGate'
+import { BreathingPacer } from './components/BreathingPacer'
 import { useDirectorLoop } from './game/useDirectorLoop'
+import { useThreatLoop } from './game/useThreatLoop'
+import { useTriggersLoop } from './game/useTriggersLoop'
+import { useCalmRoomLoop } from './game/useCalmRoomLoop'
+import { useMicSource } from './lib/useMic'
 import { useDirector, type ScareType } from './game/director'
 import { useSession } from './game/session'
 import { playScare, startAmbient, unlockAudio } from './game/scareFx'
@@ -19,6 +24,10 @@ function Game() {
     [setMonsterDistance],
   )
   useDirectorLoop(onScare)
+  useThreatLoop()
+  useCalmRoomLoop()
+  useTriggersLoop()
+  useMicSource()
 
   useEffect(() => {
     if (sessionStatus === 'playing') startAmbient()
@@ -30,6 +39,7 @@ function Game() {
       <Scene />
       <Hud />
       <ScreenFlash />
+      <BreathingPacer />
       {sessionStatus === 'ended' && <FearCurve />}
     </>
   )

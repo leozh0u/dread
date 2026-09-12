@@ -9,12 +9,13 @@ interface SessionState {
   start: () => void
 }
 
-/** Session length for the MVP: fixed 90s after calibration, matching the
- * "90-second repeatable demo ritual" the whole project is built around —
- * something a judge can watch start to finish, cold, in a loud room,
- * four times in a row. */
-export const SESSION_DURATION_MS = 90_000
-
+/**
+ * Tracks the play session's lifecycle. There is deliberately no fixed
+ * timer here — the run ends only via a real outcome (see threat.ts:
+ * detection maxes out -> died; calmRoom.ts: sustained regulation ->
+ * escaped). A clock-based cutoff would fight the escape-the-house
+ * objective by ending mid-exploration for no in-fiction reason.
+ */
 export const useSession = create<SessionState>((set) => ({
   status: 'calibrating',
   startedAt: null,

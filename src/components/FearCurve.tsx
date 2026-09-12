@@ -1,6 +1,9 @@
 import { usePulseStore } from '../lib/usePulse'
 import { useDirector } from '../game/director'
 import { useSession } from '../game/session'
+import { useThreat } from '../game/threat'
+import { useCalmRoom } from '../game/calmRoom'
+import { restartRun } from '../game/restart'
 
 /**
  * The session-end screen. This is the thing the "impact" beat of the demo
@@ -13,11 +16,14 @@ export function FearCurve() {
   const baseline = usePulseStore((s) => s.baseline)
   const scareLog = useDirector((s) => s.scareLog)
   const startedAt = useSession((s) => s.startedAt)
+  const outcome = useThreat((s) => s.outcome)
+  const regulatedSeconds = useCalmRoom((s) => s.regulatedSeconds)
 
   if (!startedAt || history.length < 2) {
     return (
       <Overlay>
         <p style={{ opacity: 0.6 }}>Not enough data captured this run.</p>
+        <PlayAgainButton />
       </Overlay>
     )
   }
@@ -47,10 +53,13 @@ export function FearCurve() {
 
   return (
     <Overlay>
-      <h1 style={{ fontSize: 22, letterSpacing: 2, marginBottom: 4 }}>YOUR FEAR, CHARTED</h1>
+      <h1 style={{ fontSize: 22, letterSpacing: 2, marginBottom: 4 }}>
+        {outcome === 'died' ? 'IT FOUND YOU' : outcome === 'escaped' ? 'YOU MADE IT OUT' : 'YOUR FEAR, CHARTED'}
+      </h1>
       <p style={{ opacity: 0.6, fontSize: 13, marginBottom: 20, maxWidth: 640 }}>
-        Every mark below is a moment the house decided to push or pull — based on your pulse,
-        read off your own webcam, nothing worn.
+        {outcome === 'escaped'
+          ? `You held your heart rate near baseline for ${regulatedSeconds.toFixed(1)}s straight to get that door open. That's the whole trick — everything below is what you had to come down from to do it.`
+          : 'Every mark below is a moment the house decided to push or pull — based on your pulse, read off your own webcam, nothing worn.'}
       </p>
 
       <svg width={W} height={H} style={{ background: '#0a0a0a', border: '1px solid #333' }}>
@@ -97,7 +106,30 @@ export function FearCurve() {
           laptop already has.
         </p>
       </div>
+
+      <PlayAgainButton />
     </Overlay>
+  )
+}
+
+function PlayAgainButton() {
+  return (
+    <button
+      onClick={() => restartRun()}
+      style={{
+        marginTop: 24,
+        background: 'transparent',
+        border: '1px solid #c33',
+        color: '#c33',
+        padding: '10px 28px',
+        fontFamily: 'monospace',
+        fontSize: 14,
+        letterSpacing: 2,
+        cursor: 'pointer',
+      }}
+    >
+      PLAY AGAIN
+    </button>
   )
 }
 

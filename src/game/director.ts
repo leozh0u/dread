@@ -20,6 +20,7 @@ interface DirectorState {
   setMonsterDistance: (d: number) => void
   recordScareOutcome: (type: ScareType, bpmBefore: number, bpmAfter: number) => void
   pickScare: () => ScareType
+  resetForNewRun: () => void
 }
 
 function freshStats(): Record<ScareType, ScareStat> {
@@ -86,6 +87,10 @@ export const useDirector = create<DirectorState>((set, get) => ({
     }
     return best
   },
+
+  // Deliberately does NOT touch `stats` — the bandit keeps what it learned
+  // about this player across a restart. Only the in-run state resets.
+  resetForNewRun: () => set({ phase: 'STALK', monsterDistance: 1, lastScare: null }),
 }))
 
 /**

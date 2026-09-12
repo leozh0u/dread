@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { usePulseStore } from '../lib/usePulse'
 import { useDirector, AROUSAL, type ScareType } from './director'
-import { useSession, SESSION_DURATION_MS } from './session'
+import { useSession } from './session'
 
 const CALIBRATION_MS = 60_000 // Presage HRV baseline window — see plan notes
 const TICK_MS = 200
@@ -24,7 +24,6 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
   const setMonsterDistance = useDirector((s) => s.setMonsterDistance)
   const sessionStatus = useSession((s) => s.status)
   const sessionStart = useSession((s) => s.start)
-  const sessionSetStatus = useSession((s) => s.setStatus)
 
   const calibrationStart = useRef<number | null>(null)
   const calibrationSamples = useRef<number[]>([])
@@ -46,13 +45,6 @@ export function useDirectorLoop(onScare: (type: ScareType) => void) {
       sessionStart()
     }
   }, [bpm, phase, setBaseline, setPhase, sessionStart])
-
-  // --- Session timer: fixed 90s ritual, matches live-judging constraints ---
-  useEffect(() => {
-    if (sessionStatus !== 'playing') return
-    const timer = setTimeout(() => sessionSetStatus('ended'), SESSION_DURATION_MS)
-    return () => clearTimeout(timer)
-  }, [sessionStatus, sessionSetStatus])
 
   // --- Post-calibration: react to arousal relative to baseline ---
   useEffect(() => {

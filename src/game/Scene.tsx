@@ -1,8 +1,9 @@
 import { useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PointerLockControls } from '@react-three/drei'
-import { Physics, RigidBody } from '@react-three/rapier'
+import { Physics } from '@react-three/rapier'
 import { Player } from './Player'
+import { House } from './House'
 import { EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { useDirector } from './director'
@@ -37,38 +38,13 @@ function Flashlight() {
   )
 }
 
-/**
- * Placeholder corridor — swap for a Kenney/Quaternius CC0 modular kit.
- * Deliberately blocky: darkness + fog does the concealing, not geometry
- * fidelity. See plan notes on why this is the correct tradeoff here.
- */
-function Corridor() {
-  return (
-    <RigidBody type="fixed" colliders="cuboid">
-      <mesh position={[0, -1, 0]} receiveShadow>
-        <boxGeometry args={[6, 0.2, 40]} />
-        <meshStandardMaterial color="#141414" />
-      </mesh>
-      <mesh position={[-3, 1.5, 0]} receiveShadow>
-        <boxGeometry args={[0.2, 5, 40]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-      <mesh position={[3, 1.5, 0]} receiveShadow>
-        <boxGeometry args={[0.2, 5, 40]} />
-        <meshStandardMaterial color="#1a1a1a" />
-      </mesh>
-    </RigidBody>
-  )
-}
-
-/** The thing hunting you. Distance driven by Director state (see director.ts). */
+/** The thing hunting you. Distance driven by Director state (see director.ts).
+ * Clamped to stay within the calm room's far wall (z=-30) at max distance. */
 function Monster() {
   const distance = useDirector((s) => s.monsterDistance)
   const ref = useRef<THREE.Mesh>(null!)
   useFrame(() => {
-    // Lerp toward the player along +z as distance shrinks. Placeholder box
-    // until a Mixamo model is dropped in — kept mostly out of light on purpose.
-    const z = -2 - distance * 30
+    const z = -2 - distance * 27 // distance 0 -> z=-2 (on top of you), 1 -> z=-29
     ref.current.position.z = THREE.MathUtils.lerp(ref.current.position.z, z, 0.02)
   })
   return (
@@ -92,7 +68,7 @@ export function Scene() {
       <color attach="background" args={['#000']} />
       <ambientLight intensity={0.02} />
       <Physics gravity={[0, -20, 0]}>
-        <Corridor />
+        <House />
         <Monster />
         <Player />
       </Physics>

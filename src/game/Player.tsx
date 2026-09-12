@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { RigidBody, type RapierRigidBody } from '@react-three/rapier'
+import { usePlayerPosition } from './playerPosition'
 import * as THREE from 'three'
 
 const SPEED = 4
@@ -37,6 +38,20 @@ export function Player({ start = [0, 1, 10] as [number, number, number] }) {
 
   useEffect(() => bindKeys(), [])
 
+  // Teleport to spawn whenever restartRun() bumps this counter — a death
+  // deep in the calm room shouldn't leave the next run starting there.
+  useEffect(() => {
+    let lastId = usePlayerPosition.getState().spawnRequestId
+    return usePlayerPosition.subscribe((s) => {
+      if (s.spawnRequestId === lastId) return
+      lastId = s.spawnRequestId
+      if (!body.current) return
+      body.current.setTranslation({ x: start[0], y: start[1], z: start[2] }, true)
+      body.current.setLinvel({ x: 0, y: 0, z: 0 }, true)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useFrame(() => {
     if (!body.current) return
     const dir = new THREE.Vector3()
@@ -57,6 +72,7 @@ export function Player({ start = [0, 1, 10] as [number, number, number] }) {
 
     const t = body.current.translation()
     camera.position.set(t.x, t.y + 0.6, t.z)
+    usePlayerPosition.getState().set(t.x, t.y, t.z)
   })
 
   return (
@@ -68,6 +84,11 @@ export function Player({ start = [0, 1, 10] as [number, number, number] }) {
       enabledRotations={[false, false, false]}
       friction={0}
       linearDamping={2}
+      ccd // continuous collision detection against frame-rate dips (real
+      // risk with screen-recording software during a live demo). Confirmed
+      // via testing this doesn't interfere with trigger detection, since
+      // clues/hiding spots/calm room are plain distance checks now, not
+      // physics sensors -- see playerPosition.ts and triggers.ts.
     >
       <mesh visible={false}>
         <capsuleGeometry args={[0.35, 0.8]} />
