@@ -430,8 +430,13 @@ export function playMonsterFootstep(
   osc.type = 'sine'
   osc.frequency.setValueAtTime(75 * pitch, t0)
   osc.frequency.exponentialRampToValueAtTime(32 * pitch, t0 + 0.16)
+  // See the note on playLandSound: a sine opened at full amplitude starts
+  // with a step discontinuity, which is a click riding on top of the
+  // thump. A few milliseconds of rise removes it and changes nothing
+  // about how hard the footfall reads.
   const oGain = audioCtx.createGain()
-  oGain.gain.setValueAtTime(0.3, t0)
+  oGain.gain.setValueAtTime(0.0001, t0)
+  oGain.gain.linearRampToValueAtTime(0.3, t0 + 0.006)
   oGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.22)
   osc.connect(oGain).connect(panner)
   osc.start(t0)
@@ -682,7 +687,21 @@ export function playLandSound(impact: number) {
   osc.frequency.setValueAtTime(85, t0)
   osc.frequency.exponentialRampToValueAtTime(40, t0 + 0.12)
   const oGain = audioCtx.createGain()
-  oGain.gain.setValueAtTime(0.08 + strength * 0.22, t0)
+  /**
+   * A few milliseconds of attack rather than none.
+   *
+   * A sine opened at full amplitude with setValueAtTime begins with a
+   * vertical step in the waveform, and a step is broadband — you hear it
+   * as a click sitting on top of the thump rather than as part of it.
+   * Landing is one of the sounds heard most often in the game, so the
+   * artifact is heard most often too.
+   *
+   * Deliberately NOT applied to the jump-scare stabs further down: an
+   * instantaneous attack is exactly what those are for, and softening
+   * them would take the snap out of the one moment that needs it.
+   */
+  oGain.gain.setValueAtTime(0.0001, t0)
+  oGain.gain.linearRampToValueAtTime(0.08 + strength * 0.22, t0 + 0.007)
   oGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18)
   osc.connect(oGain).connect(master())
   osc.start(t0)
@@ -694,7 +713,8 @@ export function playLandSound(impact: number) {
   filter.frequency.value = 220
   filter.Q.value = 0.8
   const nGain = audioCtx.createGain()
-  nGain.gain.setValueAtTime(0.04 + strength * 0.12, t0)
+  nGain.gain.setValueAtTime(0.0001, t0)
+  nGain.gain.linearRampToValueAtTime(0.04 + strength * 0.12, t0 + 0.005)
   nGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12)
   src.connect(filter).connect(nGain).connect(master())
   src.start()
@@ -742,7 +762,8 @@ export function playFootstep() {
   weightFilter.type = 'lowpass'
   weightFilter.frequency.value = 250 + Math.random() * 120
   const weightGain = audioCtx.createGain()
-  weightGain.gain.setValueAtTime(0.07, t0)
+  weightGain.gain.setValueAtTime(0.0001, t0)
+  weightGain.gain.linearRampToValueAtTime(0.07, t0 + 0.006)
   weightGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07)
   weight.connect(weightFilter).connect(weightGain).connect(panner)
   weight.start()
