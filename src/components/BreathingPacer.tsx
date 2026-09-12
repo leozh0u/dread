@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useCalmRoom, CALM_HOLD_SECONDS } from '../game/calmRoom'
+import { useSensorless } from '../game/sensorless'
 import { usePulseStore } from '../lib/usePulse'
 
 const CYCLE_MS = 10_000 // ~6 breaths/min — resonance-frequency breathing,
@@ -16,6 +17,8 @@ export function BreathingPacer() {
   const [phase, setPhase] = useState(0) // 0-1 across one cycle
   const inCalmRoom = useCalmRoom((s) => s.inCalmRoom)
   const regulatedSeconds = useCalmRoom((s) => s.regulatedSeconds)
+  const blind = useSensorless((s) => s.blind)
+  const noPulse = usePulseStore((s) => s.bpm) == null
   const bpm = usePulseStore((s) => s.bpm)
   const baseline = usePulseStore((s) => s.baseline)
 
@@ -32,6 +35,40 @@ export function BreathingPacer() {
   }, [inCalmRoom])
 
   if (!inCalmRoom) return null
+
+  // This ending IS the heart-rate mechanic, so without a pulse it can
+  // never complete — the loop that grants it requires a reading. Standing
+  // in a quiet blue room while nothing whatsoever happens is the single
+  // most confusing state in the game, so say what's wrong and point at
+  // the exit that does still work.
+  if (blind || noPulse) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          zIndex: 15,
+          fontFamily: 'monospace',
+          color: '#8fd',
+          textAlign: 'center',
+          padding: 24,
+        }}
+      >
+        <p style={{ fontSize: 14, letterSpacing: 2, opacity: 0.9 }}>
+          THIS DOOR OPENS FOR A HEARTBEAT
+        </p>
+        <p style={{ fontSize: 12, opacity: 0.6, maxWidth: 420, lineHeight: 1.7, marginTop: 10 }}>
+          It can't read yours. Allow camera access and reload to finish this
+          way — or go back and take the east exit instead.
+        </p>
+      </div>
+    )
+  }
 
   // 0 -> 0.5 breathe in (grow), 0.5 -> 1 breathe out (shrink)
   const scale = phase < 0.5 ? 0.5 + phase : 1.5 - phase

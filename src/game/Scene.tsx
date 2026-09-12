@@ -34,6 +34,14 @@ function Flashlight() {
         distance={14}
         color="#fff2d0"
         castShadow
+        // Explicit and modest. Nothing but the flashlight casts, and its
+        // frustum is only 14 units deep, so 1024 is plenty for a sharp
+        // silhouette without paying for a map nobody sees the detail in.
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-bias={-0.0015}
+        shadow-camera-near={0.4}
+        shadow-camera-far={15}
       />
       <object3D ref={target} />
     </>
