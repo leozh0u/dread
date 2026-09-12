@@ -587,9 +587,28 @@ setInterval(() => {
     // Distinguishing "the game isn't sending" from "the game is sending but
     // Presage can't read you" is the whole difference between debugging the
     // wiring and debugging the lighting.
-    console.warn(
-      `[sidecar] status=${status} — NO FRAMES arriving. Open the game and allow the camera.`,
-    )
+    // Three genuinely different situations, and they had one message
+    // between them. "Open the game and allow the camera" is actively
+    // misleading when the game is already open AND connected — which is
+    // the case that actually happens, because the socket only opens once
+    // the player is past the start screen.
+    const connected = wss.clients.size > 0
+    if (!connected) {
+      console.warn(`[sidecar] status=${status} — nothing connected. Open the game.`)
+    } else {
+      console.warn(
+        `[sidecar] status=${status} — the game is CONNECTED but sending no frames.`,
+      )
+      console.warn(
+        '[sidecar]   That means the browser has no camera picture to send, not that',
+      )
+      console.warn(
+        '[sidecar]   the sidecar is broken. Check the CAMERA row in the game panel:',
+      )
+      console.warn(
+        '[sidecar]   "BLOCKED" = permission; "waiting" = the stream has not started yet.',
+      )
+    }
   } else if (readings === 0) {
     const why =
       lastValidation != null && lastValidation !== ValidationCode.kOk
