@@ -56,6 +56,59 @@ const FLINCH_REFRACTORY_MS = 1200
 const STARTLE_DECAY = 0.9
 
 /**
+ * One step of the fast arousal channel, as a pure function.
+ *
+ * Extracted for the same reason as stepDetection, stepRegulation and
+ * nextPhase: this is one half of the two-clock design that the demo video
+ * and the writeup both lead with, and it lived inside a MediaPipe callback
+ * where the only way to exercise it was to sit in front of a webcam and
+ * try to look startled on command.
+ *
+ * `neutral` is this person's own resting composite, carried between calls.
+ * Returning it rather than mutating a closure is what makes the whole
+ * thing testable.
+ */
+export function stepStartle(args: {
+  composite: number
+  neutral: number | null
+  startle: number
+  now: number
+  lastFlinch: number
+}): { neutral: number; startle: number; flinched: boolean; lastFlinch: number } {
+  const { composite, startle, now, lastFlinch } = args
+  // First sample defines neutral. There is nothing to compare against yet,
+  // so it must not be able to register as a flinch — otherwise a player who
+  // happened to be mid-expression when the model loaded would start the
+  // game already "startled".
+  if (args.neutral == null) {
+    return { neutral: composite, startle: 0, flinched: false, lastFlinch }
+  }
+
+  const deviation = composite - args.neutral
+  const canFlinch = deviation > FLINCH_THRESHOLD && now - lastFlinch > FLINCH_REFRACTORY_MS
+
+  if (canFlinch) {
+    return {
+      // Neutral is NOT updated during a flinch — see below.
+      neutral: args.neutral,
+      startle: Math.min(1, deviation / (FLINCH_THRESHOLD * 3)),
+      flinched: true,
+      lastFlinch: now,
+    }
+  }
+
+  // Track neutral only while NOT above the flinch threshold. A long scare
+  // would otherwise drag the baseline up to meet the frightened face, and
+  // the channel would go quiet exactly when the player was most alarmed.
+  const neutral =
+    deviation < FLINCH_THRESHOLD
+      ? args.neutral * (1 - STARTLE_BASELINE_ALPHA) + composite * STARTLE_BASELINE_ALPHA
+      : args.neutral
+
+  return { neutral, startle: startle * STARTLE_DECAY, flinched: false, lastFlinch }
+}
+
+/**
  * The face model runs on the main thread, alongside a 3D renderer and a
  * 24fps frame pump to the sidecar. 60fps inference buys nothing — a
  * startle lasts hundreds of milliseconds — and costs frames in the game.
@@ -143,25 +196,11 @@ export function useBlinkDetection(videoRef: React.RefObject<HTMLVideoElement | n
             STARTLE_WEIGHTS.eyeWide * Math.max(score('eyeWideLeft'), score('eyeWideRight')) +
             STARTLE_WEIGHTS.jaw * score('jawOpen')
 
-          if (neutral == null) {
-            neutral = composite
-          } else {
-            const deviation = composite - neutral
-            let flinched = false
-            if (deviation > FLINCH_THRESHOLD && now - lastFlinch > FLINCH_REFRACTORY_MS) {
-              lastFlinch = now
-              flinched = true
-              startle = Math.min(1, deviation / (FLINCH_THRESHOLD * 3))
-            } else {
-              startle *= STARTLE_DECAY
-            }
-            useBlinkStore.getState().setStartle(startle, flinched)
-            // Track neutral only while NOT startled, or a long scare would
-            // drag the baseline up and the face would stop registering.
-            if (deviation < FLINCH_THRESHOLD) {
-              neutral = neutral * (1 - STARTLE_BASELINE_ALPHA) + composite * STARTLE_BASELINE_ALPHA
-            }
-          }
+          const step = stepStartle({ composite, neutral, startle, now, lastFlinch })
+          neutral = step.neutral
+          startle = step.startle
+          lastFlinch = step.lastFlinch
+          useBlinkStore.getState().setStartle(step.startle, step.flinched)
 
           if (closed) {
             if (closedSince == null) closedSince = now
