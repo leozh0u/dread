@@ -17,7 +17,8 @@ import {
 } from '../scareFx'
 import type { SfxName } from '../sfxBank'
 import { Creature, type EntityKind, type EntityState } from './creatures'
-import { reportEntity, inspect } from './registry'
+import { reportEntity, claimHunt, inspect } from './registry'
+import { PLAYER_SPEED } from '../Player'
 
 /** Per-kind movement and sound character. The three should never be
  * confused for each other with your eyes shut, which matters given how
@@ -47,7 +48,7 @@ const PROFILE: Record<
   },
   // Low and fast: rapid skittering steps, high and light.
   crawler: {
-    patrol: 2.4, hunt: 4.4, retreat: 3.0, stepDist: 0.7, stepPitch: 1.8, bob: 0.06,
+    patrol: 2.4, hunt: 3.7, retreat: 3.0, stepDist: 0.7, stepPitch: 1.8, bob: 0.06,
     idle: 'crawler-skitter', close: 'crawler-shriek', step: 'step-crawler', voiceGap: [30, 60],
   },
   // Heavy and deliberate: slow, enormous, dragging footfalls.
@@ -58,6 +59,19 @@ const PROFILE: Record<
 }
 
 const MAX_AUDIBLE_DIST = 20
+
+/**
+ * The player moves at 4 m/s (Player.tsx). The crawler used to hunt at
+ * 4.4, which meant that once it had seen you, running was arithmetically
+ * futile — it closed the distance no matter what you did, and you died in
+ * 2.6 seconds. A chase you cannot win isn't tense, it's just a cutscene.
+ *
+ * Hunt speeds now sit below 4, but the hitch multiplier still peaks at
+ * 1.15, so a creature can briefly surge past you and then fall back. You
+ * escape by keeping moving and using the loops in the maze — and it's
+ * close enough that it never feels safe.
+ */
+
 
 /**
  * How the creature decides to come after you.
@@ -153,14 +167,23 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
 
     const directorHunt = phase === 'STALK' || phase === 'STRIKE'
     const alerted = t < alertUntil.current
-    const hunting = alerted || directorHunt
+    // Only the closest alerted creature actually gets to come for you —
+    // see claimHunt. The rest keep patrolling, which is both fairer and
+    // considerably more frightening.
+    const hunting = claimHunt(index, alerted || directorHunt)
     const retreating = phase === 'WITHDRAW' && !alerted
     const speed = hunting ? prof.hunt : retreating ? prof.retreat : prof.patrol
 
     // Unpredictable rhythm — hitches and surges rather than a metronome.
     hitchPhase.current += dt * (0.6 + 0.4 * Math.sin(t * 0.37 + index))
     const hitch = 0.55 + 0.45 * Math.sin(hitchPhase.current * 2.3) * Math.sin(hitchPhase.current * 0.6)
-    const effSpeed = speed * THREE.MathUtils.clamp(hitch, 0.35, 1.15)
+    // Hard ceiling just above the player's own speed: a creature may
+    // briefly surge past you, but can never simply outrun you in a
+    // straight line, which would make the chase a formality.
+    const effSpeed = Math.min(
+      speed * THREE.MathUtils.clamp(hitch, 0.35, 1.15),
+      PLAYER_SPEED * 1.08,
+    )
 
     const prevX = group.current.position.x
     const prevZ = group.current.position.z

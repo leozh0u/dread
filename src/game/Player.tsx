@@ -5,7 +5,12 @@ import { usePlayerPosition, SPAWN_POINT } from './playerPosition'
 import { playFootstep, playJumpSound, playLandSound } from './scareFx'
 import * as THREE from 'three'
 
-const SPEED = 4
+/** Exported so creature hunt speeds can be clamped against it — see
+ * entities/Entity.tsx. A monster faster than the player makes a chase
+ * unwinnable, and that relationship should be enforced by the code rather
+ * than remembered by whoever edits the numbers next. */
+export const PLAYER_SPEED = 4
+const SPEED = PLAYER_SPEED
 const JUMP_SPEED = 6.5
 const LOOK_SPEED = 1.8 // rad/sec, arrow-key look
 const keys = {

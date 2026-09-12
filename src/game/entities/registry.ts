@@ -28,6 +28,33 @@ export function nearestDistance() {
   return Math.min(...distances)
 }
 
+/**
+ * Only one creature may hunt at a time.
+ *
+ * Once they could actually navigate the maze, every creature that heard
+ * or saw the player converged on them at once — three things arriving
+ * from three directions, against a player who dies in 2.6 seconds when
+ * caught in the open. That isn't difficulty, it's a dogpile with no
+ * counterplay, and it also wastes the creatures: three simultaneous
+ * hunters read as one swarm rather than as three distinct things.
+ *
+ * So the closest alerted creature gets the hunt and the others keep
+ * patrolling. You get the horror-game shape instead — one thing coming
+ * for you, the others still out there somewhere, which is worse.
+ */
+const alerted: boolean[] = [false, false, false]
+
+export function claimHunt(index: number, wantsToHunt: boolean): boolean {
+  alerted[index] = wantsToHunt
+  if (!wantsToHunt) return false
+  let best = -1
+  for (let i = 0; i < alerted.length; i++) {
+    if (!alerted[i]) continue
+    if (best === -1 || distances[i] < distances[best]) best = i
+  }
+  return best === index
+}
+
 /** Dev aid: press M to line all three up in front of the player, lit, so
  * their designs can be compared directly instead of hunted for. */
 export const inspect = { on: false }

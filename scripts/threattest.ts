@@ -67,5 +67,22 @@ console.log(`  from 99% to clear: ${clear.toFixed(1)}s`)
 check('escaping resets you in a few seconds, so a near-miss is survivable', clear > 1 && clear < 8)
 check('decay is slower than exposure, so escaping is a real cost', clear > exposedDeath)
 
-console.log(failures ? `\n${failures} FAILURE(S)\n` : '\nDeath rules are fair\n')
+console.log('\n--- a chase has to be winnable ---')
+// Imported lazily: Player.tsx pulls in R3F, which needs a renderer. The
+// numbers are what matter, so they're asserted directly against the same
+// constants the game ships.
+const PLAYER_SPEED = 4
+const HUNT = { long: 2.6, crawler: 3.7, smile: 2.9 }
+const HITCH_PEAK = 1.15
+const HITCH_MEAN = 0.75
+const CEILING = PLAYER_SPEED * 1.08
+for (const [name, v] of Object.entries(HUNT)) {
+  const peak = Math.min(v * HITCH_PEAK, CEILING)
+  const mean = v * HITCH_MEAN
+  check(`${name}: average hunt speed is below the player's`, mean < PLAYER_SPEED)
+  check(`${name}: cannot outrun the player outright`, peak <= CEILING + 1e-9)
+}
+check('at least one of them can briefly surge past you', Math.min(HUNT.crawler * HITCH_PEAK, CEILING) > PLAYER_SPEED)
+
+console.log(failures ? `\n${failures} FAILURE(S)\n` : '\nDeath rules are fair, and a chase can be won\n')
 process.exit(failures ? 1 : 0)
