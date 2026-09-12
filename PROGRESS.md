@@ -404,3 +404,55 @@ shape itself moved on.
 - Fixed 90-second session timer — removed once the game became
   objective-driven (escape or die), since a clock cutoff mid-exploration
   fights the objective
+
+---
+
+## LEDGER — Saturday 12 Sept, midday session
+
+Written down because this session has taken four separate mid-turn
+requests from Leo and the oldest ones are the ones that get lost.
+
+| # | What he asked, his words | State |
+|---|---|---|
+| 1 | "the monsters were still very bland, no details" (raised 4x) | **open** — heads rebuilt, root cause of the paleness found (see below), teeth still wrong |
+| 2 | "trackpad panning... making my camera rotate rather than pan" | **done** — camera euler order, commit 565b436 |
+| 3 | "can you get the presage to work. is it meant to be able to work" | **open** |
+| 4 | "the walking animation of the monsters phases through the walls" | **open** |
+| 5 | "you should try to make more sudden scary movements too" | **open** |
+| 6 | 66 commits carry Claude co-author trailers in a public repo | **blocked on Leo** — history rewrite needs his say-so |
+| 7 | Four API keys were exposed in chat and need rotating | **blocked on Leo** — ELEVENLABS, PRESAGE, BACKBOARD, TIGERDATA |
+
+### Sponsor status as of this session — all four confirmed live
+
+Ran the sidecar and hit it directly:
+`persona=ready backboard=ready tigerdata=ready`, Presage waiting on frames.
+
+- **Persona now authenticates.** `GET /api/v1/inquiries` returns 200 on the
+  key in `.env.local`. The server-side confirm path is correct in both
+  directions: a real but unfinished inquiry returns
+  `{verified:false,status:"created"}`, a made-up id returns
+  `{verified:false,reason:"persona 404"}`. The browser's own onComplete is
+  client-reported and therefore spoofable on a static site; only the
+  sidecar, holding the key, can actually confirm one. That distinction is
+  the Persona story for the writeup.
+- Leo has **started** an inquiry (inq_AwWY…, 16:03Z) but never finished
+  it, so nothing has been verified end to end yet. He has to complete a
+  real one himself — it is his ID.
+
+### Root cause found for "everything looks pale and bland"
+
+The creatures' limbs are `FLESH` = `#3a332b`, a dark brown. On screen at
+5 metres they render as pale cream. That is a ~13x gain: the flashlight
+(`intensity={520}`, `decay` 2) saturates every material inside about ten
+metres, so creature, wall and floor all clip to the same washed-out tone
+and there is no tonal separation left to read detail from.
+
+This is why four rounds of "add more detail to the creatures" did not
+work. The detail is there; the exposure is destroying it.
+
+Same class of mistake as the near-black materials before it, in the
+opposite direction — and inspect mode was hiding it, because it staged
+the creatures under an intensity-30 flood against an unlit near-white
+backdrop. Pressing M showed a creature no player would ever see. That
+staging is now a dim fill over a real wall tone, lit by the player's own
+torch, so the review tool shows the shipped thing.

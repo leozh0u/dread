@@ -138,6 +138,70 @@ function buildGrid() {
   return g
 }
 
+/**
+ * Distance, in cells, from every open cell to the nearest blocked one.
+ *
+ * WHY THIS EXISTS. The grid pads walls by the agent radius and then the
+ * creatures walk downhill on a BFS field, which finds the SHORTEST path —
+ * and the shortest path through a corridor hugs the inside of every
+ * corner, because cutting the corner is shorter. That is fine for a dot
+ * on a grid and wrong for these creatures: only their centre point is on
+ * the grid, while the Crawler's legs splay about 0.7m to each side and
+ * the Smile braces on an arm span over four metres wide. A centre that
+ * legally clears a wall by 0.65m still drags half a creature through it,
+ * which is what "the walking animation phases through the walls" is.
+ *
+ * Rather than pad the grid by the full limb span — which would seal every
+ * corridor in the maze and leave the creatures unable to path at all —
+ * the step function uses this to pick the ROOMIEST of the moves that make
+ * progress. They end up walking down the middle of a corridor instead of
+ * scraping its inside edge, so the limbs stay in open space.
+ *
+ * Multi-source BFS outward from every blocked cell: one pass over the
+ * grid, computed once alongside it.
+ */
+let clearance: Uint8Array | null = null
+const CLEAR_CAP = 6
+
+function buildClearance(g: Uint8Array): Uint8Array {
+  const out = new Uint8Array(NX * NZ)
+  const queue = new Int32Array(NX * NZ)
+  let head = 0
+  let tail = 0
+  for (let c = 0; c < g.length; c++) {
+    if (g[c]) {
+      out[c] = 0
+      queue[tail++] = c
+    } else {
+      out[c] = 255
+    }
+  }
+  // Cells outside the walled area have no blocked neighbour to seed from,
+  // so they keep 255 and simply read as maximally roomy. That is correct:
+  // nothing there constrains a creature.
+  while (head < tail) {
+    const c = queue[head++]
+    const d = out[c]
+    if (d >= CLEAR_CAP) continue
+    const i = c % NX
+    const j = (c - i) / NX
+    for (let di = -1; di <= 1; di++) {
+      for (let dj = -1; dj <= 1; dj++) {
+        if (!di && !dj) continue
+        const ni = i + di
+        const nj = j + dj
+        if (!inBounds(ni, nj)) continue
+        const n = idx(ni, nj)
+        if (out[n] !== 255) continue
+        out[n] = d + 1
+        queue[tail++] = n
+      }
+    }
+  }
+  for (let c = 0; c < out.length; c++) if (out[c] > CLEAR_CAP) out[c] = CLEAR_CAP
+  return out
+}
+
 /** Nearest open cell to a point, searching outward. Handles the player
  * standing fractionally inside a padded wall, which is common since the
  * creature padding is wider than the player's own collider. */
@@ -162,7 +226,10 @@ function nearestOpen(i: number, j: number): number {
  * Cheap enough to call every frame; it early-outs almost always.
  */
 export function updateNavField(px: number, pz: number) {
-  if (!blocked) blocked = buildGrid()
+  if (!blocked) {
+    blocked = buildGrid()
+    clearance = buildClearance(blocked)
+  }
   const start = nearestOpen(cellX(px), cellZ(pz))
   if (start < 0) return
   playerField = fieldFor(start)
@@ -198,7 +265,10 @@ export function navStepToward(
   tx: number,
   tz: number,
 ): { x: number; z: number } | null {
-  if (!blocked) blocked = buildGrid()
+  if (!blocked) {
+    blocked = buildGrid()
+    clearance = buildClearance(blocked)
+  }
   const target = nearestOpen(cellX(tx), cellZ(tz))
   if (target < 0) return null
   return stepOnField(fieldFor(target).cells, x, z)
@@ -213,11 +283,19 @@ function stepOnField(field: Uint16Array, x: number, z: number): { x: number; z: 
 
   const i = c % NX
   const j = (c - i) / NX
-  let best = here
   let bi = i
   let bj = j
+  let bestRoom = -1
+  let bestField = here
   // Includes diagonals when BOTH orthogonal neighbours are open, so
   // movement looks natural in open junctions without clipping corners.
+  //
+  // Of the neighbours that make progress, take the one with the most room
+  // around it, breaking ties on distance. Every candidate is STRICTLY
+  // downhill, so this cannot introduce a local minimum or a loop — the
+  // field value falls on every step exactly as before, the creature just
+  // takes the wide line through a corridor rather than clipping its inner
+  // edge and dragging its limbs through the wall.
   for (let di = -1; di <= 1; di++) {
     for (let dj = -1; dj <= 1; dj++) {
       if (!di && !dj) continue
@@ -227,8 +305,11 @@ function stepOnField(field: Uint16Array, x: number, z: number): { x: number; z: 
       const n = idx(ni, nj)
       if (blocked[n]) continue
       if (di && dj && (blocked[idx(i + di, j)] || blocked[idx(i, j + dj)])) continue
-      if (field[n] < best) {
-        best = field[n]
+      if (field[n] >= here) continue
+      const room = clearance ? clearance[n] : 0
+      if (room > bestRoom || (room === bestRoom && field[n] < bestField)) {
+        bestRoom = room
+        bestField = field[n]
         bi = ni
         bj = nj
       }
@@ -244,7 +325,10 @@ function stepOnField(field: Uint16Array, x: number, z: number): { x: number; z: 
 /** True if a straight line between two points crosses no wall — used to
  * decide whether a creature can see you, rather than merely be near. */
 export function hasLineOfSight(ax: number, az: number, bx: number, bz: number): boolean {
-  if (!blocked) blocked = buildGrid()
+  if (!blocked) {
+    blocked = buildGrid()
+    clearance = buildClearance(blocked)
+  }
   const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / (CELL * 0.5))
   for (let s = 1; s < steps; s++) {
     const t = s / steps
@@ -267,7 +351,10 @@ export function hasLineOfSight(ax: number, az: number, bx: number, bz: number): 
  * current field's target, i.e. places a creature can really stand.
  */
 export function navDebug() {
-  if (!blocked) blocked = buildGrid()
+  if (!blocked) {
+    blocked = buildGrid()
+    clearance = buildClearance(blocked)
+  }
   let open = 0
   for (let k = 0; k < blocked.length; k++) if (!blocked[k]) open++
   let reachable = 0

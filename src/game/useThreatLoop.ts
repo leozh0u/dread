@@ -4,6 +4,7 @@ import { useThreat } from './threat'
 import { useMicStore } from '../lib/useMic'
 import { useSession } from './session'
 import { playScare, playJumpscareSound } from './scareFx'
+import { inspect } from './entities/registry'
 
 const TICK_MS = 200
 const CLOSE_THRESHOLD = 0.35
@@ -102,7 +103,12 @@ export function useThreatLoop() {
 
       useThreat.getState().setDetection(next)
 
-      if (next >= 100) {
+      // Inspect mode (M) parks all three creatures five metres in front of
+      // you in the open, which is exactly the situation detection is
+      // designed to end the run for — so the art-review tool killed you
+      // within seconds of opening it and there was no way to actually look
+      // at what you were reviewing.
+      if (next >= 100 && !inspect.on) {
         useThreat.getState().setOutcome('died')
         useSession.getState().setStatus('ended')
       }

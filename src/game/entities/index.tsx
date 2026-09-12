@@ -18,12 +18,23 @@ const ROSTER = [
 ]
 
 /**
- * Inspect mode (M) staging. The creatures are UNLIT flat-black
- * silhouettes, so a light pointed at them does nothing — they're only
- * visible as shapes against something brighter behind. Without a
- * guaranteed backdrop, pressing M while facing down a dark corridor
- * shows you almost nothing, which defeats the whole point of the tool.
- * So inspect mode brings its own lit wall and stands them in front of it.
+ * Inspect mode (M) staging.
+ *
+ * This was written when the creatures were UNLIT flat-black silhouettes:
+ * a light pointed at them did nothing, so the tool supplied a bright
+ * backdrop and a hard flood to read their outlines against.
+ *
+ * They take light now, and that staging became actively misleading — an
+ * intensity-30 flood against an unlit near-white wall blows every surface
+ * out to pale cream, which is nothing like the one dim torch the game is
+ * actually lit by. Judging their colour and their detail under it meant
+ * judging a creature no player will ever see, and it is exactly how a
+ * skull that glowed in the dark survived three rounds of review.
+ *
+ * So the flood is now a dim fill and the backdrop is a real wall tone:
+ * enough to place them in space, while the PLAYER'S OWN FLASHLIGHT does
+ * the actual lighting. What you see pressing M is what you see in the
+ * corridor.
  */
 function InspectStage() {
   const backdrop = useRef<THREE.Mesh>(null!)
@@ -32,7 +43,7 @@ function InspectStage() {
   useFrame(({ camera }) => {
     const on = inspect.on
     if (backdrop.current) backdrop.current.visible = on
-    if (light.current) light.current.intensity = on ? 30 : 0
+    if (light.current) light.current.intensity = on ? 4 : 0
     if (!on) return
 
     const dir = new THREE.Vector3()
@@ -64,7 +75,7 @@ function InspectStage() {
     <>
       <mesh ref={backdrop} visible={false}>
         <planeGeometry args={[26, 9]} />
-        <meshBasicMaterial color="#8d8a7a" toneMapped={false} side={2} />
+        <meshStandardMaterial color="#2e2a22" roughness={1} side={2} />
       </mesh>
       <pointLight ref={light} color="#ffffff" intensity={0} distance={22} />
     </>

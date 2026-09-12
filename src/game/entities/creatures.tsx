@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Bone, Plate, Joint, Chain, Glow, Grin, Ridges, materials } from './shapes'
+import { Bone, Plate, Joint, Chain, Glow, Grin, Ridges, materials, crushedSkull, BONE_FOUL } from './shapes'
 import { advanceGait, legSwing, kneeBend, bodyBob, bodySway, shoulderTwist, hipTwist } from './gait'
 
 export type EntityKind = 'long' | 'crawler' | 'smile'
@@ -227,16 +227,26 @@ export function LongOne({ state }: CreatureProps) {
       <Bone from={[0, 2.4, 0]} to={[0, 2.66, 0.01]} top={0.07} bottom={0.085} />
 
       {/* Head — elongated, faceted, no features at all. The blankness is
-          the point; anything resembling a face is less frightening. */}
+          the point; anything resembling a face is less frightening.
+
+          It was #a8a294 with a #cdc7b6 emissive that climbed to 0.8 while
+          hunting: a smooth pale ovoid that glowed in the dark. That is a
+          vinyl mascot head, and it was the loudest thing on screen.
+
+          The faint emissive is kept, because it is the only way you see
+          this thing coming down a long corridor and a maze you cannot
+          read is not frightening, it is just unfair. But it is now a cold
+          grey barely off black, over stained bone rather than white, and
+          the geometry is lopsided — so at distance it is a dim smudge at
+          head height, and up close the torch shows you a skull. */}
       <group ref={head} position={[0, 2.82, 0]}>
-        <mesh scale={[0.145, 0.21, 0.155]}>
-          <icosahedronGeometry args={[1, 1]} />
+        <mesh scale={[0.145, 0.21, 0.155]} geometry={crushedSkull(3.4)}>
           <meshStandardMaterial
             ref={headMat}
-            color="#a8a294"
-            emissive="#cdc7b6"
+            color={BONE_FOUL}
+            emissive="#23261f"
             emissiveIntensity={0.4}
-            roughness={0.65}
+            roughness={0.82}
           />
         </mesh>
         {/* Two shallow hollows where eyes should be — not glowing, just
@@ -420,28 +430,60 @@ export function Crawler({ state }: CreatureProps) {
 
       {/* Neck into an oversized cranium */}
       <Bone from={[0, 0.68, 0.52]} to={[0, 0.86, 0.66]} top={0.05} bottom={0.07} />
+      {/* THE SKULL. This was the thing that made the whole creature look
+          silly: a #c6c0b0 sphere with its own emissive term, scaled
+          [0.23, 0.25, 0.24] — which is to say a glowing white ball — with
+          two round sockets and an even row of white teeth under it. A
+          bright ball with two dots and a grin is a smiley face, and it
+          was sitting on top of a body I kept adding detail to that nobody
+          could see, because the head was ten times brighter than it.
+
+          Now: no emissive at all, stained bone instead of white, lopsided
+          geometry, and narrower than it is long so it reads as a head
+          rather than a ball. */}
       <group ref={skull} position={[0, 0.95, 0.72]}>
-        <mesh scale={[0.23, 0.25, 0.24]}>
-          <icosahedronGeometry args={[1, 1]} />
-          <meshStandardMaterial color="#c6c0b0" roughness={0.7} emissive="#5a564c" emissiveIntensity={0.25} />
+        <mesh scale={[0.2, 0.215, 0.29]} geometry={crushedSkull(1.9)} material={materials.boneFoul} />
+        {/* Sockets. Spheres gave two round pupil-shaped holes — the
+            cartoon-eye read. These are tapered pits driven back INTO the
+            skull, so the torch finds an edge and then nothing, and they
+            are deliberately mismatched in size and height: a face that is
+            symmetrical is a face, and a face that is not quite is wrong. */}
+        <mesh
+          position={[-0.093, 0.045, 0.2]}
+          rotation={[1.35, 0, 0.22]}
+          scale={[0.075, 0.12, 0.085]}
+          material={materials.fleshDark}
+        >
+          <coneGeometry args={[1, 1, 7]} />
         </mesh>
-        {/* Deep sockets — dark holes, not eyes */}
-        <mesh position={[-0.095, 0.035, 0.185]} scale={[0.062, 0.075, 0.06]} material={materials.fleshDark}>
-          <sphereGeometry args={[1, 10, 10]} />
+        <mesh
+          position={[0.086, 0.019, 0.205]}
+          rotation={[1.42, 0, -0.1]}
+          scale={[0.06, 0.11, 0.07]}
+          material={materials.fleshDark}
+        >
+          <coneGeometry args={[1, 1, 7]} />
         </mesh>
-        <mesh position={[0.095, 0.035, 0.185]} scale={[0.062, 0.075, 0.06]} material={materials.fleshDark}>
-          <sphereGeometry args={[1, 10, 10]} />
+        {/* Brow, broken across the middle and sitting at a slight angle,
+            so it overhangs one socket further than the other. */}
+        <mesh position={[-0.07, 0.115, 0.175]} rotation={[0.3, 0.1, 0.07]} material={materials.boneFoul}>
+          <boxGeometry args={[0.15, 0.055, 0.095]} />
         </mesh>
-        {/* Brow ridge over them */}
-        <mesh position={[0, 0.11, 0.17]} rotation={[0.3, 0, 0]} material={materials.boneDim}>
-          <boxGeometry args={[0.27, 0.05, 0.09]} />
+        <mesh position={[0.08, 0.1, 0.175]} rotation={[0.34, -0.12, -0.05]} material={materials.boneFoul}>
+          <boxGeometry args={[0.12, 0.042, 0.085]} />
         </mesh>
+        {/* Cheek struts — the hollow under a cheekbone is most of what
+            makes a skull read as a skull rather than as an egg. */}
+        <Bone from={[-0.12, 0.02, 0.14]} to={[-0.05, -0.1, 0.24]} top={0.022} bottom={0.014} material="boneFoul" />
+        <Bone from={[0.12, 0.02, 0.14]} to={[0.05, -0.1, 0.24]} top={0.022} bottom={0.014} material="boneFoul" />
         {/* Jaw, hinged, wider than the skull should allow */}
         <group ref={jaw} position={[0, -0.12, 0.16]}>
           <mesh position={[0, -0.05, 0.02]} material={materials.fleshDark}>
             <boxGeometry args={[0.22, 0.11, 0.14]} />
           </mesh>
-          <Grin position={[0, -0.02, 0.09]} width={0.34} arc={0.16} teeth={12} scale={0.75} />
+          {/* Nine teeth, not twelve. A long even row of small identical
+              teeth is a zip; fewer and more uneven reads as a mouth. */}
+          <Grin position={[0, -0.02, 0.09]} width={0.3} arc={0.13} teeth={9} scale={0.85} />
         </group>
       </group>
     </group>
