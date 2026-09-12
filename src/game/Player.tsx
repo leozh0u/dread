@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { RigidBody, type RapierRigidBody } from '@react-three/rapier'
 import { usePlayerPosition } from './playerPosition'
+import { playFootstep } from './scareFx'
 import * as THREE from 'three'
 
 const SPEED = 4
@@ -32,9 +33,12 @@ function bindKeys() {
  * flashlight parented directly to the camera, which is the whole point
  * of this scene.
  */
+const STEP_INTERVAL_MS = 380
+
 export function Player({ start = [0, 1, 10] as [number, number, number] }) {
   const body = useRef<RapierRigidBody>(null!)
   const { camera } = useThree()
+  const lastStep = useRef(0)
 
   useEffect(() => bindKeys(), [])
 
@@ -69,6 +73,14 @@ export function Player({ start = [0, 1, 10] as [number, number, number] }) {
 
     const vel = body.current.linvel()
     body.current.setLinvel({ x: move.x, y: vel.y, z: move.z }, true)
+
+    if (move.lengthSq() > 0) {
+      const now = performance.now()
+      if (now - lastStep.current > STEP_INTERVAL_MS) {
+        lastStep.current = now
+        playFootstep()
+      }
+    }
 
     const t = body.current.translation()
     camera.position.set(t.x, t.y + 0.6, t.z)

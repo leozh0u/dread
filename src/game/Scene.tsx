@@ -7,6 +7,7 @@ import { House } from './House'
 import { EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { useDirector } from './director'
+import { setMonsterProximity } from './scareFx'
 
 /** Flashlight rigidly attached to the camera. */
 function Flashlight() {
@@ -46,6 +47,7 @@ function Monster() {
   useFrame(() => {
     const z = -2 - distance * 27 // distance 0 -> z=-2 (on top of you), 1 -> z=-29
     ref.current.position.z = THREE.MathUtils.lerp(ref.current.position.z, z, 0.02)
+    setMonsterProximity(distance)
   })
   return (
     <mesh ref={ref} position={[0, 0.5, -25]}>

@@ -3,7 +3,7 @@ import { useDirector, type ScareType } from './director'
 import { useThreat } from './threat'
 import { useMicStore } from '../lib/useMic'
 import { useSession } from './session'
-import { playScare } from './scareFx'
+import { playScare, playJumpscareSound } from './scareFx'
 
 const TICK_MS = 200
 const CLOSE_THRESHOLD = 0.35
@@ -54,6 +54,7 @@ export function useThreatLoop() {
           lastJumpscare.current = now
           const type = SCARE_TYPES[Math.floor(Math.random() * SCARE_TYPES.length)]
           playScare(type, useDirector.getState().setMonsterDistance)
+          playJumpscareSound()
         }
       } else {
         next += RATE_DECAY // hidden and quiet, even though close — safe

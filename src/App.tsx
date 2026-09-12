@@ -13,7 +13,8 @@ import { useCalmRoomLoop } from './game/useCalmRoomLoop'
 import { useMicSource } from './lib/useMic'
 import { useDirector, type ScareType } from './game/director'
 import { useSession } from './game/session'
-import { playScare, startAmbient, unlockAudio } from './game/scareFx'
+import { playScare, startAmbient, startHeartbeatAudio, stopHeartbeatAudio, unlockAudio } from './game/scareFx'
+import { usePulseStore } from './lib/usePulse'
 
 function Game() {
   const setMonsterDistance = useDirector((s) => s.setMonsterDistance)
@@ -30,7 +31,11 @@ function Game() {
   useMicSource()
 
   useEffect(() => {
-    if (sessionStatus === 'playing') startAmbient()
+    if (sessionStatus === 'playing') {
+      startAmbient()
+      startHeartbeatAudio(() => usePulseStore.getState().bpm)
+    }
+    if (sessionStatus === 'ended') stopHeartbeatAudio()
   }, [sessionStatus])
 
   return (
