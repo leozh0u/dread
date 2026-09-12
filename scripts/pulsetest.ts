@@ -13,6 +13,7 @@
  * pure noise, which must return null rather than a confident fiction.
  */
 import { estimatePulse, type GreenSample } from '../src/lib/fallbackPulse'
+import { smoothReading } from '../src/lib/usePulse'
 
 let failures = 0
 function check(label: string, ok: boolean, detail = '') {
@@ -149,6 +150,85 @@ console.log('\n=== confidence means something ===')
     Math.abs(a.confidence - b.confidence) < 0.01 && a.bpm === b.bpm,
     `dim ${a.confidence.toFixed(2)} / bright ${b.confidence.toFixed(2)}`,
   )
+}
+
+console.log('\n=== breathing and sway are not a heart rate ===')
+{
+  // LEO SAW A CONFIDENT 40 BPM WHILE SITTING STILL. Reproduced exactly: a
+  // signal containing nothing but slow leaning and breathing, with no
+  // pulse in it at all, returned 40 bpm — the bottom of the old band — at
+  // confidence 1.00. It is a genuinely sharp peak, so the peakiness floor
+  // had no reason to reject it. It simply is not a heart.
+  const motion: [string, (s: number) => number][] = [
+    ['head sway', (s) => 9 * Math.sin(s * 0.8) + 4 * Math.sin(s * 1.35 + 1)],
+    ['leaning and breathing', (s) => 7 * Math.sin(s * 0.55) + 3 * Math.sin(s * 0.25)],
+    ['walking bob', (s) => 6 * Math.sin(s * 1.9)],
+    ['fidgeting', (s) => 5 * Math.sin(s * 0.9) + 4 * Math.sin(s * 0.4 + 2)],
+  ]
+  for (const [name, fn] of motion) {
+    const samples: GreenSample[] = []
+    for (let i = 0; i < 8 * 60; i++) samples.push({ t: (i / 60) * 1000, g: 128 + fn(i / 60) })
+    const r = estimatePulse(samples)
+    check(`${name} with no pulse returns null`, r.bpm === null, `got ${r.bpm}`)
+  }
+}
+{
+  // And the other half: a real pulse must still survive all that motion
+  // on top of it, or the filter has just been set to reject everything.
+  const withPulse: [string, number, (s: number) => number][] = [
+    ['72 under heavy sway', 72, (s) => 9 * Math.sin(s * 0.8) + 1.0 * Math.sin(2 * Math.PI * 1.2 * s)],
+    ['76 through breathing', 76, (s) => 5 * Math.sin(s * 0.3) + 1.2 * Math.sin(2 * Math.PI * (76 / 60) * s)],
+    ['55 resting', 55, (s) => 1.2 * Math.sin(2 * Math.PI * (55 / 60) * s)],
+    ['130 frightened', 130, (s) => 1.2 * Math.sin(2 * Math.PI * (130 / 60) * s)],
+  ]
+  for (const [name, truth, fn] of withPulse) {
+    const samples: GreenSample[] = []
+    for (let i = 0; i < 8 * 60; i++) samples.push({ t: (i / 60) * 1000, g: 128 + fn(i / 60) })
+    const r = estimatePulse(samples)
+    check(`${name} is still found`, r.bpm !== null && Math.abs(r.bpm - truth) <= 3, `got ${r.bpm}`)
+  }
+}
+
+console.log('\n=== the number on screen tracks the number measured ===')
+{
+  // THE BUG THIS COVERS. The step clamp used to limit the INPUT to the
+  // moving average, and the average then applied alpha of that — so the
+  // display could move at most alpha * maxStep per reading, which for the
+  // fallback is 0.6 bpm. A bad first reading of 40 against a true 76 took
+  // over sixty readings to correct, and Leo watched it sit at 40.
+  // The old composition, for comparison: clamp the INPUT, then average.
+  const oldWay = (prev: number, raw: number, maxStep: number, alpha: number) => {
+    const clamped = prev + Math.max(-maxStep, Math.min(maxStep, raw - prev))
+    return prev * (1 - alpha) + clamped * alpha
+  }
+  const count = (step: (p: number, r: number, m: number, a: number) => number) => {
+    let v = 40
+    let n = 0
+    while (v < 75 && n < 500) { v = step(v, 76, 4, 0.15); n++ }
+    return n
+  }
+  const now = count(smoothReading)
+  const before = count(oldWay)
+  check('a 36 bpm correction converges much faster than it did', now * 2 < before, `${now} readings vs ${before}`)
+  // Readings arrive once per animation frame, so what matters is the
+  // wall-clock cost, not the count.
+  check('which is well under a second at 60 readings/sec', now / 60 < 0.5, `${(now / 60).toFixed(2)}s`)
+  let v = 40
+  for (let i = 0; i < 200; i++) v = smoothReading(v, 76, 4, 0.15)
+  check('and it does get there', v >= 75.9, `reached ${v.toFixed(1)}`)
+}
+{
+  // But a single wild reading must still not yank the display.
+  const moved = Math.abs(smoothReading(72, 200, 4, 0.15) - 72)
+  check('one absurd reading moves it by at most the step cap', moved <= 4.001, `${moved.toFixed(2)} bpm`)
+  const movedDown = Math.abs(smoothReading(72, 0, 4, 0.15) - 72)
+  check('and the same downward', movedDown <= 4.001, `${movedDown.toFixed(2)} bpm`)
+}
+{
+  // Steady input must settle exactly, not hover short of it.
+  let v = 60
+  for (let i = 0; i < 200; i++) v = smoothReading(v, 72, 4, 0.15)
+  check('a steady signal settles on the true value', Math.abs(v - 72) < 0.01, `${v.toFixed(3)}`)
 }
 
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nFallback pulse estimator works.')

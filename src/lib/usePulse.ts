@@ -12,6 +12,9 @@ interface PulseState {
   confidence: number
   source: PulseSource
   baseline: number | null // resting HR, set after calibration
+  /** Readings held before the first displayed value is committed. See
+   * SEED_READINGS — the first reading must not anchor the whole run. */
+  seeds: number[]
   history: { t: number; bpm: number }[]
   setReading: (bpm: number, confidence: number, source: PulseSource) => void
   setBaseline: (bpm: number) => void
@@ -28,25 +31,88 @@ interface PulseState {
 const MAX_STEP_BPM = { presage: 6, fallback: 4 } as const
 const EMA_ALPHA = { presage: 0.35, fallback: 0.15 } as const
 
+/**
+ * Readings below this are thrown away rather than smoothed in.
+ *
+ * The estimator's confidence is a scale-free measure of how much the
+ * winning frequency stands out from the rest of the band, so a low value
+ * genuinely means "this is barely a peak" rather than "the room is dim".
+ * Feeding those in and then averaging them is how a bad reading gets to
+ * influence the number at all.
+ */
+const MIN_USABLE_CONFIDENCE = 0.12
+
+/**
+ * How many readings the first displayed value is taken from.
+ *
+ * THE FIRST READING USED TO ANCHOR EVERYTHING. `prev == null` took the
+ * raw value verbatim, and the first reading is the single least reliable
+ * one there is — shortest history, camera still settling its exposure and
+ * gain. Leo saw 40 bpm, which is the exact bottom of the search band, and
+ * it stayed there.
+ *
+ * A median of the first few is robust to one outlier in a way a single
+ * sample can never be, and costs a couple of seconds of "reading…" that
+ * the panel was showing anyway.
+ */
+const SEED_READINGS = 5
+
+/**
+ * One step of display smoothing.
+ *
+ * THE TWO LAYERS USED TO MULTIPLY. The step clamp limited the INPUT to
+ * the average, then the average applied `alpha` of that — so the value on
+ * screen could move at most `alpha * maxStep` per reading, which for the
+ * fallback is 0.15 * 4 = 0.6 bpm. Correcting a 36 bpm error therefore
+ * took over sixty readings, and with a bad first reading anchoring it the
+ * number simply sat there being wrong.
+ *
+ * Averaging first and clamping the RESULT gives what was intended: an
+ * exponential average for steadiness, with a hard ceiling on how far any
+ * single reading can shift the display.
+ */
+export function smoothReading(prev: number, raw: number, maxStep: number, alpha: number) {
+  const target = prev * (1 - alpha) + raw * alpha
+  return prev + Math.max(-maxStep, Math.min(maxStep, target - prev))
+}
+
 export const usePulseStore = create<PulseState>((set, get) => ({
   bpm: null,
   rawBpm: null,
   confidence: 0,
   source: 'none',
   baseline: null,
+  seeds: [],
   history: [],
   setReading: (rawBpm, confidence, source) => {
+    // A reading nobody believes must not reach the display at all.
+    // Smoothing a bad number in is still letting it change the answer.
+    if (!Number.isFinite(rawBpm)) return
+    if (source !== 'presage' && confidence < MIN_USABLE_CONFIDENCE) {
+      set({ rawBpm, confidence })
+      return
+    }
+
     const prev = get().bpm
     const maxStep = MAX_STEP_BPM[source === 'presage' ? 'presage' : 'fallback']
     const alpha = EMA_ALPHA[source === 'presage' ? 'presage' : 'fallback']
 
-    let clamped = rawBpm
-    if (prev != null) {
-      const delta = rawBpm - prev
-      clamped = prev + Math.max(-maxStep, Math.min(maxStep, delta))
+    let bpm: number
+    if (prev == null) {
+      // Collect a few before committing to a starting value, and take the
+      // median — one outlier cannot move a median, and the first reading
+      // is exactly where the outliers are.
+      const seeds = [...get().seeds, rawBpm]
+      if (seeds.length < SEED_READINGS) {
+        set({ seeds, rawBpm, confidence, source })
+        return
+      }
+      const sorted = [...seeds].sort((a, b) => a - b)
+      bpm = Math.round(sorted[Math.floor(sorted.length / 2)])
+      set({ seeds: [] })
+    } else {
+      bpm = Math.round(smoothReading(prev, rawBpm, maxStep, alpha))
     }
-    const smoothed = prev == null ? clamped : prev * (1 - alpha) + clamped * alpha
-    const bpm = Math.round(smoothed)
 
     const history = [...get().history, { t: Date.now(), bpm }].slice(-600) // ~keep last 10min @1hz
     set({ bpm, rawBpm, confidence, source, history })

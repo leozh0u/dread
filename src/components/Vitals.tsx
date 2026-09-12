@@ -176,10 +176,22 @@ export function Vitals() {
       {baseline != null && (
         <div style={{ opacity: 0.4, marginTop: 5 }}>resting {baseline} bpm</div>
       )}
+      {/* Blind mode is a fact about the SESSION, not about right now: a run
+          that began without a signal keeps its fake baseline even if a
+          reading turns up later, so the Director's comparisons stay
+          meaningless for the rest of it. But the message must say which of
+          those two situations the player is actually in.
+
+          Leo hit the wrong one: his camera was live, the panel said so
+          three rows above, and this still told him to allow camera access
+          and reload. Being instructed to fix something you have already
+          fixed is worse than no message — it makes the readout above it
+          look untrustworthy too. */}
       {blind && (
         <div style={{ opacity: 0.75, marginTop: 7, maxWidth: 190, lineHeight: 1.45, color: '#ff5a5a' }}>
-          It can't see you. It's hunting blind — allow camera access and
-          reload to play it properly.
+          {cameraError
+            ? "It can't see you. It's hunting blind — allow camera access and reload to play it properly."
+            : 'This run started before the camera was ready, so it is using a guessed baseline. Reload to start one that reads you properly.'}
         </div>
       )}
       {calibrating && !blind && (

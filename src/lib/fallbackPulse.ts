@@ -23,8 +23,31 @@ const WINDOW_SECONDS = 8
  * 40–180 covers a resting adult through genuine fright with room to spare,
  * and Presage's own supported range (40–110) sits inside it.
  */
-const MIN_BPM = 40
+const MIN_BPM = 45
 const MAX_BPM = 180
+
+/**
+ * High-pass window, in seconds.
+ *
+ * BREATHING AND SWAY WERE BEING REPORTED AS A HEART RATE. Leo saw a
+ * confident 40 bpm — the exact bottom of the old band — while sitting
+ * still. Reproduced: a signal containing nothing but slow leaning and
+ * breathing, with no pulse in it at all, returns 40 bpm at confidence
+ * 1.00. It is a genuinely sharp peak, so the peakiness floor has no
+ * reason to reject it; it simply is not a heart.
+ *
+ * Breathing is 12-20 per minute and postural sway is slower still, so
+ * their energy sits below the band — but a windowed DFT leaks, and the
+ * bottom bin is where it lands. A detrend removes a straight line and a
+ * Hann window softens the edges; neither removes a 0.3 Hz oscillation.
+ *
+ * Subtracting a running mean over ~1.3s removes everything below roughly
+ * 0.77 Hz, which is 46 bpm — just under the new floor, so sway and
+ * breathing are gone and a genuine slow pulse is not. This is the right
+ * tool rather than simply raising the floor, because raising the floor
+ * alone leaves the leakage, it just moves where it lands.
+ */
+const HIGHPASS_SECONDS = 1.3
 const STEP_BPM = 0.5
 
 /**
@@ -100,6 +123,31 @@ export function estimatePulse(samples: GreenSample[]): FallbackReading {
   const slope = denom === 0 ? 0 : (n * sxy - sx * sy) / denom
   const intercept = (sy - slope * sx) / n
 
+  // Detrended, before the high-pass.
+  const flat = new Float64Array(n)
+  for (let i = 0; i < n; i++) flat[i] = ys[i] - (intercept + slope * xs[i])
+
+  /**
+   * High-pass by subtracting a running mean — see HIGHPASS_SECONDS.
+   * Written against the sample TIMES rather than a fixed index width,
+   * because browser frame delivery is not uniform and a fixed window of
+   * samples would be a different window of seconds on every machine.
+   */
+  const hp = new Float64Array(n)
+  {
+    let lo = 0
+    let hi = 0
+    let sum = 0
+    for (let i = 0; i < n; i++) {
+      const from = xs[i] - HIGHPASS_SECONDS / 2
+      const to = xs[i] + HIGHPASS_SECONDS / 2
+      while (hi < n && xs[hi] <= to) sum += flat[hi++]
+      while (lo < hi && xs[lo] < from) sum -= flat[lo++]
+      const count = hi - lo
+      hp[i] = flat[i] - (count > 0 ? sum / count : 0)
+    }
+  }
+
   /**
    * Hann window. The sample window starts and ends mid-heartbeat, and a
    * hard cut is a discontinuity whose energy smears across every bin —
@@ -109,7 +157,7 @@ export function estimatePulse(samples: GreenSample[]): FallbackReading {
   const signal = new Float64Array(n)
   for (let i = 0; i < n; i++) {
     const w = n > 1 ? 0.5 * (1 - Math.cos((2 * Math.PI * i) / (n - 1))) : 1
-    signal[i] = (ys[i] - (intercept + slope * xs[i])) * w
+    signal[i] = hp[i] * w
   }
 
   let bestBpm = 0
@@ -134,6 +182,65 @@ export function estimatePulse(samples: GreenSample[]): FallbackReading {
   }
 
   if (!bestBpm || bestPower <= 0) return { bpm: null, confidence: 0 }
+
+  /**
+   * A peak pinned to the edge of the band is a peak that is probably
+   * OUTSIDE it.
+   *
+   * The high-pass removes most of the breathing and sway energy, but a
+   * finite filter never removes all of it, and whatever survives lands in
+   * the lowest bin — a residue of something real at 0.2 Hz, not a heart at
+   * 45. The same argument applies at the top, where the nearest real thing
+   * is usually a lighting flicker harmonic.
+   *
+   * Refusing the outermost couple of bpm costs the ability to report a
+   * resting rate below about 47, which is trained-athlete territory. That
+   * is a far cheaper mistake than confidently reporting someone's
+   * breathing as their pulse, which is the specific failure this whole
+   * function exists to avoid.
+   */
+  const EDGE_BPM = 2
+  if (bestBpm <= MIN_BPM + EDGE_BPM || bestBpm >= MAX_BPM - EDGE_BPM) {
+    return { bpm: null, confidence: 0 }
+  }
+
+  /**
+   * IS THIS A HEART, OR THE THIRD HARMONIC OF SOMEONE WALKING?
+   *
+   * Periodic body motion is not sinusoidal — a head bob is closer to a
+   * rectified sine, which is rich in harmonics. The high-pass removes the
+   * fundamental, because that sits below the band, but it cannot touch
+   * the harmonics, which land squarely inside it. A bob at 18 per minute
+   * puts its third harmonic at 54, and 54 is a perfectly plausible
+   * resting heart rate.
+   *
+   * The tell is that a harmonic has a parent. If the candidate's half or
+   * third has substantially MORE power than the candidate itself, then
+   * the candidate is an overtone of something slower and the slower thing
+   * is the real signal — which, being below the band, is not a pulse.
+   *
+   * A genuine pulse fails this test in the other direction: a heart at 72
+   * may well have energy at 144, but it will not have more energy at 36
+   * than at 72.
+   */
+  const powerAt = (bpm: number) => {
+    const hz = bpm / 60
+    let re = 0
+    let im = 0
+    for (let i = 0; i < n; i++) {
+      const angle = 2 * Math.PI * hz * xs[i]
+      re += signal[i] * Math.cos(angle)
+      im += signal[i] * Math.sin(angle)
+    }
+    return re * re + im * im
+  }
+  for (const divisor of [2, 3]) {
+    const sub = bestBpm / divisor
+    // Below about 9 per minute there is nothing a body does periodically
+    // that we would be seeing.
+    if (sub < 9) continue
+    if (powerAt(sub) > bestPower * 1.5) return { bpm: null, confidence: 0 }
+  }
 
   /**
    * Peakiness against the MEDIAN of the band, not the mean.

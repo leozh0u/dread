@@ -178,7 +178,66 @@ sdk.on('processingStatus', (s) => {
   status = name
   console.log('[sidecar] processing status:', name)
   broadcast({ type: 'status', status: name })
+  if (name === 'kError') recoverSdk('processing status went to kError')
 })
+
+/**
+ * BRING THE SDK BACK AFTER AN ERROR.
+ *
+ * Observed live, mid-session, while a real face was being read:
+ *
+ *   status=kRunning — 26 frames in: sit back so your upper chest is in frame
+ *   sdk error 1 SmartSpectra is not in a valid state... retryable=false
+ *   processing status: kError
+ *
+ * Once the graph enters kError it refuses every frame forever, and the
+ * sidecar's only response was to log the refusal — once per frame, at
+ * 24fps, indefinitely. From the game's side the pulse readout simply says
+ * "reading…" for the rest of the session, which is indistinguishable from
+ * a signal that has not converged yet. It is the same class of failure as
+ * everything else that went wrong in this project: the broken state and
+ * the not-yet-working state look identical.
+ *
+ * The SDK exposes stop/reset/start, so the fix is to actually use them.
+ * Debounced, because errors arrive per-frame and tearing the graph down
+ * once per frame would be worse than leaving it broken, and capped,
+ * because something that fails immediately on every restart is not going
+ * to be fixed by restarting it a hundred more times.
+ */
+let recovering = false
+let recoveries = 0
+const MAX_RECOVERIES = 5
+
+async function recoverSdk(why) {
+  if (recovering) return
+  if (recoveries >= MAX_RECOVERIES) return
+  recovering = true
+  recoveries++
+  console.warn(`[sidecar] restarting the SmartSpectra graph (${why}) — attempt ${recoveries}`)
+  try {
+    try {
+      await sdk.stopAsync?.()
+    } catch {
+      sdk.stop?.()
+    }
+    sdk.reset?.()
+    // A fresh graph means a fresh clock; nothing may carry over from the
+    // stream that died, or the first frame lands as a multi-minute jump.
+    lastFrameUs = 0
+    lastSenderUs = 0
+    sdk.useCustomInput(FrameTransform.kNone)
+    sdk.start()
+    console.log('[sidecar] graph restarted — send frames again')
+  } catch (err) {
+    console.error('[sidecar] graph restart failed:', err?.message ?? err)
+  } finally {
+    // Long enough that a persistent fault does not spin, short enough
+    // that a transient one costs a second of a demo rather than the run.
+    setTimeout(() => {
+      recovering = false
+    }, 1500)
+  }
+}
 
 sdk.on('validationStatus', (code, ts, hint) => {
   // This is the SDK telling you why it can't measure. It fires per frame,
@@ -244,9 +303,13 @@ sdk.on('metrics', (buf) => {
   }
 })
 
-sdk.on('error', (code, message, retryable) =>
-  console.error('[sidecar] sdk error', code, message, 'retryable=', retryable),
-)
+sdk.on('error', (code, message, retryable) => {
+  console.error('[sidecar] sdk error', code, message, 'retryable=', retryable)
+  // A non-retryable error is the SDK saying it will not recover on its
+  // own. Taking it at its word and rebuilding the graph is the only way
+  // back; the alternative is the silent forever-"reading…" above.
+  if (retryable === false) recoverSdk(`sdk error ${code}: ${message}`)
+})
 
 /**
  * The sidecar is also the game's only trusted server.
