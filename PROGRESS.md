@@ -892,3 +892,77 @@ baseline of 72 and keeps it even after Presage starts delivering real
 readings. Every Director comparison in that run is then against a number
 that was never his. That is the thing most likely to make the biometrics
 feel like they are not working, even once they are.
+
+---
+
+## Saturday afternoon — sound, and a dead sidecar
+
+### The sidecar had been dead the whole time
+
+`/health` was unreachable. The SmartSpectra native library aborted the
+process from inside its own threads (`mutex lock failed`, SIGABRT, exit
+134). `run.sh` only restarted on our own exit code 17, so it stayed down —
+taking Presage, Backboard and every Tiger Data write with it, **silently**.
+The game kept running on the in-browser fallback, which is exactly what
+the fallback is for, but nothing said why. Now restarts on any non-clean
+exit with a five-strike cap. — `4903db8`
+
+### What the stored trace actually says about the heart rate
+
+310 readings in TimescaleDB from today. **All of them predate the fix.**
+Last row 13:11, fix landed 13:13. Range 40.0–73.0, mean 51.6, confidences
+as low as 0.01. The old band started at 40, so **Leo's "40 bpm" was the
+estimator reporting the floor of its search range — the value it returns
+when it finds nothing**, not a measurement of him. He was right to
+disbelieve it.
+
+The new estimator has **never once run on his face**. Zero post-fix rows.
+
+Leading hypothesis for both 40 and the current 51: **underlit face**. rPPG
+measures sub-percent brightness changes in skin; in a dim room those are
+below the sensor noise floor, and the strongest remaining signal is
+breathing and postural drift, which are slow — so the estimate gets
+dragged to the bottom of the band. A too-low reading is the *signature* of
+insufficient light. Told him: steady white light in front of him, never
+behind, never fluorescent (100/120 Hz beats against frame rate and
+produces a confident fake rhythm).
+
+**Still unverified against ground truth.** Nobody has ever compared the
+number to a manually counted pulse. Asked for it twice; not yet given.
+
+### "more scary noises, more often" — done
+
+The scheduler fired one sound every 35–80s from a rotation of five. A
+three-minute run carried about three noises with a real chance of a
+repeat. Now 7–19s base (~16 per run), rotation widened 5 → 12 (every
+one-shot in the bank, creature vocalisations played distant and muffled,
+house voice at ~9%), no back-to-back repeats, ±8% pitch on every play, and
+~22% of sounds placed within a few metres of the player.
+
+Cadence is now Director-driven rather than flat — dense in STALK/STRIKE,
+near-silent through the calibration cold open, backing off in WITHDRAW and
+as the player's own arousal rises. That is the design thesis applied to
+audio, where it previously only applied to the monster.
+
+**Bug the new test caught:** near sounds were biased toward +z and called
+"behind". That only holds while the player faces −z; ninety degrees round
+it put them off to one side, losing the whole point. Rebuilt in the
+player's own frame off the audio listener's forward vector. 21 new checks.
+— `dd50ffa`
+
+### LEDGER
+
+| Asked, in his words | State |
+|---|---|
+| "more scary noises, more often" | **done, tested, pushed** |
+| "do i need to shine the light on my face" | answered — yes, and it is the leading suspect for the low readings |
+| "what kind of light" | answered — steady, white, in front, not fluorescent |
+| "does the sun work" | answered — yes, best option, must be in front of him |
+| "do we just larp it in the video" | **answered: no.** A faked demo dies if a judge asks to try it, and takes the honest parts with it |
+| "which prizes could i actually win" | answered — Games track, Backboard, Tiger Data, MathWorks as the live shots |
+| "i dont think the heartrate thing is working" | **open — needs one manual pulse count from him to settle** |
+| MathWorks, ~30s of his time | **blocked on him** |
+| rotate 4 exposed API keys | **blocked on him** |
+| 66 Claude co-author trailers in a public repo | **blocked on him** |
+| video not shot | **highest risk item, blocked on him** |
+| monsters never signed off | **blocked on him** |
