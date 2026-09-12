@@ -134,16 +134,25 @@ static host — same fallback path that already exists for local use.
      sidecar-only. Start screen shows "PROVE YOU ARE ALIVE" once
      configured, always with a visible skip, and stays as plain BEGIN
      until then — so not doing it cannot break anything.
-   - **Backboard**: proxied through the sidecar because Backboard has no
-     publishable key at all. Endpoints live; the game does not call them
-     yet. That last piece is what makes "the house remembers you" real.
+   - **Backboard**: DONE end to end. The Director's bandit (which learns
+     which of four scare types spikes this player) is now persisted
+     between sessions and the player is told — "The house has met you 3
+     times. It remembers the audio." Proxied through the sidecar since
+     Backboard has no publishable key. Needs only `BACKBOARD_API_KEY` and
+     `BACKBOARD_ASSISTANT_ID` in `.env.local` (curl command in
+     SPONSORS.md) — untested against the live API, only against mocked
+     responses.
    - **Tiger Data**: same constraint, least payoff. Recommend last or not
      at all.
 6. **Creature design still not signed off.** Rebuilt with connected
    skeletons and shaded materials after Leo's screenshots showed floating
    parts and flat cardboard shapes. Press **M** to inspect.
 7. **Jumpscares** — explicitly deferred by Leo.
-8. **Ongoing standard:** verify by direct testing. Traps hit repeatedly
+8. **`npm test` now exists — 47 checks.** `test:level` (flood-fills the
+   real collision geometry), `test:run` (walks a full playthrough and
+   both endings), `test:memory` (parses hostile Backboard responses).
+   Run it before filming and before submitting.
+9. **Ongoing standard:** verify by direct testing. Traps hit repeatedly
    this session: reading state via dynamic `import()` in the console can
    resolve to a DUPLICATE module and report stale values (three false
    "it's broken" conclusions); and a black screen with no HUD is a React
