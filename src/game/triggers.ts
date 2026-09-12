@@ -9,9 +9,12 @@ export interface ClueDef {
   radius: number
 }
 
+export type HidingKind = 'closet' | 'curtain' | 'crate' | 'table'
+
 export interface BoxRegion {
   center: [number, number, number]
   half: [number, number, number]
+  kind?: HidingKind
 }
 
 export const CLUES: ClueDef[] = [
@@ -21,10 +24,10 @@ export const CLUES: ClueDef[] = [
 ]
 
 export const HIDING_SPOTS: BoxRegion[] = [
-  { center: [6, 1, 7], half: [0.6, 1, 0.6] },
-  { center: [-6, 1, -1], half: [0.6, 1, 0.6] },
-  { center: [6, 1, -9], half: [0.6, 1, 0.6] },
-  { center: [0, 1, -14], half: [0.6, 1, 0.6] },
+  { center: [6, 1, 7], half: [0.6, 1, 0.6], kind: 'closet' },
+  { center: [-6, 1, -1], half: [0.7, 1, 0.5], kind: 'curtain' },
+  { center: [6, 1, -9], half: [0.6, 0.9, 0.6], kind: 'crate' },
+  { center: [0, 0.7, -14], half: [0.9, 0.55, 0.6], kind: 'table' },
 ]
 
 export const CALM_ROOM: BoxRegion = {

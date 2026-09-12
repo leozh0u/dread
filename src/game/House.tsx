@@ -1,6 +1,7 @@
 import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import { Clue } from './Clue'
 import { HidingSpot } from './HidingSpot'
+import { Clutter } from './Clutter'
 import { ExitDoorLight } from './ExitDoor'
 import { useThreat, CLUES_REQUIRED } from './threat'
 import { CLUES, HIDING_SPOTS } from './triggers'
@@ -122,6 +123,7 @@ export function House() {
       ))}
 
       <ExitDoorLight position={[0, 1.5, -18]} />
+      <Clutter />
     </>
   )
 }
