@@ -71,11 +71,11 @@ export function FearCurve() {
             : 'Every mark below is a moment the house decided to push or pull — based on your pulse, read off your own webcam, nothing worn.'}
       </p>
 
-      <svg width={W} height={H} style={{ background: '#0a0a0a', border: '1px solid #333' }}>
+      <svg width={W} height={H} style={{ background: '#0b0a06', border: '1px solid rgba(216,203,168,0.22)' }}>
         {baselineY != null && (
-          <line x1={0} y1={baselineY} x2={W} y2={baselineY} stroke="#444" strokeDasharray="4 4" />
+          <line x1={0} y1={baselineY} x2={W} y2={baselineY} stroke="rgba(216,203,168,0.35)" strokeDasharray="4 4" />
         )}
-        <path d={path} fill="none" stroke="#c33" strokeWidth={2} />
+        <path d={path} fill="none" stroke="#e8956b" strokeWidth={2} />
         {scareLog
           .filter((s) => s.t >= t0)
           .map((s, i) => (
@@ -151,10 +151,10 @@ function PlayAgainButton() {
       style={{
         marginTop: 24,
         background: 'transparent',
-        border: '1px solid #c33',
-        color: '#c33',
+        border: '1px solid rgba(216,203,168,0.45)',
+        color: '#d8cba8',
         padding: '10px 28px',
-        fontFamily: 'monospace',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         fontSize: 14,
         letterSpacing: 2,
         cursor: 'pointer',
@@ -171,13 +171,13 @@ function Overlay({ children }: { children: React.ReactNode }) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.92)',
-        color: '#eee',
+        background: 'radial-gradient(ellipse at center, #14110a 0%, rgba(0,0,0,0.96) 78%)',
+        color: '#d8cba8',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'monospace',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         zIndex: 20,
         textAlign: 'center',
         padding: 24,

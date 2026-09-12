@@ -124,6 +124,7 @@ let ambient: {
   growlGain: GainNode
   growlFilter: BiquadFilterNode
   growlPanner: PannerNode
+  occlusion: BiquadFilterNode
 } | null = null
 
 export function startAmbient() {
@@ -197,7 +198,17 @@ export function startAmbient() {
   growlPanner.maxDistance = 40
   const growlGain = audioCtx.createGain()
   growlGain.gain.value = 0
-  growlNoise.connect(growlFilter).connect(growlPanner).connect(growlGain).connect(master())
+  // Occlusion filter — setMonsterProximity opens/closes this with distance
+  const occlusion = audioCtx.createBiquadFilter()
+  occlusion.type = 'lowpass'
+  occlusion.frequency.value = 600
+  growlNoise
+    .connect(growlFilter)
+    .connect(growlPanner)
+    .connect(occlusion)
+    .connect(growlGain)
+    .connect(master())
+  growlGain.connect(reverb())
   growlNoise.start()
 
   // Heavy breathing, layered into the same panned/positioned chain as the
@@ -219,7 +230,7 @@ export function startAmbient() {
   breathNoise.start()
   breathLfo.start()
 
-  ambient = { droneGain, noiseGain, growlGain, growlFilter, growlPanner }
+  ambient = { droneGain, noiseGain, growlGain, growlFilter, growlPanner, occlusion }
 }
 
 /** A one-shot positioned sound source — every "this happened over there"
@@ -335,6 +346,12 @@ export function setMonsterProximity(distance: number) {
   const t = getCtx().currentTime
   ambient.growlGain.gain.linearRampToValueAtTime(closeness ** 2 * 0.22, t + 0.15)
   ambient.growlFilter.frequency.linearRampToValueAtTime(80 + closeness * 60, t + 0.15)
+  // Occlusion approximation: sound reaching you from far away in a maze
+  // has gone through walls and around corners, which eats the high end.
+  // Close = full bandwidth and clearly locatable; distant = a muffled
+  // rumble you can feel but not pin down. That contrast is what makes
+  // "it's getting closer" legible by ear alone.
+  ambient.occlusion.frequency.linearRampToValueAtTime(420 + closeness * 3600, t + 0.2)
 }
 
 // ---------------------------------------------------------------------------

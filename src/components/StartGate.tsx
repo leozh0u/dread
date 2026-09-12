@@ -13,23 +13,47 @@ export function StartGate({ onStart }: { onStart: () => void }) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: '#000',
-        color: '#c33',
+        background: 'radial-gradient(ellipse at center, #15120a 0%, #000 75%)',
+        color: '#d8cba8',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'monospace',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
         zIndex: 40,
-        gap: 16,
+        gap: 18,
       }}
     >
-      <h1 style={{ letterSpacing: 4, fontSize: 28 }}>DREAD</h1>
-      <p style={{ opacity: 0.6, fontSize: 13, maxWidth: 440, textAlign: 'center' }}>
-        Sit close. Face the light. The house needs a minute to learn what calm looks like on you.
+      <h1
+        style={{
+          letterSpacing: 14,
+          fontSize: 42,
+          fontWeight: 300,
+          margin: 0,
+          paddingLeft: 14, // optical centring against the tracking
+          color: '#e8dfc0',
+          textShadow: '0 0 40px rgba(232,196,106,0.25)',
+        }}
+      >
+        DREAD
+      </h1>
+      <p
+        style={{
+          opacity: 0.55,
+          fontSize: 13,
+          maxWidth: 430,
+          textAlign: 'center',
+          lineHeight: 1.7,
+          margin: 0,
+        }}
+      >
+        Sit close. Face the light. It needs a minute to learn what calm looks like on you.
       </p>
-      <p style={{ opacity: 0.45, fontSize: 12, letterSpacing: 1 }}>
-        🎧 stereo headphones strongly advised — this is a spatial-audio game
+      <p style={{ opacity: 0.32, fontSize: 11, letterSpacing: 1.5, margin: 0 }}>
+        headphones strongly advised — you navigate by sound
+      </p>
+      <p style={{ opacity: 0.32, fontSize: 11, letterSpacing: 1.5, margin: 0 }}>
+        WASD move · arrows look · space jump
       </p>
       <button
         onClick={() => {
@@ -38,14 +62,17 @@ export function StartGate({ onStart }: { onStart: () => void }) {
         }}
         disabled={starting}
         style={{
+          marginTop: 10,
           background: 'transparent',
-          border: '1px solid #c33',
-          color: '#c33',
-          padding: '10px 28px',
-          fontFamily: 'monospace',
-          fontSize: 14,
-          letterSpacing: 2,
+          border: '1px solid rgba(216,203,168,0.45)',
+          color: '#d8cba8',
+          padding: '12px 40px',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          fontSize: 13,
+          letterSpacing: 4,
           cursor: starting ? 'default' : 'pointer',
+          opacity: starting ? 0.4 : 1,
+          transition: 'opacity 300ms linear',
         }}
       >
         {starting ? 'LISTENING...' : 'BEGIN'}

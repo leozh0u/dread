@@ -67,6 +67,9 @@ export function Monster() {
   const facing = useRef(0) // current body yaw, radians
   const gazeYaw = useRef(0) // head yaw, lags `facing` toward the player
   const hitchPhase = useRef(0) // accumulates at a noise-modulated rate -> unpredictable rhythm
+  const nextTwitch = useRef(2)
+  const twitchOffset = useRef(0)
+  const twitchTilt = useRef(0)
 
   useFrame(({ clock, camera }, delta) => {
     if (!group.current) return
@@ -211,9 +214,21 @@ export function Monster() {
     if (leftLeg.current) leftLeg.current.rotation.x = -swingL
     if (rightLeg.current) rightLeg.current.rotation.x = swingR
 
+    // Head twitches: occasional instantaneous snaps to a new angle that
+    // then drift back, rather than continuous smooth motion. Living
+    // things move smoothly; things that snap between poses read as wrong,
+    // which is the entire effect we want here.
+    if (t > nextTwitch.current) {
+      twitchOffset.current = (Math.random() - 0.5) * 0.9
+      twitchTilt.current = (Math.random() - 0.5) * 0.35
+      nextTwitch.current = t + 1.4 + Math.random() * 3.6
+    }
+    twitchOffset.current *= 1 - Math.min(1, dt * 1.8) // decay back toward gaze
+    twitchTilt.current *= 1 - Math.min(1, dt * 1.8)
+
     if (head.current) {
-      head.current.rotation.y = gazeYaw.current
-      head.current.rotation.z = Math.sin(t * 2.1) * 0.06
+      head.current.rotation.y = gazeYaw.current + twitchOffset.current
+      head.current.rotation.z = Math.sin(t * 2.1) * 0.06 + twitchTilt.current
     }
     group.current.position.y = 0.9 + Math.abs(Math.sin(t * walkSpeed)) * 0.07
 
