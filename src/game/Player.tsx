@@ -84,6 +84,32 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
 
   useEffect(() => bindKeys(), [])
 
+  /**
+   * WHY THE CAMERA'S EULER ORDER IS FORCED.
+   *
+   * Three's PointerLockControls does its mouse-look in a YXZ euler: yaw
+   * about world up, then pitch about the already-yawed right axis. That
+   * is the only ordering that behaves like a head on a neck.
+   *
+   * But it writes the result straight to camera.quaternion, and this
+   * component then reads camera.rotation to add arrow-key look and the
+   * strafe roll. A Three camera defaults to XYZ order, so that read was
+   * decomposing a YXZ orientation as XYZ and recomposing it — a different
+   * rotation. With any pitch at all on the camera, adding yaw in XYZ
+   * order rolls the horizon: swiping sideways tipped the whole view
+   * instead of turning it, which is exactly the "it rotates instead of
+   * panning" feel. It got worse the further from level you were looking,
+   * and the camera roll written below made it permanent rather than
+   * transient.
+   *
+   * Setting the order once at mount makes every writer here agree with
+   * PointerLockControls, so yaw stays yaw and roll stays the deliberate
+   * few tenths of a degree of strafe lean.
+   */
+  useEffect(() => {
+    camera.rotation.order = 'YXZ'
+  }, [camera])
+
   // Teleport to spawn whenever restartRun() bumps this counter — a death
   // deep in the calm room shouldn't leave the next run starting there.
   useEffect(() => {
