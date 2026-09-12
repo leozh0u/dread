@@ -186,16 +186,30 @@ function Overlay({ children }: { children: React.ReactNode }) {
         background: 'rgba(0,0,0,0.92)',
         color: '#eee',
         display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
         fontFamily: 'monospace',
         zIndex: 20,
         textAlign: 'center',
-        padding: 24,
+        // Scrollable and centred by margin, for the same reason as the
+        // start screen: a centred flex column taller than the window
+        // overflows off BOTH ends and cannot be scrolled back. This screen
+        // carries the fear curve, the past-run comparison and the PLAY
+        // AGAIN button — it is the longest overlay in the game and the one
+        // most likely to exceed a short window, and losing its button
+        // strands the player with no way to start another run.
+        overflowY: 'auto',
       }}
     >
-      {children}
+      <div
+        style={{
+          margin: 'auto',
+          padding: 24,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
+        {children}
+      </div>
     </div>
   )
 }

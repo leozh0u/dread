@@ -165,14 +165,42 @@ export function StartGate({ onStart }: { onStart: () => void }) {
         background: '#000',
         color: '#c33',
         display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
         fontFamily: 'monospace',
         zIndex: 40,
-        gap: 16,
+        /**
+         * SCROLLABLE, AND CENTRED BY MARGIN RATHER THAN BY JUSTIFY.
+         *
+         * This was a fixed, full-screen flex column with
+         * justifyContent:'center' and no overflow. On a short window — a
+         * small laptop, a browser with several toolbars, a window that
+         * isn't maximised — the content is taller than the viewport, and a
+         * centred flex column overflows EQUALLY off both ends and cannot
+         * be scrolled back. The BEGIN button ended up below the bottom
+         * edge with no way to reach it: the game had a start screen you
+         * could not start.
+         *
+         * Worse, it gets taller exactly when something has gone wrong,
+         * because that is when the camera warning and the phone warning
+         * appear — so the screen became unusable precisely when it had
+         * something important to say.
+         *
+         * `margin: auto` on the inner block centres it when it fits and
+         * simply starts at the top when it doesn't, which is the one
+         * behaviour that never clips.
+         */
+        overflowY: 'auto',
       }}
     >
+      <div
+        style={{
+          margin: 'auto',
+          padding: '32px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 16,
+        }}
+      >
       <h1 style={{ letterSpacing: 4, fontSize: 28 }}>DREAD</h1>
       <p style={{ opacity: 0.6, fontSize: 13, maxWidth: 440, textAlign: 'center' }}>
         Sit close. Face the light. The house needs a minute to learn what calm looks like on you.
@@ -270,6 +298,7 @@ export function StartGate({ onStart }: { onStart: () => void }) {
           skip — just let me in
         </button>
       )}
+      </div>
     </div>
   )
 }

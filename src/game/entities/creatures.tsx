@@ -1,7 +1,7 @@
 import { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { Bone, Plate, Joint, Chain, Glow, Grin, Ridges, materials, crushedSkull, BONE_FOUL } from './shapes'
+import { Bone, Plate, Joint, Chain, Eye, Grin, Ridges, materials, stainedMaterials, stainGeometry, crushedSkull, BONE_FOUL } from './shapes'
 import { advanceGait, legSwing, kneeBend, bodyBob, bodySway, shoulderTwist, hipTwist } from './gait'
 
 export type EntityKind = 'long' | 'crawler' | 'smile'
@@ -465,6 +465,14 @@ export function Crawler({ state }: CreatureProps) {
         >
           <coneGeometry args={[1, 1, 7]} />
         </mesh>
+        {/* Something in the sockets. Empty pits are good, but a wet eye
+            set deep inside one is better: for most of the time you see
+            only blackness, and then your torch happens to line up and a
+            highlight answers from inside the skull. Recessed far enough
+            that it only catches the light when you are looking more or
+            less straight at it. */}
+        <Eye position={[-0.088, 0.04, 0.155]} radius={0.03} look={[-0.1, 0, 1]} shine="#3a1a0c" />
+        <Eye position={[0.082, 0.016, 0.16]} radius={0.024} look={[0.12, 0, 1]} shine="#3a1a0c" />
         {/* Brow, broken across the middle and sitting at a slight angle,
             so it overhangs one socket further than the other. */}
         <mesh position={[-0.07, 0.115, 0.175]} rotation={[0.3, 0.1, 0.07]} material={materials.boneFoul}>
@@ -506,16 +514,26 @@ export function Smile({ state }: CreatureProps) {
   // Ragged mass: many overlapping slabs rather than one box, so the
   // silhouette has a broken edge instead of four clean corners.
   const chunks = useMemo(() => {
-    const out: { pos: Vec3; size: Vec3; rot: number }[] = []
+    const out: { pos: Vec3; size: Vec3; rot: number; geometry: THREE.BufferGeometry }[] = []
     for (let i = 0; i < 11; i++) {
       const j = Math.sin(i * 78.233) * 43758.5453
       const r = j - Math.floor(j)
       const j2 = Math.sin(i * 12.9898) * 43758.5453
       const r2 = j2 - Math.floor(j2)
+      const size: Vec3 = [1.0 + r * 0.55, 0.4 + r2 * 0.3, 0.5 + r * 0.25]
+      // Each slab is stained on its own seed. This is the largest single
+      // surface on any creature in the game and it was eleven identical
+      // flat boxes — under a ceiling light it read as a stack of pale
+      // cardboard cartons, which is the specific thing "no detail, no
+      // textures" was describing.
+      const indexed = new THREE.BoxGeometry(...size)
+      const geometry = stainGeometry(indexed.toNonIndexed(), i * 1.7 + 0.4, 1.25)
+      indexed.dispose()
       out.push({
-        pos: [(r - 0.5) * 0.85, 0.35 + i * 0.21, (r2 - 0.5) * 0.35],
-        size: [1.0 + r * 0.55, 0.4 + r2 * 0.3, 0.5 + r * 0.25],
+        pos: [(r - 0.5) * 0.85, 0.35 + i * 0.21, (r2 - 0.5) * 0.35] as Vec3,
+        size,
         rot: (r - 0.5) * 0.3,
+        geometry,
       })
     }
     return out
@@ -594,11 +612,10 @@ export function Smile({ state }: CreatureProps) {
             key={i}
             position={c.pos}
             rotation={[0, c.rot, c.rot * 0.4]}
-            material={i % 3 === 0 ? materials.fleshDark : materials.flesh}
+            material={i % 3 === 0 ? stainedMaterials.fleshDark : stainedMaterials.flesh}
+            geometry={c.geometry}
             castShadow
-          >
-            <boxGeometry args={c.size} />
-          </mesh>
+          />
         ))}
         {/* Growths in the seams between slabs. The slabs read as a stack
             of boxes without something bridging them. */}
@@ -664,8 +681,12 @@ export function Smile({ state }: CreatureProps) {
 
       {/* The only features */}
       <group ref={face} position={[0, 2.35, 0.36]}>
-        <Glow position={[-0.19, 0.13, 0]} scale={[0.055, 0.065, 0.032]} />
-        <Glow position={[0.16, 0.17, 0]} scale={[0.046, 0.052, 0.032]} />
+        {/* Wet eyes rather than two glowing dots. Deliberately mismatched
+            in size and height, and looking very slightly past you rather
+            than straight at you — a perfectly aligned pair reads as a
+            face, a misaligned pair reads as something wrong wearing one. */}
+        <Eye position={[-0.19, 0.13, 0.02]} radius={0.062} look={[-0.12, -0.05, 1]} />
+        <Eye position={[0.16, 0.175, 0.02]} radius={0.05} look={[0.18, 0.02, 1]} />
         <Grin position={[0, -0.07, 0]} width={0.66} arc={0.4} teeth={15} scale={1.15} />
       </group>
     </group>

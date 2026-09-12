@@ -50,6 +50,67 @@ export const BONE_FOUL = '#6d6659'
 
 /** Shared materials — one instance each rather than one per mesh, which
  * matters when three creatures have ~80 parts between them. */
+/**
+ * Bake per-vertex staining into any geometry.
+ *
+ * The skulls got this first and it was the single biggest visual gain of
+ * the session; the limbs and the Smile's mass were still one flat albedo
+ * each, which is what "no detail, no textures" actually looks like from
+ * the player's side. A large surface in one unbroken colour has nothing
+ * for the eye to travel across, and a strong torch flattens it further by
+ * pushing the whole thing to the same value at once.
+ *
+ * There are no image textures in this project and no time to make any,
+ * but a texture's job here is only to break up a surface — and vertex
+ * colour does that baked once at mount, costing nothing per frame and no
+ * memory beyond the attribute.
+ *
+ * Three terms, each doing a specific job:
+ *   - low-frequency blotching, so there are light and dark REGIONS rather
+ *     than uniform speckle
+ *   - a higher-frequency mottle, so those regions have grain inside them
+ *   - a downward bias, because on anything that has stood a long time in a
+ *     damp place, dirt collects low and light falls from above
+ */
+export function stainGeometry(geo: THREE.BufferGeometry, seed: number, strength = 1) {
+  const pos = geo.attributes.position as THREE.BufferAttribute
+  const colors = new Float32Array(pos.count * 3)
+  const v = new THREE.Vector3()
+  geo.computeBoundingBox()
+  const bb = geo.boundingBox!
+  const spanY = Math.max(1e-6, bb.max.y - bb.min.y)
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i)
+    const blotch =
+      0.5 + 0.5 * Math.sin(3.9 * v.x + 2.3 * v.z + seed) * Math.cos(2.6 * v.y - seed * 0.7)
+    const mottle =
+      0.5 + 0.5 * Math.sin(17.3 * v.x + seed * 3.1) * Math.sin(15.1 * v.z - seed * 2.2)
+    const height = (v.y - bb.min.y) / spanY
+    const shade =
+      1 + strength * (0.26 * (blotch - 0.5) + 0.12 * (mottle - 0.5) + 0.22 * (height - 0.5))
+    const c = THREE.MathUtils.clamp(shade, 0.55, 1.3)
+    colors[i * 3] = c
+    colors[i * 3 + 1] = c
+    colors[i * 3 + 2] = c
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  return geo
+}
+
+/**
+ * Vertex-colour twin of a material.
+ *
+ * Kept as a separate set rather than a flag on the originals, because a
+ * material with `vertexColors` on a mesh whose geometry has no `color`
+ * attribute renders black — the two must never be confusable. A part is
+ * stained or it is not, and it picks its material accordingly.
+ */
+function stainedTwin(m: THREE.MeshStandardMaterial) {
+  const c = m.clone()
+  c.vertexColors = true
+  return c
+}
+
 export const materials = {
   flesh: new THREE.MeshStandardMaterial({ color: FLESH, roughness: 0.78, metalness: 0.05 }),
   fleshDark: new THREE.MeshStandardMaterial({ color: FLESH_DARK, roughness: 0.95 }),
@@ -68,14 +129,31 @@ export const materials = {
     roughness: 0.88,
     vertexColors: true,
   }),
-  /** Teeth. Low roughness so the torch puts a wet highlight along the row
-   * instead of lighting them evenly — that highlight is the only thing
-   * that should make a mouth visible in the dark. */
   // Teeth. Dark and matte enough not to become the brightest object in
   // the frame: at roughness 0.3 the torch, which points straight down the
   // creature's face, put a specular highlight across the whole row and
   // turned it into a lit keyboard.
   tooth: new THREE.MeshStandardMaterial({ color: '#736a58', roughness: 0.62, metalness: 0.03 }),
+  /** Wet. Very low roughness so the torch lands a tight, hard specular
+   * that slides as the player moves — see Eye. A real eye is a dark
+   * sphere with a hard highlight on it; the highlight is the whole
+   * effect. */
+  eyeWet: new THREE.MeshStandardMaterial({ color: '#14100c', roughness: 0.08, metalness: 0.0 }),
+  pupil: new THREE.MeshStandardMaterial({ color: '#050404', roughness: 0.35 }),
+}
+
+/** Same palette, but reading the baked staining. See stainGeometry. */
+export const stainedMaterials: Record<keyof typeof materials, THREE.MeshStandardMaterial> = {
+  flesh: stainedTwin(materials.flesh),
+  fleshDark: stainedTwin(materials.fleshDark),
+  sinew: stainedTwin(materials.sinew),
+  bone: stainedTwin(materials.bone),
+  boneDim: stainedTwin(materials.boneDim),
+  boneFoul: stainedTwin(materials.boneFoul),
+  tooth: stainedTwin(materials.tooth),
+  boneStained: materials.boneStained,
+  eyeWet: materials.eyeWet,
+  pupil: materials.pupil,
 }
 
 /**
@@ -241,6 +319,11 @@ export function Bone({
     }
     const g = new THREE.LatheGeometry(pts, sides)
     g.computeVertexNormals()
+    // Every limb gets its own staining, seeded from its own dimensions, so
+    // no two segments in the game are shaded alike and none of it has to
+    // be placed by hand. A limb is the largest unbroken surface on these
+    // creatures and was the flattest thing on screen.
+    stainGeometry(g, (Math.abs(length * 31.7 + top * 113.3) % 10) + 0.3)
     return g
   }, [top, bottom, length, sides])
 
@@ -248,7 +331,7 @@ export function Bone({
     <mesh
       position={mid}
       quaternion={quaternion}
-      material={materials[material]}
+      material={stainedMaterials[material]}
       geometry={geometry}
       castShadow
     />
@@ -270,10 +353,28 @@ export function Plate({
   material?: keyof typeof materials
 }) {
   const { mid, length, quaternion } = useMemo(() => span(from, to), [from, to])
+  // Stained like the limbs. A plate is a flat slab and is the single
+  // easiest part to read as cardboard, which is exactly what these
+  // creatures were accused of looking like.
+  const geometry = useMemo(() => {
+    const g = new THREE.BoxGeometry(width, length, depth)
+    // A box is indexed and shares corner vertices between faces, which
+    // would smear one corner's stain across three faces. Non-indexing it
+    // first keeps each face's shading its own, so the slab reads as
+    // several dirty planes rather than one softly graded lump.
+    const flat = g.toNonIndexed()
+    g.dispose()
+    stainGeometry(flat, (Math.abs(length * 53.1 + width * 211.7) % 10) + 0.7, 1.15)
+    return flat
+  }, [width, length, depth])
   return (
-    <mesh position={mid} quaternion={quaternion} material={materials[material]} castShadow>
-      <boxGeometry args={[width, length, depth]} />
-    </mesh>
+    <mesh
+      position={mid}
+      quaternion={quaternion}
+      material={stainedMaterials[material]}
+      geometry={geometry}
+      castShadow
+    />
   )
 }
 
@@ -367,6 +468,71 @@ export function Glow({
       <sphereGeometry args={[1, 12, 10]} />
       <meshBasicMaterial color={color} toneMapped={false} />
     </mesh>
+  )
+}
+
+/**
+ * An eye that looks back.
+ *
+ * `Glow` — a single flat-shaded sphere — is a light, not an eye. Even
+ * dimmed it reads as a dot, and two dots on a dark mass is a face drawn
+ * by a child. What actually makes an eye unsettling is that it is WET: a
+ * real eye is a dark sphere with a hard specular highlight on it, and
+ * that highlight slides across the surface as you move relative to it.
+ * That movement is what reads as "this is alive and oriented toward me",
+ * and it is free here, because the player is carrying the only strong
+ * light in the building.
+ *
+ * Three parts:
+ *   - a dark, very smooth ball, so the torch lands a tight specular on it
+ *     rather than a broad sheen
+ *   - a near-black pupil proud of the front, giving the highlight
+ *     something to sit beside instead of in the middle of
+ *   - one small unlit point of dim colour, so the eye is faintly there
+ *     before your torch finds it — the animal eyeshine at the edge of a
+ *     campfire that made the original Glow worth keeping at all
+ *
+ * The eyeshine is deliberately dim. Bright self-lit eyes in a dark
+ * corridor are a jack-o'-lantern; barely-lit ones are something watching.
+ */
+export function Eye({
+  position,
+  radius = 0.05,
+  shine = '#4a2410',
+  look = [0, 0, 1],
+}: {
+  position: Vec3
+  radius?: number
+  shine?: string
+  look?: Vec3
+}) {
+  const l = useMemo(() => {
+    const v = new THREE.Vector3(...look)
+    return v.lengthSq() > 0 ? v.normalize() : new THREE.Vector3(0, 0, 1)
+  }, [look])
+  return (
+    <group position={position}>
+      <mesh material={materials.eyeWet}>
+        <sphereGeometry args={[radius, 14, 12]} />
+      </mesh>
+      <mesh
+        position={[l.x * radius * 0.86, l.y * radius * 0.86, l.z * radius * 0.86]}
+        material={materials.pupil}
+      >
+        <sphereGeometry args={[radius * 0.55, 12, 10]} />
+      </mesh>
+      {/* Offset off-axis so it never reads as a concentric target. */}
+      <mesh
+        position={[
+          l.x * radius * 0.5 - radius * 0.18,
+          l.y * radius * 0.5 + radius * 0.2,
+          l.z * radius * 0.5,
+        ]}
+      >
+        <sphereGeometry args={[radius * 0.3, 8, 8]} />
+        <meshBasicMaterial color={shine} toneMapped={false} />
+      </mesh>
+    </group>
   )
 }
 
