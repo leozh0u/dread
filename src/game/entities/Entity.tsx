@@ -8,7 +8,13 @@ import { pointAtArcLength, PATH_TOTAL_LENGTH, nearestPatrolS } from '../maze'
 import { updateNavField, navStep, navDistance, hasLineOfSight } from '../nav'
 import { useMicStore } from '../../lib/useMic'
 import { useThreat } from '../threat'
-import { setMonsterProximity, setMonsterAudioPosition, playMonsterFootstep, playSpatialSfx } from '../scareFx'
+import {
+  setMonsterProximity,
+  setMonsterAudioPosition,
+  setMonsterOccluded,
+  playMonsterFootstep,
+  playSpatialSfx,
+} from '../scareFx'
 import type { SfxName } from '../sfxBank'
 import { Creature, type EntityKind, type EntityState } from './creatures'
 import { reportEntity, inspect } from './registry'
@@ -133,11 +139,11 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
 
     // Sight is blocked by walls, and by being hidden unless it's right on
     // top of you.
+    // Computed once and used twice: for whether it can see you, and for
+    // whether you can hear it clearly. Both need the same answer.
+    const los = hasLineOfSight(here.x, here.z, player.x, player.z)
     const sightRange = hidden ? HIDDEN_SIGHT_RANGE : SIGHT_RANGE
-    const canSee =
-      toPlayer != null &&
-      toPlayer < sightRange &&
-      hasLineOfSight(here.x, here.z, player.x, player.z)
+    const canSee = toPlayer != null && toPlayer < sightRange && los
 
     // Noise carries through walls — that's the point of it.
     const heard = toPlayer != null && toPlayer < HEARING_RANGE && noise > NOISE_TRIGGER
@@ -247,6 +253,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
         group.current.position.z,
         prof.stepPitch,
         prof.step,
+        !los,
       )
     }
 
@@ -266,7 +273,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
         group.current.position.x,
         FLOOR_Y + 1.2,
         group.current.position.z,
-        { volume: useClose ? 0.95 : 0.5, rate: 0.9 + Math.random() * 0.2 },
+        { volume: useClose ? 0.95 : 0.5, rate: 0.9 + Math.random() * 0.2, occluded: !los },
       )
       const [lo, hi] = prof.voiceGap
       // Closer means somewhat more frequent, but never frantic — floors
@@ -292,6 +299,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     const closest = reportEntity(index, normalized, group.current.position)
     if (closest === index) {
       useDirector.getState().setMonsterDistance(normalized)
+      setMonsterOccluded(!los)
       setMonsterProximity(normalized)
       setMonsterAudioPosition(group.current.position.x, FLOOR_Y + 1, group.current.position.z)
     }

@@ -286,12 +286,37 @@ function positionedPanner(audioCtx: AudioContext, x: number, y: number, z: numbe
  * rather than on top of it. Silently does nothing if the file didn't
  * load — never throws, never blocks.
  */
+/**
+ * Muffle a sound that has to travel through a wall to reach you.
+ *
+ * Occlusion used to be approximated from DISTANCE alone, which meant a
+ * creature three metres away behind a wall sounded exactly like one three
+ * metres away in the same corridor. That's the single most important
+ * thing to get right in a game played by ear: the difference between
+ * "it's close" and "it's close AND it can see me" is the whole tension,
+ * and it should be audible before it's visible.
+ *
+ * Now it's geometric — nav.ts traces the actual walls. Blocked sound
+ * loses its high end and some level, so it goes dull and hard to place;
+ * the instant it steps into your corridor the sound snaps into focus.
+ * That transition IS the scare.
+ */
+function occlusionFilter(audioCtx: AudioContext, occluded: boolean) {
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'lowpass'
+  // 700Hz keeps body and footfall thump while stripping the detail your
+  // ears use to localise; 18k is effectively open.
+  filter.frequency.value = occluded ? 700 : 18000
+  filter.Q.value = 0.4
+  return filter
+}
+
 export function playSpatialSfx(
   name: SfxName,
   x: number,
   y: number,
   z: number,
-  { volume = 1, rate = 1 }: { volume?: number; rate?: number } = {},
+  { volume = 1, rate = 1, occluded = false }: { volume?: number; rate?: number; occluded?: boolean } = {},
 ) {
   const audioCtx = getCtx()
   void loadSfx(audioCtx, name).then((buffer) => {
@@ -301,8 +326,9 @@ export function playSpatialSfx(
     src.buffer = buffer
     src.playbackRate.value = rate
     const gain = audioCtx.createGain()
-    gain.gain.value = volume
-    src.connect(gain).connect(panner)
+    // Through a wall is quieter as well as duller.
+    gain.gain.value = volume * (occluded ? 0.55 : 1)
+    src.connect(gain).connect(occlusionFilter(audioCtx, occluded)).connect(panner)
     src.start()
   })
 }
@@ -336,10 +362,17 @@ export function playMonsterFootstep(
   z: number,
   pitch = 1,
   step?: SfxName,
+  occluded = false,
 ) {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
-  const panner = positionedPanner(audioCtx, x, y, z)
+  const rawPanner = positionedPanner(audioCtx, x, y, z)
+  // Everything below routes through the wall filter, so a footfall in the
+  // next corridor is a dull thud you can feel but not place, and the same
+  // footfall in YOUR corridor is sharp and locatable. Tracking it by ear
+  // depends entirely on that difference.
+  const panner = occlusionFilter(audioCtx, occluded)
+  panner.connect(rawPanner)
 
   // Its recorded footfall, positioned. This is the main thing you track
   // it by, so it's mixed loud and falls off gently (see positionedPanner).
@@ -348,9 +381,12 @@ export function playMonsterFootstep(
       if (!buffer) return
       const src = audioCtx.createBufferSource()
       src.buffer = buffer
-      src.playbackRate.value = 0.95 + Math.random() * 0.1
+      // Jittered per step so a run of footfalls never sounds like a loop
+      // of one sample — identical repeats are what make footsteps read as
+      // a sound effect rather than as something walking.
+      src.playbackRate.value = 0.92 + Math.random() * 0.16
       const gain = audioCtx.createGain()
-      gain.gain.value = 1
+      gain.gain.value = (occluded ? 0.5 : 1) * (0.85 + Math.random() * 0.3)
       src.connect(gain).connect(panner)
       src.start()
     })
@@ -441,7 +477,21 @@ export function setMonsterProximity(distance: number) {
   // Close = full bandwidth and clearly locatable; distant = a muffled
   // rumble you can feel but not pin down. That contrast is what makes
   // "it's getting closer" legible by ear alone.
-  ambient.occlusion.frequency.linearRampToValueAtTime(420 + closeness * 3600, t + 0.2)
+  ambient.occlusion.frequency.linearRampToValueAtTime(
+    (420 + closeness * 3600) * (lastOccluded ? 0.28 : 1),
+    t + 0.2,
+  )
+}
+
+/**
+ * Whether the nearest creature currently has line of sight to the player.
+ * Fed from Entity.tsx every frame; folded into the growl bed's filter
+ * above so the ambient presence goes dull behind a wall and opens up the
+ * moment it rounds the corner.
+ */
+let lastOccluded = false
+export function setMonsterOccluded(occluded: boolean) {
+  lastOccluded = occluded
 }
 
 // ---------------------------------------------------------------------------
@@ -569,7 +619,9 @@ export function playFootstep() {
     src.buffer = buffer
     src.playbackRate.value = 0.94 + Math.random() * 0.12
     const gain = audioCtx.createGain()
-    gain.gain.value = 0.85 // your own feet: loud, you're wearing the shoes
+    // Weight varies step to step. Pitch alone still reads as one sample
+    // being retriggered; uneven level is what sells a real gait.
+    gain.gain.value = 0.85 * (0.86 + Math.random() * 0.28)
     src.connect(gain).connect(panner)
     src.start()
   })
