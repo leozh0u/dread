@@ -32,7 +32,7 @@ export function StartGate({ onStart }: { onStart: () => void }) {
         🎧 stereo headphones strongly advised — this is a spatial-audio game
       </p>
       <p style={{ opacity: 0.45, fontSize: 12, letterSpacing: 1 }}>
-        WASD move · arrow keys look · space jump
+        WASD move · arrow keys look · space jump · N mute
       </p>
       <button
         onClick={() => {

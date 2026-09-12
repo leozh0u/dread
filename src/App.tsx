@@ -6,6 +6,7 @@ import { ScreenFlash } from './components/ScreenFlash'
 import { FearCurve } from './components/FearCurve'
 import { StartGate } from './components/StartGate'
 import { Crash } from './components/Crash'
+import { MuteButton } from './components/MuteButton'
 import { BreathingPacer } from './components/BreathingPacer'
 import { useDirectorLoop } from './game/useDirectorLoop'
 import { useThreatLoop } from './game/useThreatLoop'
@@ -133,6 +134,7 @@ function Game() {
       <ScreenFlash />
       <BreathingPacer />
       {sessionStatus === 'ended' && <FearCurve />}
+      <MuteButton />
       <GlLostBanner />
     </>
   )

@@ -86,6 +86,22 @@ function master() {
   return masterGain!
 }
 
+let muted = false
+
+/** Master mute. Everything — synthesis, recordings, reverb tails — is
+ * already routed through masterGain, so one ramp covers all of it. A
+ * short ramp rather than a hard cut, because an instant gain change on a
+ * running signal is an audible click. */
+export function setMuted(next: boolean) {
+  muted = next
+  const audioCtx = getCtx()
+  master().gain.linearRampToValueAtTime(next ? 0 : 1, audioCtx.currentTime + 0.12)
+}
+
+export function isMuted() {
+  return muted
+}
+
 /** Must be called synchronously inside a real click handler — Chrome
  * leaves AudioContext suspended otherwise. Called from StartGate's onClick. */
 export function unlockAudio() {
