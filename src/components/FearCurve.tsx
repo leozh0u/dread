@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { usePulseStore } from '../lib/usePulse'
 import { useDirector } from '../game/director'
 import { useSession } from '../game/session'
@@ -120,16 +121,33 @@ export function FearCurve() {
   )
 }
 
+function doRestart() {
+  restartRun()
+  // Re-request pointer lock — same trick as the BEGIN button — so looking
+  // around works immediately on the new run instead of needing another
+  // click. Safe to call from a keydown handler too.
+  document.querySelector('canvas')?.requestPointerLock()
+}
+
 function PlayAgainButton() {
+  // Enter (or Space) restarts too. Pointer lock captures the mouse, and
+  // if releasing it on death ever fails or lags, clicking this button
+  // silently does nothing until the player figures out they have to hit
+  // Escape first — a keyboard path means that can never strand anyone.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') {
+        e.preventDefault()
+        doRestart()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   return (
     <button
-      onClick={() => {
-        restartRun()
-        // Re-request pointer lock synchronously in this click handler —
-        // same trick as the BEGIN button — so looking around works
-        // immediately on the new run instead of needing another click.
-        document.querySelector('canvas')?.requestPointerLock()
-      }}
+      onClick={doRestart}
       style={{
         marginTop: 24,
         background: 'transparent',
@@ -142,7 +160,7 @@ function PlayAgainButton() {
         cursor: 'pointer',
       }}
     >
-      PLAY AGAIN
+      PLAY AGAIN &nbsp;·&nbsp; ENTER
     </button>
   )
 }

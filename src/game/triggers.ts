@@ -14,8 +14,9 @@ export interface ClueDef {
   id: string
   position: [number, number, number]
   radius: number
-  label: string // what the player sees when they pick it up — these are
-  // story objects, not unlabeled "crystals."
+  label: string // shown with the pickup counter so it reads as a real
+  // objective, not an unlabeled shape — kept abstract on purpose (Leo
+  // didn't want literal domestic objects like "a photograph")
 }
 
 export type HidingKind = 'closet' | 'curtain' | 'crate' | 'table'
@@ -27,9 +28,9 @@ export interface BoxRegion {
 }
 
 export const CLUES: ClueDef[] = [
-  { id: 'clue-1', position: [5.5, 0.5, 16], radius: 0.9, label: "a child's photograph" },
-  { id: 'clue-2', position: [17.5, 0.5, 0], radius: 0.9, label: 'a torn journal page' },
-  { id: 'clue-3', position: [-15.5, 0.5, -30], radius: 0.9, label: 'a rusted house key' },
+  { id: 'clue-1', position: [5.5, 0.5, 16], radius: 0.9, label: 'fragment' },
+  { id: 'clue-2', position: [17.5, 0.5, 0], radius: 0.9, label: 'fragment' },
+  { id: 'clue-3', position: [-15.5, 0.5, -30], radius: 0.9, label: 'fragment' },
 ]
 
 export const HIDING_SPOTS: BoxRegion[] = [

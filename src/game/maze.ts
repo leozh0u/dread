@@ -163,7 +163,6 @@ export function buildJunctionCaps(): WallSpec[] {
  * this path, so every room off the corridors — including the loop
  * shortcut — is real, reachable safety. */
 export const MONSTER_PATH: { x: number; z: number }[] = [
-  findJunction('A'),
   findJunction('B'),
   findJunction('C'),
   findJunction('D'),

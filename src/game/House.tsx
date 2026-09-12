@@ -140,7 +140,7 @@ export function House() {
       {unlocked && <pointLight position={[4, 2, DOOR_Z - 3]} color="#7a8fb0" intensity={40} distance={8} />}
 
       {CLUES.map((clue) => (
-        <Clue key={clue.id} id={clue.id} position={clue.position} label={clue.label} />
+        <Clue key={clue.id} id={clue.id} position={clue.position} />
       ))}
       {HIDING_SPOTS.map((spot, i) => (
         <HidingSpot key={i} spot={spot} />

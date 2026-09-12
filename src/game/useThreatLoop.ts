@@ -33,6 +33,13 @@ export function useThreatLoop() {
     const interval = setInterval(() => {
       const outcome = useThreat.getState().outcome
       if (outcome !== 'playing') return // already resolved, stop ticking
+      // No detection/death during calibration — dying before the session
+      // has actually 'started' left startedAt null, which sent the
+      // player to a broken "not enough data" end screen with no way
+      // forward that felt like the game working. Calibration is meant to
+      // be the safe, sit-still intro; the stealth mechanic only matters
+      // once the real game has begun.
+      if (useSession.getState().status !== 'playing') return
 
       const monsterDistance = useDirector.getState().monsterDistance
       const isHidden = useThreat.getState().isHidden

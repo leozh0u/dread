@@ -35,7 +35,11 @@ export function useTriggersLoop() {
 
       // Win condition #1: walk out the unlocked door. Distinct from the
       // calm room's slower "regulate yourself" win (useCalmRoomLoop.ts).
+      // Gated on the session actually having started for the same reason
+      // useThreatLoop gates death on it — an outcome set before startedAt
+      // exists sends the player to a broken "not enough data" end screen.
       if (
+        useSession.getState().status === 'playing' &&
         useThreat.getState().outcome === 'playing' &&
         collected.size >= CLUES_REQUIRED &&
         insideBox(p, OUTSIDE)
