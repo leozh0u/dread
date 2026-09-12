@@ -13,47 +13,26 @@ export function StartGate({ onStart }: { onStart: () => void }) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'radial-gradient(ellipse at center, #140505 0%, #000 75%)',
+        background: '#000',
         color: '#c33',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        fontFamily: 'monospace',
         zIndex: 40,
-        gap: 18,
+        gap: 16,
       }}
     >
-      <h1
-        style={{
-          letterSpacing: 14,
-          fontSize: 42,
-          fontWeight: 300,
-          margin: 0,
-          paddingLeft: 14, // optical centring against the tracking
-          color: '#d94444',
-          textShadow: '0 0 40px rgba(220,40,40,0.35)',
-        }}
-      >
-        DREAD
-      </h1>
-      <p
-        style={{
-          opacity: 0.55,
-          fontSize: 13,
-          maxWidth: 430,
-          textAlign: 'center',
-          lineHeight: 1.7,
-          margin: 0,
-        }}
-      >
-        Sit close. Face the light. It needs a minute to learn what calm looks like on you.
+      <h1 style={{ letterSpacing: 4, fontSize: 28 }}>DREAD</h1>
+      <p style={{ opacity: 0.6, fontSize: 13, maxWidth: 440, textAlign: 'center' }}>
+        Sit close. Face the light. The house needs a minute to learn what calm looks like on you.
       </p>
-      <p style={{ opacity: 0.32, fontSize: 11, letterSpacing: 1.5, margin: 0 }}>
-        headphones strongly advised — you navigate by sound
+      <p style={{ opacity: 0.45, fontSize: 12, letterSpacing: 1 }}>
+        🎧 stereo headphones strongly advised — this is a spatial-audio game
       </p>
-      <p style={{ opacity: 0.32, fontSize: 11, letterSpacing: 1.5, margin: 0 }}>
-        WASD move · arrows look · space jump
+      <p style={{ opacity: 0.45, fontSize: 12, letterSpacing: 1 }}>
+        WASD move · arrow keys look · space jump
       </p>
       <button
         onClick={() => {
@@ -62,17 +41,14 @@ export function StartGate({ onStart }: { onStart: () => void }) {
         }}
         disabled={starting}
         style={{
-          marginTop: 10,
           background: 'transparent',
           border: '1px solid #c33',
           color: '#c33',
-          padding: '12px 40px',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          fontSize: 13,
-          letterSpacing: 4,
+          padding: '10px 28px',
+          fontFamily: 'monospace',
+          fontSize: 14,
+          letterSpacing: 2,
           cursor: starting ? 'default' : 'pointer',
-          opacity: starting ? 0.4 : 1,
-          transition: 'opacity 300ms linear',
         }}
       >
         {starting ? 'LISTENING...' : 'BEGIN'}

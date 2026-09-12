@@ -2,23 +2,10 @@ import { usePulseStore } from '../lib/usePulse'
 import { useMicStore } from '../lib/useMic'
 import { useDirector } from '../game/director'
 import { useThreat, CLUES_REQUIRED } from '../game/threat'
-import { useBlinkStore } from '../lib/useBlinkDetection'
 
-/**
- * The HUD carries two jobs at once, which is why it looks the way it does.
- *
- * For the player it has to stay out of the way — this is a horror game,
- * and a dense telemetry panel in the corner kills the atmosphere. So the
- * only permanent element is the pulse readout, and danger is communicated
- * as a screen-edge bleed rather than a progress bar, which reads
- * peripherally without anyone having to look at a number.
- *
- * For a judge watching over a shoulder it has to make the mechanic
- * legible — that the game is reading a real heartbeat off the webcam, and
- * that the monster's behaviour follows from it. Hence the pulse being the
- * hero element, the live source tag, and the baseline shown once
- * calibration establishes it.
- */
+/** Debug/atmosphere HUD. Doubles as the legible "here's the mechanic"
+ * readout for live judging — a judge watching over your shoulder should
+ * be able to tell why they just died from this, not just the screen. */
 export function Hud() {
   const bpm = usePulseStore((s) => s.bpm)
   const source = usePulseStore((s) => s.source)
@@ -29,130 +16,53 @@ export function Hud() {
   const detection = useThreat((s) => s.detection)
   const cluesCollected = useThreat((s) => s.cluesCollected.size)
   const outcome = useThreat((s) => s.outcome)
-  const eyesClosed = useBlinkStore((s) => s.eyesClosed)
 
   if (outcome !== 'playing') return null
 
-  const calibrating = phase === 'CALIBRATING'
-  const elevated = bpm != null && baseline != null && bpm - baseline > 8
-
   return (
-    <>
-      {/* Danger as a screen-edge bleed rather than a bar — you feel it in
-          peripheral vision while still looking where you're going. */}
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          pointerEvents: 'none',
-          boxShadow: `inset 0 0 ${60 + detection * 1.6}px ${detection * 0.5}px rgba(150,10,10,${
-            detection / 190
-          })`,
-          transition: 'box-shadow 180ms linear',
-          zIndex: 10,
-        }}
-      />
+    <div
+      style={{
+        position: 'fixed',
+        top: 16,
+        left: 16,
+        fontFamily: 'monospace',
+        color: '#c33',
+        fontSize: 14,
+        letterSpacing: 1,
+        textShadow: '0 0 6px rgba(200,0,0,0.6)',
+        pointerEvents: 'none',
+        userSelect: 'none',
+      }}
+    >
+      <div>
+        {bpm != null ? `${bpm} bpm` : '-- bpm'} {source !== 'none' && `(${source})`}
+      </div>
+      {baseline != null && <div style={{ opacity: 0.6 }}>baseline {baseline}</div>}
+      <div style={{ marginTop: 4, opacity: 0.7 }}>{phase}</div>
 
-      {/* Eyes-closed state gets its own unmistakable treatment — the game
-          noticing your eyes are shut is one of its best moments and it
-          shouldn't be buried in a corner readout. */}
-      {eyesClosed && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            pointerEvents: 'none',
-            background: 'rgba(0,0,0,0.55)',
-            transition: 'opacity 400ms linear',
-            zIndex: 11,
-          }}
-        />
-      )}
+      <div style={{ marginTop: 12, opacity: isHidden ? 1 : 0.5 }}>
+        {isHidden ? 'HIDDEN' : 'exposed'}
+      </div>
+      <div style={{ opacity: 0.7 }}>noise {Math.round(noise * 100)}%</div>
+      <div style={{ opacity: 0.7 }}>clues {cluesCollected}/{CLUES_REQUIRED}</div>
 
-      <div
-        style={{
-          position: 'fixed',
-          top: 20,
-          left: 22,
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          color: '#c33',
-          pointerEvents: 'none',
-          userSelect: 'none',
-          zIndex: 12,
-        }}
-      >
-        {/* Pulse — the hero element. This is the whole conceit of the
-            project, so it reads like a monitor, not a stat line. */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <span
+      <div style={{ marginTop: 10, opacity: 0.5, maxWidth: 220, fontSize: 12 }}>
+        {cluesCollected < CLUES_REQUIRED
+          ? 'find what was left behind to unlock the door'
+          : 'the door is open — run for it, or go deeper and get calm'}
+      </div>
+
+      {detection > 0 && (
+        <div style={{ marginTop: 8, width: 100, height: 6, background: 'rgba(255,255,255,0.1)' }}>
+          <div
             style={{
-              fontSize: 34,
-              fontWeight: 300,
-              letterSpacing: 1,
-              color: elevated ? '#ff4444' : '#c33',
-              textShadow: elevated ? '0 0 18px rgba(255,60,60,0.65)' : '0 0 8px rgba(200,0,0,0.55)',
-              transition: 'color 500ms linear',
-              fontVariantNumeric: 'tabular-nums',
+              width: `${detection}%`,
+              height: '100%',
+              background: detection > 60 ? '#f33' : '#c33',
             }}
-          >
-            {bpm ?? '––'}
-          </span>
-          <span style={{ fontSize: 11, opacity: 0.55, letterSpacing: 2 }}>BPM</span>
+          />
         </div>
-
-        <div style={{ fontSize: 10, opacity: 0.4, letterSpacing: 1.5, marginTop: -2 }}>
-          {source === 'none' ? 'no signal' : source === 'presage' ? 'presage' : 'webcam rppg'}
-          {baseline != null && ` · rest ${baseline}`}
-        </div>
-
-        {/* Clue progress as filling marks, not a fraction */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 16 }}>
-          {Array.from({ length: CLUES_REQUIRED }).map((_, i) => (
-            <span
-              key={i}
-              style={{
-                width: 9,
-                height: 9,
-                transform: 'rotate(45deg)',
-                border: '1px solid rgba(204,51,51,0.6)',
-                background: i < cluesCollected ? '#e33' : 'transparent',
-                boxShadow: i < cluesCollected ? '0 0 10px rgba(238,51,51,0.8)' : 'none',
-              }}
-            />
-          ))}
-        </div>
-
-        {/* State line — only what's actually true right now */}
-        <div style={{ fontSize: 11, letterSpacing: 2, marginTop: 12, opacity: 0.75 }}>
-          {isHidden ? 'HIDDEN' : 'IN THE OPEN'}
-          {noise > 0.15 && <span style={{ color: '#ff4444' }}> · LOUD</span>}
-        </div>
-      </div>
-
-      {/* Objective, bottom-centre, quiet */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 26,
-          left: 0,
-          right: 0,
-          textAlign: 'center',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          fontSize: 12,
-          letterSpacing: 1.5,
-          color: '#c33',
-          opacity: 0.35,
-          pointerEvents: 'none',
-          userSelect: 'none',
-          zIndex: 12,
-        }}
-      >
-        {calibrating
-          ? 'hold still — it is learning what calm looks like on you'
-          : cluesCollected < CLUES_REQUIRED
-            ? 'find three fragments'
-            : 'the door is open'}
-      </div>
-    </>
+      )}
+    </div>
   )
 }
