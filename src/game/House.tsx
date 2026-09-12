@@ -34,10 +34,21 @@ const DOOR_Z = -48
 // as endless and same-y rather than as designed rooms.
 const WALL_TINT = '#6f6540'
 const WALL_TINT_ALT = '#665c39'
-const FLOOR_TINT = '#4a3f28'
-// Trim is darker than the wall it sits on, so it reads as a line rather
-// than as a change of material.
-const SKIRTING_TINT = '#3b3520'
+// Closer in value to the walls than it was (#4a3f28). A floor much darker
+// than the wall standing on it reads as the wall hovering over a void,
+// because there's no shared tone to say they're the same room.
+const FLOOR_TINT = '#5a4e31'
+/**
+ * The skirting must be LIGHTER than the wall, not darker.
+ *
+ * It was #3b3520 — darker than both the wall above it and the floor below
+ * — which put a dark horizontal band exactly where wall meets floor. That
+ * is precisely how you fake a floating shelf: a shadow line at the base
+ * reads as a gap with light behind it, and Leo reported the walls looking
+ * like they float again even knowing they don't. A lighter board reads as
+ * trim catching the light and pins the wall to the ground instead.
+ */
+const SKIRTING_TINT = '#8d7f4c'
 const RAIL_TINT = '#544a2c'
 const CONDUIT_TINT = '#3a3a34'
 const FRAME_TINT = '#6b5f38'
