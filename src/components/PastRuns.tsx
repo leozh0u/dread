@@ -54,6 +54,16 @@ export function PastRuns() {
 
   return (
     <div style={{ maxWidth: 640, width: '100%', marginTop: 26, textAlign: 'left' }}>
+      {/* Keyframes rather than a transition: these bars mount with their
+          final width and never change, so a width transition never fired
+          at all. scaleX is compositor-only, so the sweep costs no layout. */}
+      <style>{`
+        @keyframes dread-bar-in { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+        @media (prefers-reduced-motion: reduce) {
+          .dread-bar { animation: none !important }
+        }
+      `}</style>
+
       <div style={{ fontSize: 12, letterSpacing: 2, opacity: 0.5, marginBottom: 8 }}>
         THE HOUSE HAS BEEN KEEPING COUNT — {runs.length} RUNS
       </div>
@@ -77,11 +87,13 @@ export function PastRuns() {
               {i === 0 ? 'tonight' : new Date(r.started_at).toLocaleDateString()}
             </span>
             <span
+              className="dread-bar"
               style={{
                 height: 7,
                 width: `${w}%`,
                 background: i === 0 ? '#c33' : '#555',
-                transition: 'width 400ms',
+                transformOrigin: 'left',
+                animation: `dread-bar-in 420ms ease-out ${i * 70}ms both`,
               }}
             />
             <span style={{ width: 56 }}>{peak.toFixed(0)} bpm</span>
