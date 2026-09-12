@@ -66,6 +66,12 @@ function DevBridge() {
   return null
 }
 
+/** How far short of straight up/down the pitch stops, in radians.
+ * ~4.6 degrees: far enough from the YXZ singularity to be numerically
+ * safe, small enough that nobody notices the ceiling is slightly out of
+ * reach. */
+const PITCH_MARGIN = 0.08
+
 function AutoPointerLock() {
   const controls = useRef<ElementRef<typeof PointerLockControls>>(null)
   useEffect(() => {
@@ -82,7 +88,39 @@ function AutoPointerLock() {
       // synchronous throw path, older browsers
     }
   }, [])
-  return <PointerLockControls ref={controls} />
+  /**
+   * THE PITCH CLAMP IS THE BUG FIX HERE, not a tuning knob.
+   *
+   * Leo: "sometimes when I move my finger left on the trackpad, the
+   * perspective rotates, and then everything is upside down."
+   *
+   * Three's PointerLockControls does its look in a YXZ euler and clamps
+   * pitch with `_euler.x = clamp(PI/2 - maxPolarAngle, PI/2 - minPolarAngle)`.
+   * The defaults are minPolarAngle 0 and maxPolarAngle PI, which works out
+   * to clamping pitch at EXACTLY plus or minus 90 degrees — and straight
+   * up is precisely the singularity of a YXZ euler.
+   *
+   * At that singularity the decomposition is degenerate: yaw and roll
+   * describe the same rotation and can be traded off freely. So looking
+   * fully up or down parks the camera exactly on the gimbal lock, and the
+   * next horizontal movement lets `setFromQuaternion` come back with yaw
+   * and roll each flipped by 180 degrees. The view snaps upside down. It
+   * only happens after looking all the way up or down, which is why it
+   * was intermittent and why it looked like it was caused by the sideways
+   * movement that merely revealed it.
+   *
+   * Stopping a few degrees short keeps the euler away from the
+   * singularity entirely. You still get full 360 turning and can still
+   * look as near to straight up as anyone needs — you simply cannot park
+   * on the one orientation where the maths has no unique answer.
+   */
+  return (
+    <PointerLockControls
+      ref={controls}
+      minPolarAngle={PITCH_MARGIN}
+      maxPolarAngle={Math.PI - PITCH_MARGIN}
+    />
+  )
 }
 
 export function Scene() {

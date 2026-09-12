@@ -130,6 +130,21 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     // jolt the camera — the one place a dropped frame would be visible.
     const dtClamped = Math.min(delta, 0.05)
 
+    /**
+     * SELF-RIGHTING. The real fix for the upside-down flip is keeping the
+     * pitch away from the YXZ singularity (see Scene.tsx), but a camera
+     * that is upside down is unrecoverable without taking your hands off
+     * the game, so it gets a second line of defence that cannot fail.
+     *
+     * Pitch is clamped every frame regardless of what put it there, and
+     * roll is fully owned below — it is assigned, never accumulated. So if
+     * anything ever does flip the orientation, the next frame corrects it
+     * instead of leaving the player stuck looking at the ceiling
+     * backwards.
+     */
+    if (camera.rotation.x > PITCH_LIMIT) camera.rotation.x = PITCH_LIMIT
+    else if (camera.rotation.x < -PITCH_LIMIT) camera.rotation.x = -PITCH_LIMIT
+
     if (keys.lookLeft) camera.rotation.y += LOOK_SPEED * delta
     if (keys.lookRight) camera.rotation.y -= LOOK_SPEED * delta
     if (keys.lookUp) camera.rotation.x = Math.min(PITCH_LIMIT, camera.rotation.x + LOOK_SPEED * delta)
