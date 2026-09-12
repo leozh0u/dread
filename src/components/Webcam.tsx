@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { usePulseSource } from '../lib/usePulse'
+import { useBlinkDetection } from '../lib/useBlinkDetection'
 
 /**
  * Requests the camera, plays it into a hidden <video>, and feeds the
@@ -11,6 +12,7 @@ import { usePulseSource } from '../lib/usePulse'
 export function Webcam() {
   const videoRef = useRef<HTMLVideoElement>(null)
   usePulseSource(videoRef)
+  useBlinkDetection(videoRef)
 
   useEffect(() => {
     let stream: MediaStream | null = null

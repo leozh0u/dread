@@ -7,6 +7,7 @@ import { House } from './House'
 import { Monster } from './Monster'
 import { EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
+import { updateAudioListener } from './scareFx'
 
 /** Flashlight rigidly attached to the camera. */
 function Flashlight() {
@@ -18,7 +19,8 @@ function Flashlight() {
     light.current.position.copy(camera.position)
     const dir = new THREE.Vector3()
     camera.getWorldDirection(dir)
-    target.current.position.copy(camera.position).add(dir.multiplyScalar(5))
+    updateAudioListener(camera.position.x, camera.position.y, camera.position.z, dir.x, dir.y, dir.z)
+    target.current.position.copy(camera.position).add(dir.clone().multiplyScalar(5))
     light.current.target = target.current
   })
 

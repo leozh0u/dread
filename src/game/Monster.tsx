@@ -2,7 +2,7 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useDirector } from './director'
-import { setMonsterProximity } from './scareFx'
+import { setMonsterProximity, setMonsterAudioPosition } from './scareFx'
 
 const SKIN = '#0d0d0d'
 const EYE = '#ff2222'
@@ -44,6 +44,7 @@ export function Monster() {
     const targetZ = -2 - distance * 27
     group.current.position.z = THREE.MathUtils.lerp(group.current.position.z, targetZ, 0.02)
     setMonsterProximity(distance)
+    setMonsterAudioPosition(group.current.position.x, group.current.position.y, group.current.position.z)
 
     // New proximity scare landed -> start an attack window.
     if (scareLog.length > lastScareCount.current) {

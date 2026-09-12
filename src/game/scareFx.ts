@@ -79,6 +79,7 @@ let ambient: {
   noiseGain: GainNode
   growlGain: GainNode
   growlFilter: BiquadFilterNode
+  growlPanner: PannerNode
 } | null = null
 
 export function startAmbient() {
@@ -111,18 +112,67 @@ export function startAmbient() {
   roomNoise.start()
 
   // Monster growl bed — bandpassed noise, starts silent; setMonsterProximity
-  // drives its gain/filter every frame based on how close it is.
+  // drives its gain/filter every frame, setMonsterAudioPosition drives the
+  // panner so it actually sounds like it's coming from where the thing is
+  // relative to the player, not centered in both ears.
   const growlNoise = noiseSource(audioCtx, true)
   const growlFilter = audioCtx.createBiquadFilter()
   growlFilter.type = 'bandpass'
   growlFilter.frequency.value = 90
   growlFilter.Q.value = 1.2
+  const growlPanner = audioCtx.createPanner()
+  growlPanner.panningModel = 'HRTF'
+  growlPanner.distanceModel = 'inverse'
+  growlPanner.refDistance = 3
+  growlPanner.maxDistance = 40
   const growlGain = audioCtx.createGain()
   growlGain.gain.value = 0
-  growlNoise.connect(growlFilter).connect(growlGain).connect(master())
+  growlNoise.connect(growlFilter).connect(growlPanner).connect(growlGain).connect(master())
   growlNoise.start()
 
-  ambient = { droneGain, noiseGain, growlGain, growlFilter }
+  ambient = { droneGain, noiseGain, growlGain, growlFilter, growlPanner }
+}
+
+/** Called every frame with the monster's world position so the growl pans
+ * and attenuates correctly relative to wherever the listener currently is. */
+export function setMonsterAudioPosition(x: number, y: number, z: number) {
+  if (!ambient) return
+  const p = ambient.growlPanner
+  if (p.positionX) {
+    p.positionX.value = x
+    p.positionY.value = y
+    p.positionZ.value = z
+  } else {
+    p.setPosition(x, y, z)
+  }
+}
+
+/** Called every frame from the camera so the whole spatial audio graph
+ * (currently just the monster growl, but anything panned in future routes
+ * through this) tracks where the player is actually looking. */
+export function updateAudioListener(
+  px: number,
+  py: number,
+  pz: number,
+  fx: number,
+  fy: number,
+  fz: number,
+) {
+  const listener = getCtx().listener
+  if (listener.positionX) {
+    listener.positionX.value = px
+    listener.positionY.value = py
+    listener.positionZ.value = pz
+    listener.forwardX.value = fx
+    listener.forwardY.value = fy
+    listener.forwardZ.value = fz
+    listener.upX.value = 0
+    listener.upY.value = 1
+    listener.upZ.value = 0
+  } else if (listener.setPosition) {
+    listener.setPosition(px, py, pz)
+    listener.setOrientation(fx, fy, fz, 0, 1, 0)
+  }
 }
 
 export function setAmbientVolume(muted: boolean) {
@@ -274,6 +324,39 @@ function proximityLunge() {
   osc.connect(filter).connect(gain).connect(master())
   osc.start(t0)
   osc.stop(t0 + 0.55)
+}
+
+/** Fired when the player's eyes have been closed too long (see
+ * useBlinkDetection.ts) — a breathy hiss panned hard into one ear, plus
+ * the literal words via the browser's built-in speech synthesis (free,
+ * no API key). Speech synthesis output can't be routed through this
+ * WebAudio graph in most browsers, so it isn't itself spatialized — the
+ * panned hiss underneath is what actually sells "which ear" it came from. */
+export function playWhisper(ear: 'left' | 'right') {
+  const audioCtx = getCtx()
+  const t0 = audioCtx.currentTime
+  const src = noiseSource(audioCtx)
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.value = 1200
+  filter.Q.value = 0.6
+  const gain = audioCtx.createGain()
+  gain.gain.setValueAtTime(0.0001, t0)
+  gain.gain.linearRampToValueAtTime(0.1, t0 + 0.3)
+  gain.gain.linearRampToValueAtTime(0.0001, t0 + 1.6)
+  const panner = audioCtx.createStereoPanner()
+  panner.pan.value = ear === 'left' ? -1 : 1
+  src.connect(filter).connect(gain).connect(panner).connect(master())
+  src.start()
+  src.stop(t0 + 1.7)
+
+  if ('speechSynthesis' in window) {
+    const utter = new SpeechSynthesisUtterance('open your eyes')
+    utter.volume = 0.5
+    utter.pitch = 0.6
+    utter.rate = 0.75
+    window.speechSynthesis.speak(utter)
+  }
 }
 
 /** A harsher, louder sting for the up-close "it almost got you" jumpscare —
