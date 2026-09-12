@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test:level": "tsx scripts/reachability.ts",
     "test:run": "tsx scripts/fullrun.ts",
-    "test": "npm run typecheck && npm run test:geometry && npm run test:level && npm run test:run && npm run test:nav && npm run test:pulse && npm run test:threat && npm run test:memory && npm run test:director && npm run build && npm run test:secrets",
+    "test": "npm run typecheck && npm run test:geometry && npm run test:level && npm run test:run && npm run test:nav && npm run test:pulse && npm run test:calm && npm run test:threat && npm run test:memory && npm run test:director && npm run build && npm run test:secrets",
     "test:memory": "tsx scripts/memorytest.ts",
     "test:director": "tsx scripts/directortest.ts",
     "test:secrets": "tsx scripts/secretscan.ts",
@@ -18,7 +18,8 @@
     "test:threat": "tsx scripts/threattest.ts",
     "test:geometry": "tsx scripts/geometrytest.ts",
     "typecheck": "tsc -b",
-    "test:pulse": "tsx scripts/pulsetest.ts"
+    "test:pulse": "tsx scripts/pulsetest.ts",
+    "test:calm": "tsx scripts/calmtest.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
