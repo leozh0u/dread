@@ -28,10 +28,10 @@ function Flashlight() {
     <>
       <spotLight
         ref={light}
-        intensity={2500}
-        angle={0.35}
-        penumbra={0.5}
-        distance={15}
+        intensity={900}
+        angle={0.4}
+        penumbra={0.6}
+        distance={14}
         color="#fff2d0"
         castShadow
       />
@@ -72,16 +72,18 @@ export function Scene() {
       camera={{ fov: 75, position: [0, 0.5, 23] }}
       gl={{ antialias: true }}
       onCreated={({ scene }) => {
-        // Exponential fog instead of linear: linear fog has a fixed
-        // near/far band and reads as a harsh "wall of black" right at the
-        // far distance. Exponential falls off as a smooth curve — still
-        // properly dark for horror, but the transition into blackness is
-        // gradual instead of a visible cutoff line.
-        scene.fog = new THREE.FogExp2('#000000', 0.052)
+        // Exponential fog, tinted to the room's own sickly yellow rather
+        // than pure black. Linear black fog gave a hard "wall of
+        // darkness" cutoff; a warm haze that matches the walls reads as
+        // depth — corridors fading out rather than ending.
+        scene.fog = new THREE.FogExp2('#0d0b06', 0.055)
       }}
     >
-      <color attach="background" args={['#000']} />
-      <ambientLight intensity={0.08} />
+      <color attach="background" args={['#0d0b06']} />
+      {/* Enough ambient to read the space — the fluorescents are the real
+          light source now, so the room is lit-but-wrong rather than a
+          black void navigated by torch. */}
+      <ambientLight intensity={0.35} color="#b8a878" />
       <Physics gravity={[0, -20, 0]}>
         <House />
         <Monster />

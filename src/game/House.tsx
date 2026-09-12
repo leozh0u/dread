@@ -3,15 +3,26 @@ import { Clue } from './Clue'
 import { HidingSpot } from './HidingSpot'
 import { Clutter } from './Clutter'
 import { Signage } from './Signage'
+import { Fluorescents } from './Fluorescents'
 import { ExitDoorLight } from './ExitDoor'
 import { useThreat, CLUES_REQUIRED } from './threat'
 import { CLUES, HIDING_SPOTS } from './triggers'
 import { buildCorridorWalls, buildJunctionCaps, type WallSpec } from './maze'
 
-const WALL_H = 5
+// Low, oppressive ceiling — Backrooms interiors are office-height, not
+// cathedral-height, and the low ceiling is half of why they feel wrong.
+const WALL_H = 3.2
 const DOOR_Z = -46
 
-function Wall({ spec, tint = '#1a1a1a' }: { spec: WallSpec; tint?: string }) {
+// Mono-yellow: aged wallpaper over damp carpet. The whole palette is one
+// sickly hue with small value shifts, which is what makes the space read
+// as endless and same-y rather than as designed rooms.
+const WALL_TINT = '#6f6540'
+const WALL_TINT_ALT = '#665c39'
+const FLOOR_TINT = '#4a3f28'
+const CEILING_TINT = '#5d5638'
+
+function Wall({ spec, tint = WALL_TINT }: { spec: WallSpec; tint?: string }) {
   const len = Math.abs(spec.to - spec.from)
   if (len <= 0.01) return null // a gap that consumed the whole run — nothing to draw
   const mid = (spec.from + spec.to) / 2
@@ -34,7 +45,7 @@ function WallX({ z, x1, x2, y = WALL_H / 2 }: { z: number; x1: number; x2: numbe
   return (
     <mesh position={[cx, y, z]} receiveShadow>
       <boxGeometry args={[len, WALL_H, 0.2]} />
-      <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+      <meshStandardMaterial color={WALL_TINT_ALT} roughness={0.95} />
     </mesh>
   )
 }
@@ -45,7 +56,7 @@ function WallZ({ x, z1, z2, y = WALL_H / 2 }: { x: number; z1: number; z2: numbe
   return (
     <mesh position={[x, y, cz]} receiveShadow>
       <boxGeometry args={[0.2, WALL_H, len]} />
-      <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+      <meshStandardMaterial color={WALL_TINT_ALT} roughness={0.95} />
     </mesh>
   )
 }
@@ -78,7 +89,14 @@ export function House() {
         {/* one floor slab under the whole maze */}
         <mesh position={[1, -1, -19.5]} receiveShadow>
           <boxGeometry args={[44, 0.2, 92]} />
-          <meshStandardMaterial color="#141414" />
+          <meshStandardMaterial color={FLOOR_TINT} roughness={1} />
+        </mesh>
+
+        {/* Ceiling — the level had none, which is a large part of why it
+            read as a void rather than an interior. Low and close. */}
+        <mesh position={[1, WALL_H, -19.5]} receiveShadow>
+          <boxGeometry args={[44, 0.2, 92]} />
+          <meshStandardMaterial color={CEILING_TINT} roughness={1} />
         </mesh>
 
         {corridorWalls.map((spec, i) => (
@@ -147,6 +165,7 @@ export function House() {
       ))}
 
       <ExitDoorLight position={[4, 1.5, DOOR_Z]} />
+      <Fluorescents />
       <Clutter />
       <Signage />
     </>

@@ -189,24 +189,18 @@ export function Clutter() {
 
   return (
     <group>
-      {/* Swinging bare bulb at the B junction (first real turn) */}
-      <mesh position={[0, 4.6, 8]}>
-        <cylinderGeometry args={[0.01, 0.01, 0.6, 4]} />
+      {/* One bare bulb on a cord, swinging — deliberately the odd one out
+          among the ceiling fluorescents (see Fluorescents.tsx), hung in
+          the branch dead end where the strip lighting doesn't reach. */}
+      <mesh position={[0, 2.95, -17]}>
+        <cylinderGeometry args={[0.01, 0.01, 0.5, 4]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      <mesh ref={bulbMesh} position={[0, 4.2, 8]}>
+      <mesh ref={bulbMesh} position={[0, 2.65, -17]}>
         <sphereGeometry args={[0.08, 8, 8]} />
         <meshStandardMaterial color="#ffdd88" emissive="#ffcc55" emissiveIntensity={2} toneMapped={false} />
       </mesh>
-      <pointLight ref={bulb} position={[0, 4.2, 8]} color="#ffcc77" intensity={25} distance={5} />
-
-      {/* A second bulb at the far side of the loop, so the maze doesn't
-          rely on one light source */}
-      <pointLight position={[-10, 4.2, -24]} color="#ffcc77" intensity={20} distance={5} />
-      <mesh position={[-10, 4.2, -24]}>
-        <sphereGeometry args={[0.07, 8, 8]} />
-        <meshStandardMaterial color="#ffdd88" emissive="#ffcc55" emissiveIntensity={2} toneMapped={false} />
-      </mesh>
+      <pointLight ref={bulb} position={[0, 2.65, -17]} color="#ffcc77" intensity={16} distance={6} />
 
       {/* Posters, scratches, a sketch, a toy — placed on real corridor
           walls throughout the maze (see maze.ts for the graph). Each is a
@@ -261,10 +255,15 @@ export function Clutter() {
         </mesh>
       </group>
 
-      {/* Cracked, uneven ceiling patch over room A — small "wrong geometry" detail */}
-      <mesh position={[5.5, 4.95, 14]} rotation={[0.05, 0.3, 0.02]}>
-        <boxGeometry args={[1.4, 0.1, 1.2]} />
-        <meshStandardMaterial color="#0c0c0c" roughness={1} />
+      {/* A sagging, water-stained ceiling tile — the "this building has
+          been leaking for years" detail */}
+      <mesh position={[5.5, 3.12, 14]} rotation={[0.06, 0.3, 0.03]}>
+        <boxGeometry args={[1.4, 0.08, 1.2]} />
+        <meshStandardMaterial color="#3d3420" roughness={1} />
+      </mesh>
+      <mesh position={[-10, 3.1, -30]} rotation={[-0.05, 0.1, 0.04]}>
+        <boxGeometry args={[1.2, 0.08, 1.2]} />
+        <meshStandardMaterial color="#453a22" roughness={1} />
       </mesh>
     </group>
   )

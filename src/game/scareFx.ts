@@ -36,6 +36,50 @@ function getCtx() {
   return ctx
 }
 
+// ---------------------------------------------------------------------------
+// Room reverb. Every positioned sound is sent through a convolver built
+// from a procedurally generated impulse response (a decaying noise burst),
+// so footsteps and scrapes have the tail of a hard-walled corridor instead
+// of sounding like they happened in a vacuum. This is the single biggest
+// "the space is real" lever in the whole audio design.
+// ---------------------------------------------------------------------------
+let reverbSend: GainNode | null = null
+
+function buildImpulseResponse(audioCtx: AudioContext, seconds: number, decay: number) {
+  const rate = audioCtx.sampleRate
+  const len = Math.floor(rate * seconds)
+  const impulse = audioCtx.createBuffer(2, len, rate)
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch)
+    for (let i = 0; i < len; i++) {
+      // Noise with an exponential decay envelope — a rough but convincing
+      // small-hard-room tail. Slight per-channel difference widens it.
+      const t = i / len
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay) * (ch === 0 ? 1 : 0.92)
+    }
+  }
+  return impulse
+}
+
+/** Bus that positioned sounds send a copy of themselves into. */
+function reverb() {
+  const audioCtx = getCtx()
+  if (!reverbSend) {
+    const convolver = audioCtx.createConvolver()
+    convolver.buffer = buildImpulseResponse(audioCtx, 1.6, 3.2)
+    const wet = audioCtx.createGain()
+    wet.gain.value = 0.32
+    // Roll the top off the tail — concrete corridors eat high frequencies
+    const damp = audioCtx.createBiquadFilter()
+    damp.type = 'lowpass'
+    damp.frequency.value = 2600
+    reverbSend = audioCtx.createGain()
+    reverbSend.gain.value = 1
+    reverbSend.connect(convolver).connect(damp).connect(wet).connect(masterGain!)
+  }
+  return reverbSend
+}
+
 function master() {
   getCtx()
   return masterGain!
@@ -100,6 +144,27 @@ export function startAmbient() {
   drone.connect(droneGain).connect(master())
   drone.start()
   lfo.start()
+
+  // Fluorescent hum — the defining sound of this kind of space, and the
+  // thing that makes a lit corridor feel occupied by nothing. Mains-hum
+  // fundamental plus its harmonic, very slightly detuned so it beats
+  // against itself instead of sitting perfectly still.
+  for (const [freq, level] of [
+    [120, 0.022],
+    [240, 0.012],
+    [360, 0.005],
+  ] as const) {
+    const hum = audioCtx.createOscillator()
+    hum.type = 'sawtooth'
+    hum.frequency.value = freq + (Math.random() - 0.5) * 0.6
+    const humFilter = audioCtx.createBiquadFilter()
+    humFilter.type = 'lowpass'
+    humFilter.frequency.value = 900
+    const humGain = audioCtx.createGain()
+    humGain.gain.value = level
+    hum.connect(humFilter).connect(humGain).connect(master())
+    hum.start()
+  }
 
   // Filtered noise room tone — dark, low-passed "brown-ish" hiss.
   const roomNoise = noiseSource(audioCtx, true)
@@ -177,6 +242,7 @@ function positionedPanner(audioCtx: AudioContext, x: number, y: number, z: numbe
     panner.setPosition(x, y, z)
   }
   panner.connect(master())
+  panner.connect(reverb()) // send a copy into the corridor tail
   return panner
 }
 

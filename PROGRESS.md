@@ -2,6 +2,33 @@
 
 HackRice 16. Games & Gamification track. Repo: https://github.com/leozh0u/dread
 
+## Leo's vision — check every change against this
+
+Written down because it's been stated across many messages and needs to
+survive compaction. In his words where possible:
+
+1. **A maze, "like the backrooms"** — not a hallway with boxes off it.
+   Disorienting, repetitive-but-varied, real turns and choices.
+2. **Eerie abandoned atmosphere** — "strange light sources and weird
+   objects scattered around, but like actual objects, like desks,
+   posters, drawings." Mundane furniture left behind, not story props.
+3. **A simple, clear objective: escape.** "A door leading to safety that
+   you have to find." No heavy narrative dressing on the collectibles —
+   he explicitly rejected "actual products" like a photograph/journal.
+4. **A monster that is actually frightening** — "it looks like Baymax"
+   was the complaint. Must not read soft, round, or goofy. Needs weight,
+   wrongness, real animation.
+5. **Audio above all, and truly spatial** — "I need to really be able to
+   hear where everything is and coming from where." Heavy monster
+   footsteps in stereo, realistic footsteps/jump/landing for the player,
+   sudden noises and scratching, real voices.
+6. **Real stakes** — hide, avoid, escape; the monster patrols constantly.
+7. **The biometric hook is the point**: real pulse + blink sensing off
+   the webcam (Presage), driving when the monster pushes and retreats.
+8. **Judges must be able to play it** — hosted, zero setup.
+9. **No jank.** Movement always works, no phasing through walls, no dead
+   ends in the UI where a screen traps you.
+
 ## What DREAD is
 
 A horror game that reads your pulse from your webcam and hunts your fear.
