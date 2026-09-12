@@ -134,7 +134,10 @@ static host — same fallback path that already exists for local use.
      sidecar-only. Start screen shows "PROVE YOU ARE ALIVE" once
      configured, always with a visible skip, and stays as plain BEGIN
      until then — so not doing it cannot break anything.
-   - **Backboard**: DONE end to end. The Director's bandit (which learns
+   - **Backboard**: DONE and **verified against the live API**
+     (2026-09-12 ~06:30) — write returned 201, recall returned the memory
+     with priors intact, and the real parser handled the real response
+     (bestArm -> audio, as encoded). Test memory deleted afterwards. The Director's bandit (which learns
      which of four scare types spikes this player) is now persisted
      between sessions and the player is told — "The house has met you 3
      times. It remembers the audio." Proxied through the sidecar since
@@ -142,11 +145,17 @@ static host — same fallback path that already exists for local use.
      `BACKBOARD_ASSISTANT_ID` in `.env.local` (curl command in
      SPONSORS.md) — untested against the live API, only against mocked
      responses.
-   - **Tiger Data**: DONE. Pulse trace streams to a TimescaleDB
-     hypertable via the sidecar (a connection string carries a password,
-     so it can never ship). Needs only `TIGERDATA_URL` in `.env.local`.
-     Untested against a live database — only against the no-database
-     degradation path.
+   - **Tiger Data**: DONE and **verified against Leo's live instance**.
+     Two real bugs to get there: Timescale signs with their own private
+     CA (pinned in sidecar/timescale-ca.pem, verification kept ON, which
+     is stronger than the `sslmode=require` their string asks for), and
+     node-postgres parses `sslmode` out of a connection string and
+     silently overrode the ssl config — fixed by passing components
+     explicitly. The end screen now shows past runs: "It got 8 bpm
+     further into you than last time."
+   - **Persona**: Leo is setting up the dashboard values now
+     (2026-09-12 ~06:35). CI already reads the two publishable ids from
+     repo variables; he sets them with `gh variable set`.
    - **All four integrations fail soft.** No sidecar, no keys, no
      network: the game plays exactly as it does now. That is deliberate,
      because judges will run the hosted build with none of it.
