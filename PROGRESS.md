@@ -97,17 +97,36 @@ static host — same fallback path that already exists for local use.
    unlocks at 3 fragments) but an actual playthrough is the only proof.
    Dev keys added to make this fast: **C** skips calibration, **K**
    grants all fragments, **J** does both.
-2. **Presage on real hardware** — Leo is on it. Highest-risk unknown: if
-   it fails on his laptop the noisier in-browser fallback carries the
-   demo.
+2. **Presage — FIXED, needs one real-face confirmation from Leo.**
+   Root cause was two bugs masking each other: the sidecar called
+   `useCamera()`, which captures in the sidecar's own process, and a Node
+   process launched from a terminal has no macOS camera grant — so
+   AVFoundation opened the device, warned about focus/exposure locking,
+   and then delivered *zero frames*, silently (measured: 0 frames, 0
+   validation events in 20s, status stuck on kStarting). Separately the
+   protobuf metrics payload was never decoded, so it would have reported
+   nothing even with perfect frames.
+   Now the **browser** captures and pushes frames over the WebSocket
+   (`src/lib/presageBridge.ts`); it already owns the camera and already
+   has permission. Verified end to end with synthetic frames:
+   kStarting -> **kRunning**, ~20fps sustained, SDK correctly reports
+   kNoFaceFound for noise. Only a real face is untested.
+   Fallback is no longer all-or-nothing: if the sidecar connects but
+   stays silent 35s, or goes quiet mid-run, in-browser rPPG resumes
+   automatically — important because motion corrupts rPPG and the player
+   moves most right after a scare.
 3. **Shoot the video Saturday evening**, not Sunday morning. Shot list is
    in VIDEO.md. Use **J** so it doesn't open on 60s of calibration.
 4. **MATLAB** — script is written (matlab/autonomic_model.m), Leo runs it
    once; the game already works without it via a documented fallback.
-5. **Remaining sponsors need credentials from Leo**: Persona, Backboard
-   (keys -> .env.local), Tiger Data (needs a decision — a static site
-   can't hold DB credentials, so it needs a serverless proxy; may not be
-   worth the time).
+5. **Sponsors — Leo now HAS the Persona and Backboard keys** (said so
+   2026-09-12 ~01:15). Both still need to go into `.env.local` and get
+   wired up; neither is written yet. Reminder: DREAD is a static site, so
+   anything in the client bundle is public — neither key may ship to the
+   browser. Backboard ("the house remembers you") and Persona ("prove
+   you're alive to enter") both need a decision on where the call runs.
+   Tiger Data has the same problem and is the least valuable of the
+   three; drop it if time is short.
 6. **Creature design still not signed off.** Rebuilt with connected
    skeletons and shaded materials after Leo's screenshots showed floating
    parts and flat cardboard shapes. Press **M** to inspect.
