@@ -21,6 +21,27 @@ const DOOR_Z = -48
 // Mono-yellow: aged wallpaper over damp carpet. The whole palette is one
 // sickly hue with small value shifts, which is what makes the space read
 // as endless and same-y rather than as designed rooms.
+/**
+ * Where the room actually starts and stops.
+ *
+ * These used to be implicit and they did not agree. The floor slab sits at
+ * y=-1 with thickness 0.2, so its top face is -0.9 — but walls were placed
+ * at WALL_H/2 with height WALL_H, spanning 0 to 3.2. Every wall in the
+ * level therefore floated 0.9 units above the floor, with a visible strip
+ * of nothing underneath it, light leaking through, and a gap you could see
+ * the void through.
+ *
+ * Derived from the slabs now, so the walls cannot drift from the floor
+ * again if either moves.
+ */
+const FLOOR_Y = -1
+const FLOOR_THICK = 0.2
+const SLAB_THICK = 0.2
+export const FLOOR_TOP = FLOOR_Y + FLOOR_THICK / 2 // -0.9
+const CEILING_BOTTOM = WALL_H // ceiling slab is centred at WALL_H
+const WALL_SPAN = CEILING_BOTTOM - FLOOR_TOP // full floor-to-ceiling height
+const WALL_MID_Y = (FLOOR_TOP + CEILING_BOTTOM) / 2
+
 const WALL_TINT = '#6f6540'
 const WALL_TINT_ALT = '#665c39'
 const FLOOR_TINT = '#4a3f28'
@@ -31,8 +52,9 @@ function Wall({ spec, tint = WALL_TINT }: { spec: WallSpec; tint?: string }) {
   if (len <= 0.01) return null // a gap that consumed the whole run — nothing to draw
   const mid = (spec.from + spec.to) / 2
   const position: [number, number, number] =
-    spec.axis === 'x' ? [spec.fixed, WALL_H / 2, mid] : [mid, WALL_H / 2, spec.fixed]
-  const size: [number, number, number] = spec.axis === 'x' ? [0.2, WALL_H, len] : [len, WALL_H, 0.2]
+    spec.axis === 'x' ? [spec.fixed, WALL_MID_Y, mid] : [mid, WALL_MID_Y, spec.fixed]
+  const size: [number, number, number] =
+    spec.axis === 'x' ? [0.2, WALL_SPAN, len] : [len, WALL_SPAN, 0.2]
   return (
     <mesh position={position} receiveShadow>
       <boxGeometry args={size} />
@@ -43,23 +65,23 @@ function Wall({ spec, tint = WALL_TINT }: { spec: WallSpec; tint?: string }) {
 
 /** Wall segment running along X at a fixed Z — kept for the hand-placed
  * rooms/branch/exit stub, which aren't part of the graph generator. */
-function WallX({ z, x1, x2, y = WALL_H / 2 }: { z: number; x1: number; x2: number; y?: number }) {
+function WallX({ z, x1, x2, y = WALL_MID_Y }: { z: number; x1: number; x2: number; y?: number }) {
   const len = Math.abs(x2 - x1)
   const cx = (x1 + x2) / 2
   return (
     <mesh position={[cx, y, z]} receiveShadow>
-      <boxGeometry args={[len, WALL_H, 0.2]} />
+      <boxGeometry args={[len, WALL_SPAN, 0.2]} />
       <meshStandardMaterial color={WALL_TINT_ALT} roughness={0.95} />
     </mesh>
   )
 }
 
-function WallZ({ x, z1, z2, y = WALL_H / 2 }: { x: number; z1: number; z2: number; y?: number }) {
+function WallZ({ x, z1, z2, y = WALL_MID_Y }: { x: number; z1: number; z2: number; y?: number }) {
   const len = Math.abs(z2 - z1)
   const cz = (z1 + z2) / 2
   return (
     <mesh position={[x, y, cz]} receiveShadow>
-      <boxGeometry args={[0.2, WALL_H, len]} />
+      <boxGeometry args={[0.2, WALL_SPAN, len]} />
       <meshStandardMaterial color={WALL_TINT_ALT} roughness={0.95} />
     </mesh>
   )
@@ -143,15 +165,15 @@ export function House() {
     <>
       <RigidBody type="fixed" colliders="cuboid">
         {/* one floor slab under the whole maze */}
-        <mesh position={[2, -1, -17]} receiveShadow>
-          <boxGeometry args={[52, 0.2, 106]} />
+        <mesh position={[2, FLOOR_Y, -17]} receiveShadow>
+          <boxGeometry args={[52, FLOOR_THICK, 106]} />
           <meshStandardMaterial color={FLOOR_TINT} roughness={1} />
         </mesh>
 
         {/* Ceiling — the level had none, which is a large part of why it
             read as a void rather than an interior. Low and close. */}
-        <mesh position={[2, WALL_H, -17]} receiveShadow>
-          <boxGeometry args={[52, 0.2, 106]} />
+        <mesh position={[2, CEILING_BOTTOM, -17]} receiveShadow>
+          <boxGeometry args={[52, SLAB_THICK, 106]} />
           <meshStandardMaterial color={CEILING_TINT} roughness={1} />
         </mesh>
 

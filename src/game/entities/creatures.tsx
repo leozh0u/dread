@@ -14,6 +14,12 @@ export interface EntityState {
   closeness: number // 0 far .. 1 on top of you
   hunting: boolean
   attacking: boolean
+  /** Actual metres/second this frame. Gait is driven by this rather than
+   * by a hunting flag, so a creature that is standing still has still
+   * legs — the previous version animated on a fixed rate regardless of
+   * movement, and the tall one had no leg animation at all, which is why
+   * they read as gliding rather than walking. */
+  speed: number
 }
 
 export interface CreatureProps {
@@ -36,6 +42,9 @@ type Vec3 = [number, number, number]
 /* ground, which is far worse than something that runs.                */
 /* ------------------------------------------------------------------ */
 export function LongOne({ state }: CreatureProps) {
+  const legL = useRef<THREE.Group>(null!)
+  const legR = useRef<THREE.Group>(null!)
+  const gait = useRef(0)
   const tendrils = useRef<THREE.Group>(null!)
   const head = useRef<THREE.Group>(null!)
   const headMat = useRef<THREE.MeshStandardMaterial>(null!)
@@ -58,7 +67,24 @@ export function LongOne({ state }: CreatureProps) {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const { closeness, hunting } = state.current
+    const { closeness, hunting, speed } = state.current
+
+    // Gait. Stride length is fixed by the body, so cadence has to come
+    // from how fast it is actually travelling — that's what stops it
+    // looking like it's on rails. Phase accumulates rather than being
+    // sampled from elapsed time, so a speed change doesn't snap the legs
+    // to a new position mid-step.
+    gait.current += speed * 1.15 * 0.016
+    const stride = Math.min(1, speed / 2.6)
+    const swing = Math.sin(gait.current)
+    if (legL.current) {
+      legL.current.rotation.x = swing * 0.55 * stride
+      legL.current.position.z = swing * 0.12 * stride
+    }
+    if (legR.current) {
+      legR.current.rotation.x = -swing * 0.55 * stride
+      legR.current.position.z = -swing * 0.12 * stride
+    }
 
     if (tendrils.current) {
       tendrils.current.children.forEach((c, i) => {
@@ -82,9 +108,15 @@ export function LongOne({ state }: CreatureProps) {
 
   return (
     <group>
-      {/* Legs — long, jointless, slightly knock-kneed */}
-      <Chain points={[[-0.1, 0, 0], [-0.13, 0.62, 0.02], [-0.08, 1.24, 0]]} top={0.075} bottom={0.05} />
-      <Chain points={[[0.1, 0, 0], [0.13, 0.62, 0.02], [0.08, 1.24, 0]]} top={0.075} bottom={0.05} />
+      {/* Legs — long, jointless, slightly knock-kneed. Pivoted at the hip
+          (y=1.24) so they swing from the top like a real leg rather than
+          rotating about the floor. */}
+      <group ref={legL} position={[0, 1.24, 0]}>
+        <Chain points={[[-0.1, -1.24, 0], [-0.13, -0.62, 0.02], [-0.08, 0, 0]]} top={0.075} bottom={0.05} />
+      </group>
+      <group ref={legR} position={[0, 1.24, 0]}>
+        <Chain points={[[0.1, -1.24, 0], [0.13, -0.62, 0.02], [0.08, 0, 0]]} top={0.075} bottom={0.05} />
+      </group>
 
       {/* Coat flare — a suggestion of a suit jacket, ragged at the hem */}
       {[-0.2, -0.07, 0.07, 0.2].map((x, i) => (
@@ -185,6 +217,7 @@ export function LongOne({ state }: CreatureProps) {
 /* fingers longer than its forearms, limbs folded above its own back.   */
 /* ------------------------------------------------------------------ */
 export function Crawler({ state }: CreatureProps) {
+  const gait = useRef(0)
   const legs = useRef<THREE.Group>(null!)
   const skull = useRef<THREE.Group>(null!)
   const jaw = useRef<THREE.Group>(null!)
@@ -202,19 +235,26 @@ export function Crawler({ state }: CreatureProps) {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const { closeness, hunting, attacking } = state.current
-    const rate = hunting ? 9.5 : 4.2
+    const { closeness, hunting, attacking, speed } = state.current
 
+    // Skittering cadence tied to actual ground speed, plus a floor so a
+    // stationary crawler still twitches rather than freezing solid.
+    gait.current += (speed * 2.6 + 0.7) * 0.016
+    const amp = 0.35 + Math.min(1, speed / 4.4) * 0.5
     if (legs.current) {
       legs.current.children.forEach((c, i) => {
         const phase = i * 1.9
-        c.rotation.x = Math.sin(t * rate + phase) * (0.3 + (i % 2) * 0.16)
-        c.rotation.z = Math.cos(t * rate * 0.7 + phase) * 0.13
+        c.rotation.x = Math.sin(gait.current + phase) * amp * (0.75 + (i % 2) * 0.35)
+        c.rotation.z = Math.cos(gait.current * 0.7 + phase) * 0.13
       })
     }
     if (skull.current) {
       skull.current.rotation.z = Math.sin(t * 2.1) * 0.1
-      skull.current.rotation.x = -0.18 + Math.sin(t * 1.5) * 0.08
+      // Head drops and levels when it's hunting — a stalking posture,
+      // rather than the idle sway it has the rest of the time.
+      const hunt = hunting ? 1 : 0
+      skull.current.rotation.x =
+        -0.18 + Math.sin(t * 1.5) * 0.08 * (1 - hunt * 0.7) + hunt * 0.3
     }
     if (jaw.current) {
       const open = 1 + 0.15 + closeness * 0.45 + (attacking ? 0.8 : 0)
@@ -385,10 +425,13 @@ export function Smile({ state }: CreatureProps) {
         c.rotation.y = Math.cos(t * (1.1 + i * 0.26) + i) * 0.2
       })
     }
+    // Strands hang and sway at rest, but trail backwards as it moves —
+    // dead weight being dragged, which is the whole read on this one.
+    const drag = Math.min(1, state.current.speed / 2.9)
     if (strands.current) {
       strands.current.children.forEach((c, i) => {
-        c.rotation.x = Math.sin(t * (0.8 + i * 0.2) + i) * 0.22
-        c.rotation.z = Math.cos(t * (0.6 + i * 0.15)) * 0.16
+        c.rotation.x = Math.sin(t * (0.8 + i * 0.2) + i) * 0.22 - drag * 0.5
+        c.rotation.z = Math.cos(t * (0.6 + i * 0.15)) * (0.16 + drag * 0.1)
       })
     }
     if (face.current) {

@@ -274,3 +274,28 @@ export function shortestArcDelta(s: number, target: number): number {
   if (delta < -total / 2) delta += total
   return delta
 }
+
+/**
+ * Patrol progress closest to a world point, searched near a hint.
+ *
+ * Creatures now leave the patrol line to hunt (see nav.ts), so when they
+ * give up they need to rejoin it near where they actually are rather than
+ * at whatever arc-length they abandoned it at — otherwise they slide
+ * across the level to a stale position. Searched locally around the hint
+ * because the polyline self-intersects at junctions, where a global
+ * nearest-point can jump to the wrong branch.
+ */
+export function nearestPatrolS(x: number, z: number, hint: number): number {
+  let best = hint
+  let bestD = Infinity
+  for (let d = -30; d <= 30; d += 0.5) {
+    const s = ((hint + d) % PATH_TOTAL_LENGTH + PATH_TOTAL_LENGTH) % PATH_TOTAL_LENGTH
+    const p = pointAtArcLength(s)
+    const dist = (p.x - x) ** 2 + (p.z - z) ** 2
+    if (dist < bestD) {
+      bestD = dist
+      best = s
+    }
+  }
+  return best
+}

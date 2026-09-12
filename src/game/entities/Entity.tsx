@@ -4,7 +4,10 @@ import * as THREE from 'three'
 import { useDirector } from '../director'
 import { usePlayerPosition } from '../playerPosition'
 import { distance3 } from '../triggers'
-import { pointAtArcLength, projectToArcLength, shortestArcDelta, PATH_TOTAL_LENGTH } from '../maze'
+import { pointAtArcLength, PATH_TOTAL_LENGTH, nearestPatrolS } from '../maze'
+import { updateNavField, navStep, navDistance, hasLineOfSight } from '../nav'
+import { useMicStore } from '../../lib/useMic'
+import { useThreat } from '../threat'
 import { setMonsterProximity, setMonsterAudioPosition, playMonsterFootstep, playSpatialSfx } from '../scareFx'
 import type { SfxName } from '../sfxBank'
 import { Creature, type EntityKind, type EntityState } from './creatures'
@@ -49,6 +52,32 @@ const PROFILE: Record<
 }
 
 const MAX_AUDIBLE_DIST = 20
+
+/**
+ * How the creature decides to come after you.
+ *
+ * It used to be locked to the patrol polyline even while hunting, moving
+ * only to where the player projected onto that line — so standing in any
+ * room made you unreachable and nothing could ever catch you. Now it
+ * navigates the real maze (nav.ts). Three ways it commits to a hunt:
+ *
+ *  - SIGHT: it can see you, and you're within its range. Line of sight is
+ *    checked against the actual walls, so a corner genuinely breaks it.
+ *  - SOUND: you made noise. Loud enough carries much further than sight,
+ *    which is what makes the microphone matter and gives "stay quiet" a
+ *    reason to exist.
+ *  - THE DIRECTOR: a STRIKE phase sends it at you regardless, because the
+ *    pulse-driven escalation has to be able to reach you.
+ *
+ * It keeps hunting for a few seconds after losing you, so breaking line
+ * of sight isn't an instant reset — you have to actually get away.
+ */
+const SIGHT_RANGE = 14
+const HEARING_RANGE = 26
+const NOISE_TRIGGER = 0.12
+const HUNT_MEMORY_S = 6
+/** Creatures don't see through a closed hiding spot. */
+const HIDDEN_SIGHT_RANGE = 2.2
 /** Top surface of the floor slab. Creatures are modelled feet-at-origin,
  * so this is where that origin sits. */
 const FLOOR_Y = -0.9
@@ -76,10 +105,14 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const attackUntil = useRef(0)
   const lastScareCount = useRef(0)
   const nextVoice = useRef(4 + index * 5)
+  const alertUntil = useRef(0)
+  const patrolDir = useRef(1)
+  const wanderT = useRef(3 + index * 2)
+  const pauseUntil = useRef(0)
   // Mutated every frame, read by the creature's own frame loop. Never a
   // prop and never state: props would freeze (refs don't re-render) and
   // state would re-render three creatures at 60fps for nothing.
-  const state = useRef<EntityState>({ closeness: 0, hunting: false, attacking: false })
+  const state = useRef<EntityState>({ closeness: 0, hunting: false, attacking: false, speed: 0 })
 
   useFrame(({ clock, camera }, delta) => {
     if (!group.current) return
@@ -89,8 +122,32 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     const player = usePlayerPosition.getState()
     const prof = PROFILE[kind]
 
-    const hunting = phase === 'STALK' || phase === 'STRIKE'
-    const retreating = phase === 'WITHDRAW'
+    // One shared distance field for all three creatures; early-outs unless
+    // the player changed cell.
+    updateNavField(player.x, player.z)
+
+    const here = group.current.position
+    const toPlayer = navDistance(here.x, here.z)
+    const hidden = useThreat.getState().isHidden
+    const noise = useMicStore.getState().level
+
+    // Sight is blocked by walls, and by being hidden unless it's right on
+    // top of you.
+    const sightRange = hidden ? HIDDEN_SIGHT_RANGE : SIGHT_RANGE
+    const canSee =
+      toPlayer != null &&
+      toPlayer < sightRange &&
+      hasLineOfSight(here.x, here.z, player.x, player.z)
+
+    // Noise carries through walls — that's the point of it.
+    const heard = toPlayer != null && toPlayer < HEARING_RANGE && noise > NOISE_TRIGGER
+
+    if (canSee || heard) alertUntil.current = t + HUNT_MEMORY_S
+
+    const directorHunt = phase === 'STALK' || phase === 'STRIKE'
+    const alerted = t < alertUntil.current
+    const hunting = alerted || directorHunt
+    const retreating = phase === 'WITHDRAW' && !alerted
     const speed = hunting ? prof.hunt : retreating ? prof.retreat : prof.patrol
 
     // Unpredictable rhythm — hitches and surges rather than a metronome.
@@ -98,23 +155,41 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     const hitch = 0.55 + 0.45 * Math.sin(hitchPhase.current * 2.3) * Math.sin(hitchPhase.current * 0.6)
     const effSpeed = speed * THREE.MathUtils.clamp(hitch, 0.35, 1.15)
 
-    if (hunting) {
-      const targetS = projectToArcLength(player)
-      const d = shortestArcDelta(pathS.current, targetS)
-      pathS.current += Math.sign(d) * Math.min(Math.abs(d), effSpeed * dt)
-    } else if (retreating) {
-      const towardPlayer = shortestArcDelta(pathS.current, projectToArcLength(player))
-      pathS.current += (towardPlayer >= 0 ? -1 : 1) * effSpeed * dt
-    } else {
-      pathS.current += effSpeed * dt
-    }
-    pathS.current = ((pathS.current % PATH_TOTAL_LENGTH) + PATH_TOTAL_LENGTH) % PATH_TOTAL_LENGTH
-
     const prevX = group.current.position.x
     const prevZ = group.current.position.z
-    const pos = pointAtArcLength(pathS.current)
-    group.current.position.x = pos.x
-    group.current.position.z = pos.z
+
+    if (hunting || retreating) {
+      // Free navigation of the real maze. Retreating walks the same field
+      // uphill, which backs away along a route that exists rather than
+      // reversing into a wall.
+      const step = navStep(here.x, here.z)
+      if (step) {
+        const sign = retreating ? -1 : 1
+        here.x += step.x * sign * effSpeed * dt
+        here.z += step.z * sign * effSpeed * dt
+      }
+      // Keep patrol progress roughly in sync with where it actually is,
+      // so returning to patrol doesn't teleport it across the level.
+      pathS.current = nearestPatrolS(here.x, here.z, pathS.current)
+    } else {
+      // Patrolling: walk the loop, but not like a tram. It pauses, and it
+      // reverses direction at random intervals, so you can't learn the
+      // timetable and simply walk behind it forever.
+      wanderT.current -= dt
+      if (wanderT.current <= 0) {
+        wanderT.current = 4 + Math.random() * 9
+        if (Math.random() < 0.35) patrolDir.current *= -1
+        pauseUntil.current = Math.random() < 0.4 ? t + 0.8 + Math.random() * 2.2 : 0
+      }
+      if (t > pauseUntil.current) {
+        pathS.current += effSpeed * dt * patrolDir.current
+      }
+      pathS.current = ((pathS.current % PATH_TOTAL_LENGTH) + PATH_TOTAL_LENGTH) % PATH_TOTAL_LENGTH
+      const pos = pointAtArcLength(pathS.current)
+      // Ease back onto the patrol line rather than snapping to it.
+      here.x += (pos.x - here.x) * Math.min(1, dt * 3)
+      here.z += (pos.z - here.z) * Math.min(1, dt * 3)
+    }
 
     // Inspect mode (press M) lines all three up in front of the player so
     // their designs can actually be looked at side by side.
@@ -224,6 +299,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     // Hand the creature its live state for this frame
     state.current.closeness = 1 - normalized
     state.current.hunting = hunting
+    state.current.speed = moved / Math.max(dt, 0.0001)
     state.current.attacking = attacking
   })
 

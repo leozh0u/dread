@@ -1,9 +1,29 @@
+import { RigidBody, CuboidCollider } from '@react-three/rapier'
 import type { BoxRegion } from './triggers'
 
-/** Whether the player counts as hidden is decided by useTriggersLoop's
- * bounding-box check against triggers.ts — this is purely the dressing
- * that sells "there is something here to get behind," one distinct prop
- * per spot instead of four identical translucent boxes. */
+/**
+ * Whether the player counts as hidden is decided by useTriggersLoop's
+ * bounding-box check against triggers.ts — this is the dressing that
+ * sells "there is something here to get behind."
+ *
+ * SOLIDITY, AND WHY IT'S SHAPED LIKE THIS. These props had no colliders
+ * at all, so you walked straight through a wardrobe, which instantly
+ * reads as an unfinished game. But they also can't simply become solid
+ * blocks: the hiding region is the SAME volume as the prop, so a solid
+ * closet is a closet nobody can hide in.
+ *
+ * So each is made solid in the shape it should actually be:
+ *   closet  — back, both sides and a roof; the FRONT IS OPEN, so you step
+ *             inside it exactly as the fiction says you do
+ *   crate   — genuinely solid, and small enough to hide beside rather
+ *             than inside
+ *   curtain — deliberately left passable. It's fabric. Walking through it
+ *             is correct, and being able to slip behind it is the point
+ *   table   — solid top with clear space beneath, so you get under it
+ *
+ * Every collider sits inside a room or alcove, never in a corridor, so
+ * none of them can block a route through the maze.
+ */
 export function HidingSpot({ spot }: { spot: BoxRegion }) {
   const [cx, cy, cz] = spot.center
   const [hx, hy, hz] = spot.half
@@ -12,9 +32,34 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
     case 'closet':
       return (
         <group position={[cx, 0, cz]}>
-          <mesh position={[0, hy, 0]}>
-            <boxGeometry args={[hx * 2, hy * 2, hz * 2]} />
+          {/* Hollow: back, sides and roof only — the front stays open. */}
+          <RigidBody type="fixed" colliders={false}>
+            <CuboidCollider args={[hx, hy, 0.08]} position={[cx, hy, cz - hz]} />
+            <CuboidCollider args={[0.08, hy, hz]} position={[cx - hx, hy, cz]} />
+            <CuboidCollider args={[0.08, hy, hz]} position={[cx + hx, hy, cz]} />
+            <CuboidCollider args={[hx, 0.08, hz]} position={[cx, hy * 2, cz]} />
+          </RigidBody>
+          {/* Carcass, drawn as panels so the inside isn't a filled block */}
+          <mesh position={[0, hy, -hz]}>
+            <boxGeometry args={[hx * 2, hy * 2, 0.08]} />
             <meshStandardMaterial color="#241c14" roughness={0.9} />
+          </mesh>
+          <mesh position={[-hx, hy, 0]}>
+            <boxGeometry args={[0.08, hy * 2, hz * 2]} />
+            <meshStandardMaterial color="#1e170f" roughness={0.9} />
+          </mesh>
+          <mesh position={[hx, hy, 0]}>
+            <boxGeometry args={[0.08, hy * 2, hz * 2]} />
+            <meshStandardMaterial color="#1e170f" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, hy * 2, 0]}>
+            <boxGeometry args={[hx * 2, 0.08, hz * 2]} />
+            <meshStandardMaterial color="#241c14" roughness={0.9} />
+          </mesh>
+          {/* A door hanging open off one edge, so the gap reads as a way in */}
+          <mesh position={[-hx - 0.18, hy, hz * 0.55]} rotation={[0, 0.9, 0]}>
+            <boxGeometry args={[hx * 1.6, hy * 1.95, 0.05]} />
+            <meshStandardMaterial color="#2b2218" roughness={0.9} />
           </mesh>
           {/* door seam */}
           <mesh position={[0, hy, hz + 0.01]}>
@@ -50,6 +95,12 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
     case 'crate':
       return (
         <group position={[cx, 0, cz]}>
+          <RigidBody type="fixed" colliders={false}>
+            <CuboidCollider
+              args={[hx * 0.85, hy * 0.6, hz * 0.85]}
+              position={[cx, hy * 0.6, cz]}
+            />
+          </RigidBody>
           <mesh position={[0, hy * 0.6, 0]} rotation={[0, 0.15, 0]}>
             <boxGeometry args={[hx * 1.7, hy * 1.2, hz * 1.7]} />
             <meshStandardMaterial color="#2a2016" roughness={0.95} />
@@ -68,6 +119,10 @@ export function HidingSpot({ spot }: { spot: BoxRegion }) {
     case 'table':
       return (
         <group position={[cx, 0, cz]}>
+          {/* Top only — the space underneath is the hiding spot. */}
+          <RigidBody type="fixed" colliders={false}>
+            <CuboidCollider args={[hx, 0.06, hz]} position={[cx, cy + hy, cz]} />
+          </RigidBody>
           <mesh position={[0, cy + hy, 0]}>
             <boxGeometry args={[hx * 2, 0.08, hz * 2]} />
             <meshStandardMaterial color="#1c140c" roughness={0.8} />
