@@ -521,3 +521,62 @@ Several MP3s share a byte size exactly, which usually means a generation
 script wrote the same clip under several names. Checksummed all 19: every
 one is distinct. The matching sizes are just equal durations at constant
 bitrate.
+
+---
+
+## The automated playthrough, and the three bugs it found
+
+"Nobody has played a full run end to end" was the oldest item on the
+pre-submission list and kept staying open, because a run costs sixty
+seconds of calibration plus a traverse of eighty units of maze — minutes
+per attempt by hand, so it never got done. The endings were therefore the
+least-exercised part of the game.
+
+So: a dev bridge (`src/game/devBridge.ts`, compiled out of production
+builds) exposes the camera, the navigation field and the stores, and an
+injected script drives the REAL controls through the REAL maze. It
+deliberately exposes primitives rather than a "win the game" button — an
+autopilot that walks the maze and trips the real triggers is evidence; one
+that sets `outcome='escaped_door'` is evidence of nothing.
+
+It died at the spawn point before taking a step. Everything below came out
+of chasing that.
+
+**Both endings and all hiding were unreachable.** Trigger volumes span
+y ∈ [0,3], from when the floor was at y=0. The floor is at -0.9 and the
+player's tracked position is their capsule centre at -0.15 — below every
+box. You could collect all three fragments, open the door, walk out, and
+nothing happened. Hiding never registered either.
+
+**The player could die at spawn without moving.** The position store
+started at the world origin rather than the spawn; creatures mounted six
+metres from that origin, inside the seven-metre kill radius; detection
+filled at 8/tick against someone standing still thirty-five metres away.
+2.5 seconds to death.
+
+**Fragments had a 62cm effective pickup radius**, because 0.65 of the
+0.9 budget was spent on a permanent vertical gap.
+
+### The test was the reason all three survived
+
+`scripts/fullrun.ts` walks a player through these regions and passed the
+whole time. It placed them at y=0.5 — the height the *fragments* sit at,
+and one the running game never produces. The vertical term was zero in the
+test and 0.65 in reality.
+
+A test fed numbers the system does not produce will confirm whatever you
+already believed. It now walks at the real tracked height and has explicit
+coverage that each hiding spot registers when stood in and stops when
+stepped out of. 142 checks.
+
+### Still open
+
+- **Trackpad "rotate not pan" — reported again, and I cannot reproduce
+  it.** The euler-order fix is live and verified in the running page
+  (`order: 'YXZ'`, roll measured at 0.003°). Nothing else in the codebase
+  writes camera roll, and there is no CSS transform on the canvas. Needs
+  Leo to say which gesture and what exactly moves.
+- Creature art: reworked, not signed off.
+- Presage: pipeline proven, blocked on Leo's camera.
+- 66 Claude co-author trailers; four keys to rotate. Both need Leo.
+- MathWorks: still unclaimed, ~30 seconds of Leo's time.
