@@ -69,7 +69,7 @@ export function Scene() {
   return (
     <Canvas
       shadows
-      camera={{ fov: 75, position: [0, 0.5, 23] }}
+      camera={{ fov: 75, position: [0, 0.5, 29] }}
       gl={{ antialias: true }}
       onCreated={({ scene }) => {
         // Exponential fog, tinted to the room's own sickly yellow rather

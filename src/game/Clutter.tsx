@@ -173,16 +173,21 @@ function ScratchMarks({ position, rotY }: { position: [number, number, number]; 
 /** Pure set-dressing — no colliders, no triggers, just breaking up the
  * "flat wall and hallway" feel with a lot of unique objects instead of
  * repeated geometry. Cheap on purpose: this is atmosphere, not content. */
+const BULB_X = -18 // base position of the swinging bulb, see below
+
 export function Clutter() {
   const bulb = useRef<THREE.PointLight>(null!)
   const bulbMesh = useRef<THREE.Mesh>(null!)
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
-    const swing = Math.sin(t * 1.3) * 0.15
+    // Swing RELATIVE to the bulb's own position. Setting position.x
+    // absolutely (as this used to) silently teleports the bulb to the
+    // world origin the moment it's placed anywhere but x=0.
+    const swing = BULB_X + Math.sin(t * 1.3) * 0.15
     if (bulb.current) {
       bulb.current.position.x = swing
-      bulb.current.intensity = 25 + Math.sin(t * 9) * 4 // faint flicker
+      bulb.current.intensity = 16 + Math.sin(t * 9) * 4 // faint flicker
     }
     if (bulbMesh.current) bulbMesh.current.position.x = swing
   })
@@ -190,78 +195,75 @@ export function Clutter() {
   return (
     <group>
       {/* One bare bulb on a cord, swinging — deliberately the odd one out
-          among the ceiling fluorescents (see Fluorescents.tsx), hung in
-          the branch dead end where the strip lighting doesn't reach. */}
-      <mesh position={[0, 2.95, -17]}>
+          among the ceiling fluorescents, hung in the branch dead end
+          where the strip lighting doesn't reach. */}
+      <mesh position={[-18, 2.95, -36]}>
         <cylinderGeometry args={[0.01, 0.01, 0.5, 4]} />
         <meshStandardMaterial color="#1a1a1a" />
       </mesh>
-      <mesh ref={bulbMesh} position={[0, 2.65, -17]}>
+      <mesh ref={bulbMesh} position={[-18, 2.65, -36]}>
         <sphereGeometry args={[0.08, 8, 8]} />
         <meshStandardMaterial color="#ffdd88" emissive="#ffcc55" emissiveIntensity={2} toneMapped={false} />
       </mesh>
-      <pointLight ref={bulb} position={[0, 2.65, -17]} color="#ffcc77" intensity={16} distance={6} />
+      <pointLight ref={bulb} position={[-18, 2.65, -36]} color="#ffcc77" intensity={16} distance={6} />
 
-      {/* Posters, scratches, a sketch, a toy — placed on real corridor
-          walls throughout the maze (see maze.ts for the graph). Each is a
-          different object, not a repeated prop. */}
-      <Poster position={[-2.94, 1.7, 20]} rotY={Math.PI / 2} color="#5a2020" />
-      <Poster position={[2.94, 1.6, 12]} rotY={-Math.PI / 2} color="#3a3020" />
-      <Poster position={[8.94, 1.65, -4]} rotY={Math.PI / 2} color="#243040" />
-      <Poster position={[-6.94, 1.5, -29]} rotY={-Math.PI / 2} color="#402a20" />
-      <ScratchMarks position={[8.94, 1.5, 3]} rotY={Math.PI / 2} />
-      <ScratchMarks position={[-1.94, 1.4, -19]} rotY={Math.PI / 2} />
-      <SketchPage position={[-6.94, 1.3, -35]} rotY={-Math.PI / 2} />
-      <SketchPage position={[1.94, 1.3, -18]} rotY={-Math.PI / 2} />
-      <Drawing position={[2.94, 1.2, 3]} rotY={-Math.PI / 2} />
-      <Drawing position={[-2.94, 1.15, -2]} rotY={Math.PI / 2} />
-      <Drawing position={[8.94, 1.1, -18]} rotY={Math.PI / 2} />
-      <Toy position={[13, -0.84, -8]} />
-      <Toy position={[-9, -0.84, -40]} />
-      <Toy position={[0, -0.84, -19]} />
+      {/* Posters, scratches, sketches, drawings, toys — placed on real
+          corridor walls throughout the maze (see maze.ts for the graph). */}
+      <Poster position={[-2.94, 1.7, 26]} rotY={Math.PI / 2} color="#5a2020" />
+      <Poster position={[2.94, 1.6, 18]} rotY={-Math.PI / 2} color="#3a3020" />
+      <Poster position={[10.94, 1.65, 7]} rotY={Math.PI / 2} color="#243040" />
+      <Poster position={[-8.94, 1.5, -8]} rotY={-Math.PI / 2} color="#402a20" />
+      <Poster position={[12.94, 1.6, -34]} rotY={Math.PI / 2} color="#33251c" />
+      <ScratchMarks position={[2.94, 1.5, 6]} rotY={-Math.PI / 2} />
+      <ScratchMarks position={[-11.06, 1.4, -20]} rotY={Math.PI / 2} />
+      <SketchPage position={[-2.94, 1.3, -20]} rotY={Math.PI / 2} />
+      <SketchPage position={[18.94, 1.3, -38]} rotY={Math.PI / 2} />
+      <Drawing position={[2.94, 1.2, -6]} rotY={-Math.PI / 2} />
+      <Drawing position={[-2.94, 1.15, 8]} rotY={Math.PI / 2} />
+      <Drawing position={[-16.94, 1.1, -36]} rotY={-Math.PI / 2} />
+      <Toy position={[13, -0.84, -6]} />
+      <Toy position={[-12, -0.84, -10]} />
+      <Toy position={[1, -0.84, -30]} />
 
       {/* Abandoned furniture — the "someone worked here and left" layer */}
-      <Desk position={[10.6, -0.9, -14]} rotY={0.25} />
-      <Desk position={[-8.6, -0.9, -30]} rotY={-1.4} />
-      <Desk position={[1.4, -0.9, 11]} rotY={1.9} />
+      <Desk position={[12.6, -0.9, -20]} rotY={0.25} />
+      <Desk position={[-12.6, -0.9, -6]} rotY={-1.4} />
+      <Desk position={[1.4, -0.9, 18]} rotY={1.9} />
+      <Desk position={[14.4, -0.9, -36]} rotY={0.8} />
 
       {/* Strange, failing light sources scattered through the maze */}
-      <BrokenLight position={[8.7, 2.6, -2]} color="#6a7a55" />
-      <BrokenLight position={[-2.7, 2.6, -14]} color="#55606a" />
-      <BrokenLight position={[-9.7, 2.6, -34]} color="#7a6a55" />
-      <BrokenLight position={[2.7, 2.6, 15]} color="#6a5a6a" />
+      <BrokenLight position={[2.7, 2.6, 2]} color="#6a7a55" />
+      <BrokenLight position={[-2.7, 2.6, -24]} color="#55606a" />
+      <BrokenLight position={[-11.7, 2.6, -40]} color="#7a6a55" />
+      <BrokenLight position={[13.3, 2.6, -30]} color="#6a5a6a" />
+      <BrokenLight position={[2.7, 2.6, 24]} color="#6a6a5a" />
 
-      {/* A toppled chair near the D junction */}
-      <group position={[13, 0, -6]} rotation={[0, 0.6, Math.PI / 2.3]}>
+      {/* A toppled chair near the E hub */}
+      <group position={[2, 0, -3]} rotation={[0, 0.6, Math.PI / 2.3]}>
         <mesh position={[0, 0.4, 0]}>
           <boxGeometry args={[0.4, 0.05, 0.4]} />
           <meshStandardMaterial color="#1e1712" roughness={0.9} />
         </mesh>
-        <mesh position={[0.15, 0.2, 0.15]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.4, 5]} />
-          <meshStandardMaterial color="#1e1712" />
-        </mesh>
-        <mesh position={[-0.15, 0.2, 0.15]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.4, 5]} />
-          <meshStandardMaterial color="#1e1712" />
-        </mesh>
-        <mesh position={[0.15, 0.2, -0.15]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.4, 5]} />
-          <meshStandardMaterial color="#1e1712" />
-        </mesh>
-        <mesh position={[-0.15, 0.2, -0.15]}>
-          <cylinderGeometry args={[0.02, 0.02, 0.4, 5]} />
-          <meshStandardMaterial color="#1e1712" />
-        </mesh>
+        {[
+          [0.15, 0.15],
+          [-0.15, 0.15],
+          [0.15, -0.15],
+          [-0.15, -0.15],
+        ].map(([x, z], i) => (
+          <mesh key={i} position={[x, 0.2, z]}>
+            <cylinderGeometry args={[0.02, 0.02, 0.4, 5]} />
+            <meshStandardMaterial color="#1e1712" />
+          </mesh>
+        ))}
       </group>
 
       {/* A sagging, water-stained ceiling tile — the "this building has
           been leaking for years" detail */}
-      <mesh position={[5.5, 3.12, 14]} rotation={[0.06, 0.3, 0.03]}>
+      <mesh position={[5.5, 3.12, 22]} rotation={[0.06, 0.3, 0.03]}>
         <boxGeometry args={[1.4, 0.08, 1.2]} />
         <meshStandardMaterial color="#3d3420" roughness={1} />
       </mesh>
-      <mesh position={[-10, 3.1, -30]} rotation={[-0.05, 0.1, 0.04]}>
+      <mesh position={[-12, 3.1, -20]} rotation={[-0.05, 0.1, 0.04]}>
         <boxGeometry args={[1.2, 0.08, 1.2]} />
         <meshStandardMaterial color="#453a22" roughness={1} />
       </mesh>

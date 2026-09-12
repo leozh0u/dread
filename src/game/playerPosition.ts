@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export const SPAWN_POINT: [number, number, number] = [0, 1, 23]
+export const SPAWN_POINT: [number, number, number] = [0, 1, 29]
 
 interface PlayerPositionState {
   x: number

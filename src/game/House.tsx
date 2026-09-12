@@ -12,7 +12,7 @@ import { buildCorridorWalls, buildJunctionCaps, type WallSpec } from './maze'
 // Low, oppressive ceiling — Backrooms interiors are office-height, not
 // cathedral-height, and the low ceiling is half of why they feel wrong.
 const WALL_H = 3.2
-const DOOR_Z = -46
+const DOOR_Z = -48
 
 // Mono-yellow: aged wallpaper over damp carpet. The whole palette is one
 // sickly hue with small value shifts, which is what makes the space read
@@ -87,15 +87,15 @@ export function House() {
     <>
       <RigidBody type="fixed" colliders="cuboid">
         {/* one floor slab under the whole maze */}
-        <mesh position={[1, -1, -19.5]} receiveShadow>
-          <boxGeometry args={[44, 0.2, 92]} />
+        <mesh position={[2, -1, -16]} receiveShadow>
+          <boxGeometry args={[52, 0.2, 104]} />
           <meshStandardMaterial color={FLOOR_TINT} roughness={1} />
         </mesh>
 
         {/* Ceiling — the level had none, which is a large part of why it
             read as a void rather than an interior. Low and close. */}
-        <mesh position={[1, WALL_H, -19.5]} receiveShadow>
-          <boxGeometry args={[44, 0.2, 92]} />
+        <mesh position={[2, WALL_H, -16]} receiveShadow>
+          <boxGeometry args={[52, 0.2, 104]} />
           <meshStandardMaterial color={CEILING_TINT} roughness={1} />
         </mesh>
 
@@ -106,56 +106,55 @@ export function House() {
           <Wall key={`j${i}`} spec={spec} tint="#171717" />
         ))}
 
-        {/* Room 1 (clue: photograph, closet) — off the A-B corridor */}
-        <WallX z={14} x1={3} x2={8} />
-        <WallX z={18} x1={3} x2={8} />
-        <WallZ x={8} z1={14} z2={18} />
+        {/* Room 1 (clue) — off A-B, far north-east */}
+        <WallX z={21} x1={3} x2={8} />
+        <WallX z={25} x1={3} x2={8} />
+        <WallZ x={8} z1={21} z2={25} />
 
-        {/* Room 2 (clue: journal page, curtain) — off C-D */}
-        <WallX z={-2} x1={15} x2={20} />
-        <WallX z={2} x1={15} x2={20} />
-        <WallZ x={20} z1={-2} z2={2} />
+        {/* Room 2 (clue) — off F-G, far west */}
+        <WallX z={-9} x1={-20} x2={-15} />
+        <WallX z={-5} x1={-20} x2={-15} />
+        <WallZ x={-20} z1={-9} z2={-5} />
 
-        {/* Room 3 (clue: house key, crate) — off G-H */}
-        <WallX z={-32} x1={-18} x2={-13} />
-        <WallX z={-28} x1={-18} x2={-13} />
-        <WallZ x={-18} z1={-32} z2={-28} />
+        {/* Room 3 (clue) — off K-L, far south-east */}
+        <WallX z={-37} x1={19} x2={24} />
+        <WallX z={-33} x1={19} x2={24} />
+        <WallZ x={24} z1={-37} z2={-33} />
 
-        {/* Room 4 (hiding only, table) — off H-I */}
-        <WallZ x={-4} z1={-37} z2={-32} />
-        <WallZ x={0} z1={-37} z2={-32} />
-        <WallX z={-32} x1={-4} x2={0} />
+        {/* Hiding alcove — off G-H */}
+        <WallZ x={-8} z1={-21} z2={-17} />
+        <WallZ x={-4} z1={-21} z2={-17} />
+        <WallX z={-21} x1={-8} x2={-4} />
 
-        {/* Branch dead end — off F-G, a narrow passage nobody has to take */}
-        <WallZ x={-2} z1={-21} z2={-14} />
-        <WallZ x={2} z1={-21} z2={-14} />
-        <WallX z={-14} x1={-2} x2={2} />
+        {/* Branch dead end — off M-N, a passage nobody has to take */}
+        <WallZ x={-20} z1={-38} z2={-34} />
+        <WallZ x={-16} z1={-38} z2={-34} />
+        <WallX z={-38} x1={-20} x2={-16} />
 
-        {/* Short stub from junction I down to the exit door */}
-        <WallZ x={1} z1={DOOR_Z} z2={-43} />
-        <WallZ x={7} z1={DOOR_Z} z2={-43} />
+        {/* Short stub from junction O down to the exit door */}
+        <WallZ x={-1} z1={DOOR_Z} z2={-45} />
+        <WallZ x={5} z1={DOOR_Z} z2={-45} />
 
         {/* Beyond the door: a short "outside" foyer (the fast escape —
             reaching this counts as win condition #1) then the calm room
-            enclosure deeper in (win condition #2, the slower one) — same
-            width as the door itself, no taper needed. */}
-        <WallZ x={1} z1={-63} z2={DOOR_Z} />
-        <WallZ x={7} z1={-63} z2={DOOR_Z} />
-        <WallX z={-63} x1={1} x2={7} />
+            enclosure deeper in (win condition #2, the slower one). */}
+        <WallZ x={-1} z1={-65} z2={DOOR_Z} />
+        <WallZ x={5} z1={-65} z2={DOOR_Z} />
+        <WallX z={-65} x1={-1} x2={5} />
       </RigidBody>
 
       {/* Exit door — isolated RigidBody, one explicit CuboidCollider */}
       <RigidBody type="fixed" colliders={false}>
-        <CuboidCollider args={[2.8, 1.5, 0.2]} position={[4, 1.5, DOOR_Z]} sensor={unlocked} />
+        <CuboidCollider args={[2.8, 1.5, 0.2]} position={[2, 1.5, DOOR_Z]} sensor={unlocked} />
         {!unlocked && (
-          <mesh position={[4, 1.5, DOOR_Z]}>
+          <mesh position={[2, 1.5, DOOR_Z]}>
             <boxGeometry args={[5.6, 3, 0.4]} />
             <meshStandardMaterial color="#1a1010" />
           </mesh>
         )}
       </RigidBody>
 
-      {unlocked && <pointLight position={[4, 2, DOOR_Z - 3]} color="#7a8fb0" intensity={40} distance={8} />}
+      {unlocked && <pointLight position={[2, 2, DOOR_Z - 3]} color="#7a8fb0" intensity={40} distance={8} />}
 
       {CLUES.map((clue) => (
         <Clue key={clue.id} id={clue.id} position={clue.position} />
@@ -164,7 +163,7 @@ export function House() {
         <HidingSpot key={i} spot={spot} />
       ))}
 
-      <ExitDoorLight position={[4, 1.5, DOOR_Z]} />
+      <ExitDoorLight position={[2, 1.5, DOOR_Z]} />
       <Fluorescents />
       <Clutter />
       <Signage />

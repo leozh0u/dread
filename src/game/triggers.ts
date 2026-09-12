@@ -28,27 +28,28 @@ export interface BoxRegion {
 }
 
 export const CLUES: ClueDef[] = [
-  { id: 'clue-1', position: [5.5, 0.5, 16], radius: 0.9, label: 'fragment' },
-  { id: 'clue-2', position: [17.5, 0.5, 0], radius: 0.9, label: 'fragment' },
-  { id: 'clue-3', position: [-15.5, 0.5, -30], radius: 0.9, label: 'fragment' },
+  { id: 'clue-1', position: [5.5, 0.5, 23], radius: 0.9, label: 'fragment' }, // NE room, off A-B
+  { id: 'clue-2', position: [-17.5, 0.5, -7], radius: 0.9, label: 'fragment' }, // far west room, off F-G
+  { id: 'clue-3', position: [21.5, 0.5, -35], radius: 0.9, label: 'fragment' }, // far SE room, off K-L
 ]
 
 export const HIDING_SPOTS: BoxRegion[] = [
-  { center: [7, 1, 16], half: [0.6, 1, 0.6], kind: 'closet' },
-  { center: [19, 1, 0], half: [0.7, 1, 0.5], kind: 'curtain' },
-  { center: [-17, 1, -30], half: [0.6, 0.9, 0.6], kind: 'crate' },
-  { center: [-2, 0.7, -34.5], half: [0.9, 0.55, 0.6], kind: 'table' },
+  { center: [7, 1, 23], half: [0.6, 1, 0.6], kind: 'closet' },
+  { center: [-19, 1, -7], half: [0.7, 1, 0.5], kind: 'curtain' },
+  { center: [23, 1, -35], half: [0.6, 0.9, 0.6], kind: 'crate' },
+  { center: [-6, 0.7, -19], half: [0.9, 0.55, 0.6], kind: 'table' }, // alcove off G-H
+  { center: [-18, 1, -36], half: [0.6, 1, 0.6], kind: 'closet' }, // branch dead end
 ]
 
 /** Beyond the unlocked door — reaching here is win condition #1, "escape,"
  * distinct from the calm room's slower "regulate yourself" win. */
 export const OUTSIDE: BoxRegion = {
-  center: [4, 1.5, -47.5],
+  center: [2, 1.5, -49.5],
   half: [2.8, 1.5, 1.4],
 }
 
 export const CALM_ROOM: BoxRegion = {
-  center: [4, 1.5, -56],
+  center: [2, 1.5, -58],
   half: [2.8, 1.5, 6.5],
 }
 

@@ -6,7 +6,7 @@ import { usePlayerPosition } from '../playerPosition'
 import { distance3 } from '../triggers'
 import { pointAtArcLength, projectToArcLength, shortestArcDelta, PATH_TOTAL_LENGTH } from '../maze'
 import { setMonsterProximity, setMonsterAudioPosition, playMonsterFootstep } from '../scareFx'
-import { Creature, type EntityKind } from './creatures'
+import { Creature, type EntityKind, type EntityState } from './creatures'
 import { reportEntity, inspect } from './registry'
 
 /** Per-kind movement and sound character. The three should never be
@@ -25,6 +25,9 @@ const PROFILE: Record<
 }
 
 const MAX_AUDIBLE_DIST = 20
+/** Top surface of the floor slab. Creatures are modelled feet-at-origin,
+ * so this is where that origin sits. */
+const FLOOR_Y = -0.9
 
 /**
  * One creature walking the maze. Movement is arc-length progress along
@@ -48,6 +51,10 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const hitchPhase = useRef(index * 3)
   const attackUntil = useRef(0)
   const lastScareCount = useRef(0)
+  // Mutated every frame, read by the creature's own frame loop. Never a
+  // prop and never state: props would freeze (refs don't re-render) and
+  // state would re-render three creatures at 60fps for nothing.
+  const state = useRef<EntityState>({ closeness: 0, hunting: false, attacking: false })
 
   useFrame(({ clock, camera }, delta) => {
     if (!group.current) return
@@ -109,11 +116,12 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       facing.current += d * Math.min(1, dt * 4)
     }
     group.current.rotation.y = facing.current
-    group.current.position.y = prof.bob > 0 ? Math.abs(Math.sin(t * 7)) * prof.bob : 0
+    group.current.position.y =
+      FLOOR_Y + (prof.bob > 0 ? Math.abs(Math.sin(t * 7)) * prof.bob : 0)
 
     const realDist = distance3(player, [
       group.current.position.x,
-      0.9,
+      FLOOR_Y + 1,
       group.current.position.z,
     ])
     const normalized = THREE.MathUtils.clamp(realDist / MAX_AUDIBLE_DIST, 0, 1)
@@ -124,7 +132,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       distSinceStep.current = 0
       playMonsterFootstep(
         group.current.position.x,
-        0.2,
+        FLOOR_Y + 0.1,
         group.current.position.z,
         prof.stepPitch,
       )
@@ -148,30 +156,19 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     if (closest === index) {
       useDirector.getState().setMonsterDistance(normalized)
       setMonsterProximity(normalized)
-      setMonsterAudioPosition(group.current.position.x, 0.9, group.current.position.z)
+      setMonsterAudioPosition(group.current.position.x, FLOOR_Y + 1, group.current.position.z)
     }
 
-    // Store for the creature's own visuals
-    closenessRef.current = 1 - normalized
-    huntingRef.current = hunting
-    attackingRef.current = attacking
+    // Hand the creature its live state for this frame
+    state.current.closeness = 1 - normalized
+    state.current.hunting = hunting
+    state.current.attacking = attacking
   })
 
-  // Kept in refs and read during render of the creature — updating state
-  // every frame for three entities would thrash React for no benefit.
-  const closenessRef = useRef(0)
-  const huntingRef = useRef(false)
-  const attackingRef = useRef(false)
-
   return (
-    <group ref={group} position={[0, 0, -6]}>
+    <group ref={group} position={[0, FLOOR_Y, -6]}>
       <group ref={body}>
-        <Creature
-          kind={kind}
-          closeness={closenessRef.current}
-          hunting={huntingRef.current}
-          attacking={attackingRef.current}
-        />
+        <Creature kind={kind} state={state} />
       </group>
     </group>
   )

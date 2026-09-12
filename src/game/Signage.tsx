@@ -7,14 +7,24 @@ import * as THREE from 'three'
 // fixed direction — the old single-spine version always pointed -z,
 // which stopped making sense once the path actually turns.
 const CHEVRONS: { x: number; z: number; rotY: number }[] = [
-  { x: 0, z: 15, rotY: 0 }, // A -> B, heading south
-  { x: 6, z: 8, rotY: -Math.PI / 2 }, // B -> C, heading east
-  { x: 12, z: -1, rotY: 0 }, // C -> D, heading south
-  { x: 12, z: -16, rotY: 0 }, // D -> F, heading south
-  { x: 0, z: -24, rotY: Math.PI / 2 }, // F -> G, heading west
-  { x: -10, z: -32, rotY: 0 }, // G -> H, heading south
-  { x: -4, z: -40, rotY: -Math.PI / 2 }, // H -> I, heading east
-  { x: 4, z: -44, rotY: 0 }, // I -> door, heading south
+  { x: 0, z: 22, rotY: 0 }, // A -> B, south
+  { x: 7, z: 14, rotY: -Math.PI / 2 }, // B -> C, east
+  { x: 14, z: 7, rotY: 0 }, // C -> D, south
+  { x: 7, z: 0, rotY: Math.PI / 2 }, // D -> E, west
+  { x: 0, z: 7, rotY: 0 }, // B -> E shortcut, south
+  { x: -6, z: 0, rotY: Math.PI / 2 }, // E -> F, west
+  { x: -12, z: -7, rotY: 0 }, // F -> G, south
+  { x: -6, z: -14, rotY: -Math.PI / 2 }, // G -> H, east
+  { x: 0, z: -7, rotY: 0 }, // E -> H shortcut, south
+  { x: 7, z: -14, rotY: -Math.PI / 2 }, // H -> I, east
+  { x: 0, z: -21, rotY: 0 }, // H -> J, south
+  { x: 8, z: -28, rotY: -Math.PI / 2 }, // J -> K, east
+  { x: 16, z: -35, rotY: 0 }, // K -> L, south
+  { x: -7, z: -28, rotY: Math.PI / 2 }, // J -> M, west
+  { x: -14, z: -35, rotY: 0 }, // M -> N, south
+  { x: -6, z: -42, rotY: -Math.PI / 2 }, // N -> O, east
+  { x: 9, z: -42, rotY: Math.PI / 2 }, // L -> O, west
+  { x: 2, z: -46, rotY: 0 }, // O -> door, south
 ]
 
 /** A single floor chevron pointing along its corridor's direction of

@@ -40,27 +40,42 @@ export interface Edge {
 // Spacing is chosen so every edge has enough length for junction
 // clearance (HALF_WIDTH at each end) plus room for a door-sized gap.
 export const JUNCTIONS: Junction[] = [
-  { id: 'A', x: 0, z: 24, open: ['S'] }, // spawn end
-  { id: 'B', x: 0, z: 8, open: ['N', 'E', 'S'] },
-  { id: 'C', x: 12, z: 8, open: ['W', 'S'] },
-  { id: 'D', x: 12, z: -8, open: ['N', 'W', 'S'] },
-  { id: 'E', x: 0, z: -8, open: ['N', 'E'] }, // loop shortcut node
-  { id: 'F', x: 12, z: -24, open: ['N', 'W'] },
-  { id: 'G', x: -10, z: -24, open: ['E', 'S'] },
-  { id: 'H', x: -10, z: -40, open: ['N', 'E'] },
-  { id: 'I', x: 4, z: -40, open: ['W', 'S'] }, // south -> exit door
+  { id: 'A', x: 0, z: 30, open: ['S'] }, // spawn nook
+  { id: 'B', x: 0, z: 14, open: ['N', 'E', 'S'] },
+  { id: 'C', x: 14, z: 14, open: ['W', 'S'] },
+  { id: 'D', x: 14, z: 0, open: ['N', 'W', 'S'] },
+  { id: 'E', x: 0, z: 0, open: ['N', 'E', 'W', 'S'] }, // central hub
+  { id: 'F', x: -12, z: 0, open: ['E', 'S'] },
+  { id: 'G', x: -12, z: -14, open: ['N', 'E'] },
+  { id: 'H', x: 0, z: -14, open: ['N', 'E', 'W', 'S'] }, // second hub
+  { id: 'I', x: 14, z: -14, open: ['N', 'W'] },
+  { id: 'J', x: 0, z: -28, open: ['N', 'E', 'W'] },
+  { id: 'K', x: 16, z: -28, open: ['W', 'S'] },
+  { id: 'L', x: 16, z: -42, open: ['N', 'W'] },
+  { id: 'M', x: -14, z: -28, open: ['E', 'S'] },
+  { id: 'N', x: -14, z: -42, open: ['N', 'E'] },
+  { id: 'O', x: 2, z: -42, open: ['W', 'E', 'S'] }, // south -> exit door
 ]
 
 export const EDGES: Edge[] = [
   { a: 'A', b: 'B' },
   { a: 'B', b: 'C' },
-  { a: 'B', b: 'E' }, // loop shortcut
   { a: 'C', b: 'D' },
-  { a: 'D', b: 'E' }, // loop shortcut closes here
-  { a: 'D', b: 'F' },
+  { a: 'D', b: 'E' },
+  { a: 'B', b: 'E' }, // loop 1 — bypasses the C/D leg
+  { a: 'E', b: 'F' },
   { a: 'F', b: 'G' },
   { a: 'G', b: 'H' },
+  { a: 'E', b: 'H' }, // loop 2 — bypasses the west leg
   { a: 'H', b: 'I' },
+  { a: 'D', b: 'I' }, // loop 3 — east side round trip
+  { a: 'H', b: 'J' },
+  { a: 'J', b: 'K' },
+  { a: 'K', b: 'L' },
+  { a: 'J', b: 'M' },
+  { a: 'M', b: 'N' },
+  { a: 'N', b: 'O' },
+  { a: 'L', b: 'O' }, // loop 4 — two separate approaches to the exit
 ]
 
 export function findJunction(id: string): Junction {
@@ -103,11 +118,11 @@ function runWithGaps(axis: 'x' | 'z', fixed: number, from: number, to: number, g
  * (z for vertical corridors, x for horizontal ones). `left` is the wall
  * at (fixed - HALF_WIDTH), `right` is (fixed + HALF_WIDTH). */
 const EDGE_GAPS: Record<string, EdgeGap[]> = {
-  'A-B': [{ side: 'right', from: 14, to: 18 }], // Room 1 (clue) — east
-  'C-D': [{ side: 'right', from: -2, to: 2 }], // Room 2 (clue) — east
-  'F-G': [{ side: 'right', from: -2, to: 2 }], // branch dead-end — south
-  'G-H': [{ side: 'left', from: -32, to: -28 }], // Room 3 (clue) — west
-  'H-I': [{ side: 'right', from: -4, to: 0 }], // Room 4 (hiding only) — north
+  'A-B': [{ side: 'right', from: 21, to: 25 }], // Room 1 (clue) — far north-east
+  'F-G': [{ side: 'left', from: -9, to: -5 }], // Room 2 (clue) — far west
+  'K-L': [{ side: 'right', from: -37, to: -33 }], // Room 3 (clue) — far south-east
+  'G-H': [{ side: 'right', from: -8, to: -4 }], // hiding alcove
+  'M-N': [{ side: 'left', from: -38, to: -34 }], // branch dead end
 }
 
 /** Builds every corridor wall in the graph. Each edge contributes two
@@ -166,18 +181,18 @@ export const MONSTER_PATH: { x: number; z: number }[] = [
   findJunction('B'),
   findJunction('C'),
   findJunction('D'),
-  findJunction('E'),
-  findJunction('B'),
-  findJunction('C'),
-  findJunction('D'),
-  findJunction('F'),
-  findJunction('G'),
-  findJunction('H'),
   findJunction('I'),
   findJunction('H'),
+  findJunction('J'),
+  findJunction('K'),
+  findJunction('L'),
+  findJunction('O'),
+  findJunction('N'),
+  findJunction('M'),
+  findJunction('J'),
+  findJunction('H'),
   findJunction('G'),
   findJunction('F'),
-  findJunction('D'),
   findJunction('E'),
   findJunction('B'),
 ]
