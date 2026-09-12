@@ -1,119 +1,198 @@
 # DREAD — demo video plan
 
-HackRice prescribes 30s intro / 2min demo / 30s technical / 30s impact.
-Be cinematic *inside* those beats — Relevance is a scored criterion, so
-don't reinvent the structure, just execute it well.
+**Brief, in Leo's words:** *"I'm not doing a playthrough of the game. I
+just need to show snippets of it working, show the main features, explain
+how it works, the stack, and the outcome / why it's important regarding
+exposure therapy, helping people regulate heart rate etc."*
 
-**Mark it "Not for Kids" on YouTube** or judges can't view it. Upload
-early, unlisted, so the link is live and tested well before submission.
+So this is **not** a let's-play. It is a product demo: short proof
+snippets, each one labelled, each one earning a specific claim, with
+narration carrying the argument between them.
+
+Target **3:00–3:30**. HackRice prescribes roughly 30s intro / 2min demo /
+30s technical / 30s impact; this fits inside that shape without being a
+playthrough.
+
+**Mark it "Not for Kids" on YouTube** or judges cannot view it. Upload
+unlisted and early, so the link is live and tested long before submission.
 
 ---
 
-## The one rule for this video
+## The one rule
 
-The artifact is genuinely strange — a horror game that reads your pulse
-off your webcam and hunts you with it. **The strangeness IS the pitch.**
-Both viral precedents for this kind of demo (Dropbox's 2007 screencast,
-GibberLink at ElevenLabs' hackathon) are straight demos of a weird real
-thing with personality layered on top — never a bit standing in for a
-demo. So: no skits, no fake dialogue, no "imagine a world where."
-Show a real person, really scared, with their real heartbeat on screen.
+The artifact is genuinely strange: a browser horror game that reads your
+pulse off your webcam and uses it against you. **The strangeness is the
+pitch.** No skits, no "imagine a world where", no fake dialogue. Every
+claim in the narration is answered by something visibly happening on
+screen within two seconds of you saying it.
 
-**The single most valuable asset is genuine reaction footage.** Film
-several different people playing. You cannot fake or reshoot a real
-flinch, and that footage is the whole video.
+The one shot you cannot fake or reshoot is **a real face and a real pulse
+number in the same unbroken frame at the moment of a scare.** Everything
+else is replaceable. Get that first, while you have energy.
+
+---
+
+## Before you record
+
+| | |
+|---|---|
+| Sidecar running | `node sidecar/server.js` — wait for `persona=ready backboard=ready tigerdata=ready` |
+| Lamp | One desk lamp on your face. It is in-fiction (the game tells you to face the light) AND it is what Presage needs. Shoot it as staging, not as a compromise. |
+| Camera allowed | The start screen will tell you if it isn't. Do not record until the vitals panel shows `CAMERA live`. |
+| Headphones | Not for the recording — for you. Audio is spatial; you need to hear what you're describing. |
+| Screen capture | 1280×800 or 16:9. **Do not record in a short window** — and check the vitals panel isn't clipped. |
+| Facecam inset | Small, bottom-right, always visible during snippets. The face is half of every claim. |
+| Dev keys | `C` skip calibration · `K` grant all fragments · `J` both. Use them between takes so you're never waiting 60 seconds on camera. |
+
+Record every snippet **twice**. The second take is always tighter.
 
 ---
 
 ## Shot list
 
-### 0:00–0:30 — Intro (cold open, no title card)
+### 1 · Cold open — 0:00–0:20
+
+No title card. No logo. Start on the thing itself.
 
 | # | Shot | Notes |
 |---|---|---|
-| 1 | Face in the dark, lit by one lamp, pulse number overlaid | The lamp is in-fiction — Presage needs a well-lit face. Shoot it as horror staging, not as a setup compromise. |
-| 2 | Hold on the face. Let the pulse number sit there, steady. | ~4s. The stillness sells the spike that follows. |
-| 3 | **The spike.** Real scare, real jump, pulse number visibly jumps. | One continuous take, face and number in the same frame — that's what makes it unfakeable. Do not cut between them. |
-| 4 | Title: DREAD | Only after the spike has landed. |
+| 1 | Your face in the dark, lit by the one lamp. Pulse number overlaid, steady. | Hold ~4 seconds. The stillness is what sells the spike. |
+| 2 | **The spike.** A real scare, a real flinch, the number visibly jumping. | ONE CONTINUOUS TAKE with face and number in frame together. Never cut between them — the cut is what would make it look staged. |
+| 3 | Cut to black. Title: **DREAD**. | Only after the spike has landed. |
 
-Voiceover over 1–3, short: *"This is a horror game. It's reading his
-heartbeat through the webcam. When he calms down, it comes closer."*
-That's the whole premise in two sentences — say it and stop talking.
+> **VO (over 1–2):** "This is a horror game. It's reading my heart rate
+> through the webcam — no wearable, no hardware. And when I calm down,
+> it comes closer."
 
-### 0:30–2:30 — Demo
+Stop talking there. Two sentences is the whole premise.
 
-Screen capture with a facecam inset (small, bottom corner, always
-visible — the face is half the demo).
+### 2 · The inversion — 0:20–0:40
 
-| # | Beat | What it proves |
+The single idea that makes this different from every other horror game.
+
+| # | Shot | Notes |
 |---|---|---|
-| 5 | Calibration: sitting still, HUD reading bpm, "learning what calm looks like on you" | The sensing is real and live |
-| 6 | Moving through the corridors, fluorescents flickering, hum | Atmosphere and craft |
-| 7 | **Hear it before you see it** — footsteps approaching in stereo, player turns toward the sound | Say out loud: "everything you hear is positioned — he's finding it by ear" |
-| 8 | Hiding while it passes. Pulse climbing on the HUD. | Stakes, and the mechanic |
-| 9 | **The Director beat** — it backs off as he spikes, then comes back once he settles | THE differentiator. Call it out explicitly in VO: "it just backed off — because his heart rate spiked. It waits for him to recover." |
-| 10 | Finding the last fragment, door unlocking, running for the exit | Payoff, and shows there's a real win |
+| 4 | Vitals panel, pulse dropping back toward baseline, and the Director's phase flipping `WITHDRAW → STALK` | This is the mechanic, visible as text. Let it sit long enough to read. |
+| 5 | A creature stepping out of the dark toward you | Cut on the movement |
 
-Cut 5–10 tight. Two minutes goes fast; don't let exploration footage
-run long. Prioritise 7 and 9 — they're the two things no other
-submission will have.
+> **VO:** "Every horror game escalates on a script. This one is adversarial
+> to your nervous system. Scared, and it backs off and lets you recover.
+> Calm, and it starts closing in — because a scare lands hardest after
+> you've been allowed to relax."
 
-### 2:30–3:00 — Technical
+### 3 · Feature snippets — 0:40–2:05
 
-Talking head or VO over b-roll of the code/architecture.
+Six snippets, 10–15 seconds each. Each one is a claim and its proof. Put
+a **small label in the corner** for each so a judge skimming can follow.
 
-- Presage SmartSpectra reads pulse off the webcam — no wearable, nothing
-  strapped to anyone. In-browser rPPG fallback so the demo can never go
-  dark (**say this** — judges respect a failsafe).
-- MediaPipe face landmarks for eyes-closed detection, client-side.
-- The Director: an epsilon-greedy bandit that learns which scare type
-  spikes *this specific player* hardest, and uses arousal to decide when
-  to push and when to retreat.
-- Spatial audio: everything synthesised at runtime — HRTF panning,
-  distance-based occlusion, convolution reverb. No audio files.
-- **Name the hard part honestly:** motion corrupts an rPPG signal exactly
-  when the player flinches — the interesting moment. That's a real
-  engineering problem and saying so is stronger than pretending it isn't.
+| # | Label on screen | What to capture | The claim it earns |
+|---|---|---|---|
+| 6 | **LIVE PULSE** | Vitals panel: `CAMERA live`, `LINK presage`, `FACE tracked`, a bpm number moving, confidence bar filling | The biometrics are real, live, and from the webcam alone |
+| 7 | **IT SEES YOU BLINK** | Close your eyes on camera → `EYES closed` flips in the panel, and a whisper answers | Two independent sensing channels, not one |
+| 8 | **THE DIRECTOR** | Phase readout cycling `STALK → STRIKE → WITHDRAW` next to the pulse trace | The AI director is driven by measured arousal, not a timer |
+| 9 | **IT HUNTS** | A creature coiling, snapping its head to you, and lunging | It navigates the real maze and commits to an attack |
+| 10 | **HIDE** | Step into the wardrobe, `exposed` flips to `hidden`, the creature passes | There is counterplay; it's a game, not a jumpscare reel |
+| 11 | **CALM YOURSELF OUT** | The calm room: the band indicator, your bpm settling inside baseline ±5, the door opening after 8 seconds held | **The most important snippet in the video.** See below. |
 
-### 3:00–3:30 — Impact
+Snippet 11 is the one that carries the impact section, so shoot it
+properly: get your heart rate genuinely up first (play for real for a
+minute), then walk into the calm room and actually breathe it down on
+camera. The breathing pacer is on screen to help. **That is the whole
+thesis in one shot** — the game ends because you regulated yourself.
 
-End on the fear curve screen — the real pulse trace with every scare
-event marked on it.
+### 4 · How it works and the stack — 2:05–2:45
 
-Script, roughly: *"Escalate while they're calm, back off when they
-spike, return once they've recovered. That push-and-retreat loop is
-structurally what a clinician does by eye in graded exposure therapy.
-We're not claiming this treats anything — what we're showing is that the
-loop, and the sensing behind it, used to need a chest strap. This ran on
-the webcam that was already in the laptop."*
+Screen-record the architecture while you narrate. Keep it concrete.
 
-**Do not oversell this.** The hedge is not a weakness, it's the reason
-the claim is credible at all. Judges punish overreach and reward
-calibration.
+> **VO:** "The pulse comes from Presage's SmartSpectra SDK, running in a
+> local sidecar — the browser captures frames and streams them over a
+> websocket, because the whole game is a static site and the API key can
+> never touch it. Presage gives a pulse rate averaged over twelve seconds,
+> which is far too slow for a jump scare. So there are two clocks: the
+> slow one, pulse and heart-rate variability, drives the Director's
+> decisions. A fast one — MediaPipe face landmarks, blinks and startle,
+> running in the browser at frame rate — catches the flinch. They fail in
+> opposite places, which is exactly why there are two.
+>
+> The game is React Three Fiber and Rapier. The creatures path on a
+> shared breadth-first distance field, so all three navigate one real
+> maze. Identity is Persona — you prove you're a living human before the
+> door opens, and it's verified server-side, because a client-reported
+> pass on a static site is worth nothing. The house remembers you between
+> runs through Backboard, and it learns which kind of scare works on you
+> specifically. Every heartbeat is written to Tiger Data as time-series,
+> which is what draws your fear curve at the end."
+
+Show, in order, as you say each: the sidecar terminal → the vitals panel
+→ the maze from above (press `M`) → the Persona gate → "the house has met
+you N times" → the fear curve.
+
+### 5 · Why it matters — 2:45–3:15
+
+This is the section Leo asked for and the one most likely to win
+something. **Be accurate.** Overclaiming a medical benefit is the fastest
+way to lose a judge who knows the field.
+
+> **VO:** "Two real things meet here. Graded exposure — controlled,
+> repeated contact with something frightening — is the standard
+> evidence-based treatment for phobia and anxiety. And heart-rate
+> biofeedback, learning to bring your own arousal down by watching it, is
+> used for anxiety regulation today. Both depend on the same thing:
+> knowing the person's actual arousal, and adjusting what you expose them
+> to based on it.
+>
+> That's the loop this game already runs. It measures arousal, escalates
+> when you habituate, backs off when you're overwhelmed, and its second
+> ending can only be reached by deliberately calming yourself down. We
+> built it to be frightening — but the control loop underneath is the one
+> exposure therapy uses, and it runs on a laptop webcam with nothing
+> strapped to you.
+>
+> It isn't a clinical tool and we haven't tested it as one. What it shows
+> is that the hardware barrier is gone."
+
+**Say that last line.** The honest limitation is what makes the rest
+credible, and Ken Kennedy-style responsible-computing judges reward it
+explicitly. Same reason to mention, if asked, that camera-based pulse
+estimation is known to be less accurate on darker skin tones — naming a
+real limitation of your own stack is a strength in that room.
+
+### 6 · Close — 3:15–3:30
+
+| # | Shot |
+|---|---|
+| 12 | The fear curve, full screen, with scare events marked along it |
+| 13 | The hosted URL on screen, held for 3 seconds |
+
+> **VO:** "It runs in a browser. Open it, allow the camera, and it starts
+> reading you in about a minute."
 
 ---
 
-## Production notes
+## Snippet capture cheat-sheet
 
-- **Assign a video owner at hour zero.** B-roll of people playing cannot
-  be manufactured later.
-- **Shoot Saturday evening, not Sunday morning.** Ten hours of slack, not
-  one, on a build that works.
-- **Cut anything flaky out of the demo entirely** rather than showing it
-  fail. Judges never penalise scope you didn't claim; they always notice
-  evasion. If Presage isn't stable on the day, film the fallback and say
-  it's the fallback.
-- Record clean audio separately from screen capture. Laptop mic over
-  game audio is the most common way a good hackathon video reads cheap.
-- Have the game **already calibrated** before you roll on the demo
-  section — nobody wants to watch 60 seconds of calibration.
+Per snippet, so you're not remembering this at 1am:
 
-## Pre-submission checklist
+- **Live pulse** — sit still, face the lamp, let the confidence bar fill.
+  If the panel shows a red box, it is telling you exactly what's wrong;
+  fix that first.
+- **Blink** — close your eyes for a full second. Don't blink normally,
+  it's too fast to see on video.
+- **Director** — press `C` to skip calibration, then just play. The phase
+  readout is top-left under the bpm.
+- **Hunt** — press `J`, walk into an open corridor, and let one find you.
+  Film the approach, not the death.
+- **Hide** — the wardrobe near spawn. Watch `exposed` flip to `hidden`.
+- **Calm room** — press `K` so the door is already unlocked, take the
+  southern fork rather than the exit door. Get your pulse up first or the
+  shot proves nothing.
+- **Fear curve** — any completed run. A longer run makes a better curve.
 
-- [ ] Uploaded to YouTube, marked **Not for Kids**, link tested logged-out
-- [ ] Under 4 minutes
-- [ ] Face and pulse number visible in the same frame at least once
-- [ ] The Director backing-off beat is explicitly called out in VO
-- [ ] The honest-limitation line is in the technical section
-- [ ] Devpost: every sponsor challenge box ticked
-- [ ] Live link in the description: https://leozh0u.github.io/dread/
+## What NOT to put in the video
+
+- Anything that only works sometimes. Cut it entirely rather than show it
+  failing — judges never penalise scope you didn't claim, and they always
+  notice a demo dodging its own feature.
+- The dev keys. Use them, don't film them.
+- Long stretches of walking. Every snippet should be moving toward a
+  claim.
