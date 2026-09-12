@@ -77,8 +77,13 @@ export function Vitals() {
          * Capping it against the viewport and letting it scroll internally
          * keeps it in its own corner at any window height. 190px is the
          * room the HUD needs above it.
+         *
+         * 230, not 190: the HUD's tallest state is bpm, baseline, phase,
+         * exposed, noise, clues, a two-line objective and a progress bar,
+         * which measures around 210px. At 190 the two still touched on a
+         * 673px window.
          */
-        maxHeight: 'calc(100vh - 190px)',
+        maxHeight: 'calc(100vh - 230px)',
         overflowY: 'auto',
         zIndex: 26,
         fontFamily: 'monospace',

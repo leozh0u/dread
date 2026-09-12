@@ -4,7 +4,7 @@ import { usePlayerPosition } from './playerPosition'
 import { useThreat } from './threat'
 import { useSession } from './session'
 import { useDirector } from './director'
-import { CLUES, OUTSIDE } from './triggers'
+import { CLUES, OUTSIDE, HIDING_SPOTS } from './triggers'
 import { entityReports } from './entities/registry'
 
 /**
@@ -39,6 +39,7 @@ export interface DevBridge {
   position: () => { x: number; y: number; z: number }
   clues: typeof CLUES
   outside: typeof OUTSIDE
+  hidingSpots: typeof HIDING_SPOTS
   entities: typeof entityReports
   state: () => {
     outcome: string
@@ -66,6 +67,7 @@ export function installDevBridge(camera: THREE.Camera) {
     },
     clues: CLUES,
     outside: OUTSIDE,
+    hidingSpots: HIDING_SPOTS,
     entities: entityReports,
     state: () => {
       const threat = useThreat.getState()

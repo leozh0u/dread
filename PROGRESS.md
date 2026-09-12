@@ -649,3 +649,40 @@ pitch clamp landing exactly on the YXZ singularity is a real degenerate
 case and is fixed, and Player.tsx now self-rights every frame so an
 upside-down camera cannot persist. But a full 180° flip could not be
 reproduced in simulation. **If it recurs, the cause is still unfound.**
+
+### A full run, verified in the real browser
+
+Not headlessly — in the actual engine, driving the actual controls.
+
+```
+doorOpen=true
+approach reached 24.3s
+through the door reached 1.5s
+outcome: escaped_door
+```
+
+That closes the oldest item on the list. It confirms the whole chain:
+navigation through the maze, fragments collecting at the player's real
+height, the door unlocking on the third, the door's collider genuinely
+becoming passable (it switches to a sensor when unlocked), and the escape
+ending firing when the player walks out.
+
+An earlier run confirmed the other half: fragments collected at 2.8s and
+12.7s, then a creature hunted the player down and killed them on the way
+to the third. That is the correct outcome for a harness that walks in
+straight lines and never hides, and it is the first time the creatures
+have been shown to actually find and catch a moving player.
+
+Also checked directly, because it was the likeliest reason for a bad first
+impression: **the creatures do not camp the spawn.** Sampled every second
+from the start of a run, all three sit 20m+ away with detection at zero
+and walk their patrols. The fast deaths were the harness walking into
+them.
+
+Two things learned about the harness rather than the game:
+- `navStepToward` is built on the grid padded by the CREATURE radius, so
+  it cannot route into the tight alcoves a player fits through. Fleeing to
+  a hiding spot jammed on a wall.
+- The nav grid keeps the exit door solid forever, so nothing can path
+  OUTSIDE. That is right for creatures — they should not follow you out —
+  but it means reaching the exit has to be waypointed by hand.
