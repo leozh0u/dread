@@ -30,12 +30,41 @@ function Game() {
   useTriggersLoop()
   useMicSource()
 
+  // Ambient (room tone + monster growl/breathing) starts the moment the
+  // game does, NOT once calibration finishes — calibration can take the
+  // full 60s, or stall entirely on bad lighting/no face, and gating all
+  // audio behind 'playing' meant the game went dead silent for that whole
+  // window. Heartbeat audio only needs a live bpm reading, which usually
+  // arrives well before calibration completes, so it starts as soon as
+  // one exists rather than waiting on the full session state.
   useEffect(() => {
-    if (sessionStatus === 'playing') {
-      startAmbient()
-      startHeartbeatAudio(() => usePulseStore.getState().bpm)
+    startAmbient()
+  }, [])
+
+  // Pointer lock captures the mouse entirely — without releasing it here,
+  // clicking "PLAY AGAIN" on the end screen silently does nothing until
+  // the player manually hits Escape first, which read as the whole game
+  // being broken. Release it the moment a run ends; FearCurve's button
+  // re-requests it on click (see PlayAgainButton) since restarting still
+  // needs a locked mouse to look around.
+  useEffect(() => {
+    if (sessionStatus === 'ended' && document.pointerLockElement) {
+      document.exitPointerLock()
     }
-    if (sessionStatus === 'ended') stopHeartbeatAudio()
+  }, [sessionStatus])
+
+  useEffect(() => {
+    if (sessionStatus === 'ended') {
+      stopHeartbeatAudio()
+      return
+    }
+    const unsubscribe = usePulseStore.subscribe((s) => {
+      if (s.bpm != null) {
+        startHeartbeatAudio(() => usePulseStore.getState().bpm)
+        unsubscribe()
+      }
+    })
+    return unsubscribe
   }, [sessionStatus])
 
   return (

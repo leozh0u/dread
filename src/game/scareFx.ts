@@ -305,11 +305,63 @@ export function stopHeartbeatAudio() {
 // ---------------------------------------------------------------------------
 // Footsteps
 // ---------------------------------------------------------------------------
+/** A short exhale-ish whoosh on takeoff — subtle, just enough that a jump
+ * doesn't feel silent. */
+export function playJumpSound() {
+  const audioCtx = getCtx()
+  const t0 = audioCtx.currentTime
+  const src = noiseSource(audioCtx)
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'highpass'
+  filter.frequency.value = 800
+  const gain = audioCtx.createGain()
+  gain.gain.setValueAtTime(0.06, t0)
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15)
+  src.connect(filter).connect(gain).connect(master())
+  src.start()
+  src.stop(t0 + 0.16)
+}
+
+/** Landing thud, scaled by how hard the fall was — a light hop lands soft,
+ * jumping off something taller lands with real weight. `impact` is the
+ * fall speed at touchdown (roughly 0-12 units/s in practice). */
+export function playLandSound(impact: number) {
+  const audioCtx = getCtx()
+  const t0 = audioCtx.currentTime
+  const strength = Math.min(1, impact / 8)
+  const osc = audioCtx.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(85, t0)
+  osc.frequency.exponentialRampToValueAtTime(40, t0 + 0.12)
+  const oGain = audioCtx.createGain()
+  oGain.gain.setValueAtTime(0.08 + strength * 0.22, t0)
+  oGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18)
+  osc.connect(oGain).connect(master())
+  osc.start(t0)
+  osc.stop(t0 + 0.2)
+
+  const src = noiseSource(audioCtx)
+  const filter = audioCtx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.value = 220
+  filter.Q.value = 0.8
+  const nGain = audioCtx.createGain()
+  nGain.gain.setValueAtTime(0.04 + strength * 0.12, t0)
+  nGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12)
+  src.connect(filter).connect(nGain).connect(master())
+  src.start()
+  src.stop(t0 + 0.14)
+}
+
 let footstepLeft = true
 
 /** The player's own footsteps — alternates a faint L/R pan per step (left
- * foot, right foot) for a subtle sense of your own body, plus a soft low
- * thud under the noise transient so it reads as a step, not just a tap. */
+ * foot, right foot) for a subtle sense of your own body. Built entirely
+ * from filtered noise, deliberately no oscillator/tone: a pitched sine
+ * "thud" reads as a drum hit, not a footstep. Two noise layers instead —
+ * a dull lowpassed "weight" (the sole meeting the floor) and a tiny
+ * highpassed "scuff" (the contact transient) — with per-step randomized
+ * cutoffs so consecutive steps don't sound identical. */
 export function playFootstep() {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
@@ -318,28 +370,32 @@ export function playFootstep() {
   footstepLeft = !footstepLeft
   panner.connect(master())
 
-  const src = noiseSource(audioCtx)
-  const filter = audioCtx.createBiquadFilter()
-  filter.type = 'bandpass'
-  filter.frequency.value = 180 + Math.random() * 80
-  filter.Q.value = 0.9
-  const gain = audioCtx.createGain()
-  gain.gain.setValueAtTime(0.07, t0)
-  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09)
-  src.connect(filter).connect(gain).connect(panner)
-  src.start()
-  src.stop(t0 + 0.1)
+  // Weight: dull, low, no ringing — a lowpass (not bandpass) so there's no
+  // resonant tone, just a soft muffled thump.
+  const weight = noiseSource(audioCtx)
+  const weightFilter = audioCtx.createBiquadFilter()
+  weightFilter.type = 'lowpass'
+  weightFilter.frequency.value = 250 + Math.random() * 120
+  weightFilter.Q.value = 0.3
+  const weightGain = audioCtx.createGain()
+  weightGain.gain.setValueAtTime(0.09, t0)
+  weightGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07)
+  weight.connect(weightFilter).connect(weightGain).connect(panner)
+  weight.start()
+  weight.stop(t0 + 0.08)
 
-  const thud = audioCtx.createOscillator()
-  thud.type = 'sine'
-  thud.frequency.setValueAtTime(90, t0)
-  thud.frequency.exponentialRampToValueAtTime(55, t0 + 0.07)
-  const thudGain = audioCtx.createGain()
-  thudGain.gain.setValueAtTime(0.05, t0)
-  thudGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09)
-  thud.connect(thudGain).connect(panner)
-  thud.start(t0)
-  thud.stop(t0 + 0.1)
+  // Scuff: brief, quiet, high — the contact transient. Tiny relative to
+  // the weight layer, just enough texture to read as a real step.
+  const scuff = noiseSource(audioCtx)
+  const scuffFilter = audioCtx.createBiquadFilter()
+  scuffFilter.type = 'highpass'
+  scuffFilter.frequency.value = 2500 + Math.random() * 1500
+  const scuffGain = audioCtx.createGain()
+  scuffGain.gain.setValueAtTime(0.02, t0)
+  scuffGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.02)
+  scuff.connect(scuffFilter).connect(scuffGain).connect(panner)
+  scuff.start()
+  scuff.stop(t0 + 0.03)
 }
 
 // ---------------------------------------------------------------------------

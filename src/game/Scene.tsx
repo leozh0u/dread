@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef, type ElementRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PointerLockControls } from '@react-three/drei'
 import { Physics } from '@react-three/rapier'
@@ -40,6 +40,31 @@ function Flashlight() {
   )
 }
 
+/** Auto-engages pointer lock the moment the scene mounts, so panning/
+ * looking around works immediately after clicking BEGIN instead of
+ * needing a second click into the canvas. This relies on the browser's
+ * "transient activation" window from the BEGIN click still being open a
+ * moment later — true in every browser we've tested this in — with the
+ * old click-to-lock behavior as an automatic fallback if it isn't. */
+function AutoPointerLock() {
+  const controls = useRef<ElementRef<typeof PointerLockControls>>(null)
+  useEffect(() => {
+    try {
+      // requestPointerLock() returns a Promise in modern browsers, which
+      // rejects (not throws) if transient activation already expired or
+      // the browser refused it — either way, the player just clicks the
+      // canvas once, same as before this existed.
+      const result = controls.current?.lock() as unknown
+      if (result && typeof (result as Promise<void>).catch === 'function') {
+        ;(result as Promise<void>).catch(() => {})
+      }
+    } catch {
+      // synchronous throw path, older browsers
+    }
+  }, [])
+  return <PointerLockControls ref={controls} />
+}
+
 export function Scene() {
   return (
     <Canvas
@@ -58,7 +83,7 @@ export function Scene() {
         <Player />
       </Physics>
       <Flashlight />
-      <PointerLockControls />
+      <AutoPointerLock />
       <EffectComposer>
         <Noise opacity={0.06} />
         <Vignette darkness={0.9} offset={0.3} />

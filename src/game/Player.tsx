@@ -2,20 +2,41 @@ import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { RigidBody, CapsuleCollider, type RapierRigidBody } from '@react-three/rapier'
 import { usePlayerPosition, SPAWN_POINT } from './playerPosition'
-import { playFootstep } from './scareFx'
+import { playFootstep, playJumpSound, playLandSound } from './scareFx'
 import * as THREE from 'three'
 
 const SPEED = 4
-const keys = { forward: false, back: false, left: false, right: false }
+const JUMP_SPEED = 6.5
+const LOOK_SPEED = 1.8 // rad/sec, arrow-key look
+const keys = {
+  forward: false,
+  back: false,
+  left: false,
+  right: false,
+  jump: false,
+  lookLeft: false,
+  lookRight: false,
+  lookUp: false,
+  lookDown: false,
+}
 
+// WASD moves; arrow keys look around. This is a deliberate split, not a
+// duplicate binding — arrow-key look works whether or not pointer lock is
+// currently engaged, so losing pointer lock (Escape, alt-tab, a flaky
+// browser) doesn't leave the player stuck unable to look around at all.
 function bindKeys() {
   const down = (e: KeyboardEvent) => setKey(e.code, true)
   const up = (e: KeyboardEvent) => setKey(e.code, false)
   function setKey(code: string, v: boolean) {
-    if (code === 'KeyW' || code === 'ArrowUp') keys.forward = v
-    if (code === 'KeyS' || code === 'ArrowDown') keys.back = v
-    if (code === 'KeyA' || code === 'ArrowLeft') keys.left = v
-    if (code === 'KeyD' || code === 'ArrowRight') keys.right = v
+    if (code === 'KeyW') keys.forward = v
+    if (code === 'KeyS') keys.back = v
+    if (code === 'KeyA') keys.left = v
+    if (code === 'KeyD') keys.right = v
+    if (code === 'Space') keys.jump = v
+    if (code === 'ArrowLeft') keys.lookLeft = v
+    if (code === 'ArrowRight') keys.lookRight = v
+    if (code === 'ArrowUp') keys.lookUp = v
+    if (code === 'ArrowDown') keys.lookDown = v
   }
   window.addEventListener('keydown', down)
   window.addEventListener('keyup', up)
@@ -24,6 +45,8 @@ function bindKeys() {
     window.removeEventListener('keyup', up)
   }
 }
+
+const PITCH_LIMIT = Math.PI / 2 - 0.05
 
 /**
  * Minimal first-person controller: a capsule RigidBody for collision,
@@ -39,6 +62,8 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
   const body = useRef<RapierRigidBody>(null!)
   const { camera } = useThree()
   const lastStep = useRef(0)
+  const wasGrounded = useRef(true)
+  const fallSpeed = useRef(0)
 
   useEffect(() => bindKeys(), [])
 
@@ -56,8 +81,14 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!body.current) return
+
+    if (keys.lookLeft) camera.rotation.y += LOOK_SPEED * delta
+    if (keys.lookRight) camera.rotation.y -= LOOK_SPEED * delta
+    if (keys.lookUp) camera.rotation.x = Math.min(PITCH_LIMIT, camera.rotation.x + LOOK_SPEED * delta)
+    if (keys.lookDown) camera.rotation.x = Math.max(-PITCH_LIMIT, camera.rotation.x - LOOK_SPEED * delta)
+
     const dir = new THREE.Vector3()
     camera.getWorldDirection(dir)
     dir.y = 0
@@ -72,9 +103,26 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     if (move.lengthSq() > 0) move.normalize().multiplyScalar(SPEED)
 
     const vel = body.current.linvel()
-    body.current.setLinvel({ x: move.x, y: vel.y, z: move.z }, true)
+    // Grounded approximation: resting on the floor keeps vertical velocity
+    // near zero (gravity balanced by the contact solver); a real jump or
+    // fall pushes it well past this. No raycast/contact-event needed,
+    // which matters given this project's history with Rapier events not
+    // firing reliably (see playerPosition.ts).
+    const grounded = Math.abs(vel.y) < 0.05
 
-    if (move.lengthSq() > 0) {
+    // Landing: only fires on the false -> true grounded transition, scaled
+    // by how fast we were falling the instant before touchdown.
+    if (grounded && !wasGrounded.current) {
+      playLandSound(Math.abs(fallSpeed.current))
+    }
+    if (!grounded) fallSpeed.current = vel.y
+    wasGrounded.current = grounded
+
+    if (keys.jump && grounded) playJumpSound()
+    const jumpVel = keys.jump && grounded ? JUMP_SPEED : vel.y
+    body.current.setLinvel({ x: move.x, y: jumpVel, z: move.z }, true)
+
+    if (move.lengthSq() > 0 && grounded) {
       const now = performance.now()
       if (now - lastStep.current > STEP_INTERVAL_MS) {
         lastStep.current = now

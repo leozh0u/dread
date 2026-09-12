@@ -102,6 +102,11 @@ export function House() {
           <boxGeometry args={[18, 0.2, 60]} />
           <meshStandardMaterial color="#141414" />
         </mesh>
+        {/* extra floor patch under the west branch passage/dead end */}
+        <mesh position={[-11.5, -1, 6]} receiveShadow>
+          <boxGeometry args={[7, 0.2, 2]} />
+          <meshStandardMaterial color="#141414" />
+        </mesh>
 
         {/* +x corridor wall, gaps at Room A (12..16) and Room C (-4..0) */}
         <WallZ x={3} z1={16} z2={20} tint="#1c1a17" />
@@ -118,10 +123,18 @@ export function House() {
         <WallX z={16} x1={3} x2={8} />
         <WallZ x={8} z1={12} z2={16} />
 
-        {/* Room B (left, x -8..-3, z 4..8) */}
+        {/* Room B (left, x -8..-3, z 4..8) — far wall has a gap: a narrow
+            branch passage leads off it, west to a forgotten dead end. This
+            is the maze-like non-linearity — not every path is the main
+            spine, and the monster (confined to the spine) can never
+            follow you down it. */}
         <WallX z={4} x1={-8} x2={-3} />
         <WallX z={8} x1={-8} x2={-3} />
-        <WallZ x={-8} z1={4} z2={8} />
+        <WallZ x={-8} z1={4} z2={5} />
+        <WallZ x={-8} z1={7} z2={8} />
+        <WallX z={5} x1={-15} x2={-8} />
+        <WallX z={7} x1={-15} x2={-8} />
+        <WallZ x={-15} z1={5} z2={7} />
 
         {/* Room C (right, x 3..8, z -4..0) */}
         <WallX z={-4} x1={3} x2={8} />

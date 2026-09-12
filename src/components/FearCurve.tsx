@@ -123,7 +123,13 @@ export function FearCurve() {
 function PlayAgainButton() {
   return (
     <button
-      onClick={() => restartRun()}
+      onClick={() => {
+        restartRun()
+        // Re-request pointer lock synchronously in this click handler —
+        // same trick as the BEGIN button — so looking around works
+        // immediately on the new run instead of needing another click.
+        document.querySelector('canvas')?.requestPointerLock()
+      }}
       style={{
         marginTop: 24,
         background: 'transparent',
