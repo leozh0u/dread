@@ -85,20 +85,21 @@ key**, so every call is proxied through the sidecar — meaning memory works
 on your laptop and in the video, but not on the hosted build for judges.
 That's a hard constraint of their API, not a choice.
 
-You need an assistant id first:
+Memories are scoped to an *assistant*, so you need an assistant id as well
+as the key. Add the key:
 
 ```bash
-cd /Users/leo/Projects/dread && source .env.local 2>/dev/null; curl -s -X POST https://app.backboard.io/api/assistants -H "X-API-Key: $BACKBOARD_API_KEY" -H "content-type: application/json" -d '{"name":"DREAD House","system_prompt":"You remember what frightens each player."}'
+cd /Users/leo/Projects/dread && printf 'BACKBOARD_API_KEY=your_key\n' >> .env.local
 ```
 
-Take the `assistant_id` from the response and:
+Then let the script make the assistant and write its id back for you:
 
 ```bash
-cd /Users/leo/Projects/dread && cat >> .env.local <<'ENV'
-BACKBOARD_API_KEY=your_key
-BACKBOARD_ASSISTANT_ID=the_uuid_from_above
-ENV
+cd /Users/leo/Projects/dread && node scripts/setup-backboard.mjs
 ```
+
+Safe to run twice — if an assistant id is already set it stops rather than
+orphaning the existing one and every memory attached to it.
 
 Sidecar endpoints already live: `POST /memory/remember`, `GET
 /memory/recall?q=…`. The game does not yet *call* them — that's the next
