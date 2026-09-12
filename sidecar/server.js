@@ -27,6 +27,7 @@
 // height, float64 timestamp in microseconds, then packed RGBA. Pulse goes
 // back out as JSON.
 import { readFileSync, existsSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'node:http'
@@ -384,6 +385,35 @@ const httpServer = createServer(async (req, res) => {
         },
         origin,
       )
+    }
+
+    /**
+     * DIAGNOSTIC SINK for the raw pulse signal (dev only, see devKeys.ts).
+     *
+     * Writes the browser's real green-channel trace to a file so the
+     * estimator can be run against an actual camera recording rather than
+     * against a simulation of one. Every accuracy fix so far has been
+     * validated on synthetic signals, which cannot catch a fault in what
+     * the camera is pointed at.
+     */
+    if (url.pathname === '/debug/pulse' && req.method === 'POST') {
+      const body = await readBody(req)
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const dir = join(process.cwd(), 'pulse-dumps')
+      await mkdir(dir, { recursive: true })
+      // The ROI still is a data URL and would dominate the JSON; write it
+      // beside the trace as a real png instead.
+      let png = null
+      if (typeof body.roiPng === 'string' && body.roiPng.startsWith('data:image/png;base64,')) {
+        png = join(dir, `roi-${stamp}.png`)
+        await writeFile(png, Buffer.from(body.roiPng.slice('data:image/png;base64,'.length), 'base64'))
+        delete body.roiPng
+      }
+      const file = join(dir, `pulse-${stamp}.json`)
+      await writeFile(file, JSON.stringify(body, null, 2))
+      const n = body.samples?.length ?? 0
+      console.log(`[sidecar] pulse dump: ${n} samples, reported ${body.reported}, truth ${body.truth} -> ${file}`)
+      return sendJson(res, 200, { ok: true, file, png, samples: n }, origin)
     }
 
     // Backboard memory proxy — "the house remembers you between sessions".

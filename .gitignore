@@ -6,3 +6,4 @@ dist/
 .DS_Store
 sidecar/node_modules/
 sidecar/.env
+pulse-dumps/

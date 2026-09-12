@@ -311,4 +311,36 @@ export class FallbackPulseEstimator {
   estimate(): FallbackReading {
     return estimatePulse(this.samples)
   }
+
+  /**
+   * The raw green-channel trace, for diagnosis.
+   *
+   * Every accuracy problem so far has been diagnosed by guessing at what
+   * the camera was probably producing and then reproducing it
+   * synthetically. That found the breathing bug and the drift bug, but it
+   * cannot find a problem whose cause is the actual picture — a region of
+   * interest landing on hair instead of skin, a face too small in frame,
+   * an auto-exposure loop fighting the signal. For those the only useful
+   * thing is the real samples off the real camera.
+   */
+  dump(): { samples: GreenSample[]; roi: { sx: number; sy: number; sw: number; sh: number }; video: { w: number; h: number } } {
+    const vw = this.video.videoWidth
+    const vh = this.video.videoHeight
+    return {
+      samples: this.samples.slice(),
+      roi: { sx: vw * 0.35, sy: vh * 0.12, sw: vw * 0.3, sh: vh * 0.18 },
+      video: { w: vw, h: vh },
+    }
+  }
+
+  /** A still of what the ROI is actually looking at, as a data URL. If the
+   * pulse is being read off someone's hairline this is the fastest way to
+   * see it. */
+  roiSnapshot(): string | null {
+    try {
+      return this.canvas.toDataURL('image/png')
+    } catch {
+      return null
+    }
+  }
 }

@@ -290,6 +290,11 @@ export function usePulseSource(videoRef: React.RefObject<HTMLVideoElement | null
       const video = videoRef.current
       if (!video) return
       if (!fallbackRef.current) fallbackRef.current = new FallbackPulseEstimator(video)
+      // Hand the live estimator to the diagnostic key (see devKeys.ts).
+      // DEV only — this is a debugging seam, not a shipped feature.
+      if (import.meta.env.DEV) {
+        ;(window as unknown as { __dreadPulse?: unknown }).__dreadPulse = fallbackRef.current
+      }
       const generation = ++fallbackGeneration
       const tick = () => {
         // Exit if stood down, or if a newer loop has taken over.

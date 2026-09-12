@@ -17,7 +17,7 @@ import { useTriggersLoop } from './game/useTriggersLoop'
 import { useCalmRoomLoop } from './game/useCalmRoomLoop'
 import { useMicSource } from './lib/useMic'
 import { useAmbientHorror } from './game/useAmbientHorror'
-import { useDevKeys } from './game/devKeys'
+import { useDevKeys, usePulseDumpKey } from './game/devKeys'
 import { useDirector, type ScareType } from './game/director'
 import { useSession } from './game/session'
 import { playScare, startAmbient, startHeartbeatAudio, stopHeartbeatAudio, unlockAudio } from './game/scareFx'
@@ -91,6 +91,7 @@ function Game() {
   useMicSource()
   useAmbientHorror()
   useDevKeys()
+  usePulseDumpKey()
   // Backboard: what the Director learned about this player in previous
   // sessions, and a line to tell them the house recognises them.
   const recognition = useHouseMemory()

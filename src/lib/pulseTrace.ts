@@ -33,7 +33,43 @@ export interface TraceSample {
 
 let buffer: TraceSample[] = []
 let timer: ReturnType<typeof setInterval> | null = null
-let available = true
+
+/**
+ * SIDECAR AVAILABILITY IS TEMPORARY, NOT PERMANENT.
+ *
+ * This used to be a plain `available = false` latch: the first failed
+ * flush disabled trace writing for the entire life of the tab. That was
+ * defensible when the sidecar either ran for the whole session or never
+ * started — but the SmartSpectra library aborts the process from inside
+ * its own threads, and the sidecar is now supervised and comes straight
+ * back (see sidecar/run.sh).
+ *
+ * So the real sequence was: sidecar crashes, one flush fails, the browser
+ * gives up forever, sidecar restarts thirty seconds later, and the tab
+ * never writes another row. The symptom is a game that displays a live
+ * pulse while Tiger Data receives nothing at all, with no error anywhere
+ * — which is exactly what happened today, and it silently took out the
+ * post-game fear curve and the whole time-series claim with it.
+ *
+ * Back off instead. Doubling from 15s to a 4-minute ceiling costs almost
+ * nothing when the sidecar is genuinely absent, and recovers on its own
+ * when it isn't.
+ */
+const RETRY_BASE_MS = 15_000
+const RETRY_MAX_MS = 240_000
+let retryDelay = RETRY_BASE_MS
+let unavailableUntil = 0
+
+function sidecarUsable() {
+  return Date.now() >= unavailableUntil
+}
+
+/** Exposed for the diagnostics panel and for tests. */
+export function traceStatus() {
+  return sidecarUsable()
+    ? { ok: true as const, buffered: buffer.length }
+    : { ok: false as const, buffered: buffer.length, retryInMs: unavailableUntil - Date.now() }
+}
 
 export function startTrace() {
   if (timer) return
@@ -46,7 +82,9 @@ export function stopTrace() {
 }
 
 export function recordSample(s: TraceSample) {
-  if (!available) return
+  // Keep buffering even while the sidecar is down. It is capped below, and
+  // the samples are the point of the feature — dropping them during an
+  // outage means the run's trace has a hole in it even after recovery.
   buffer.push(s)
   // Never let this grow without bound if the sidecar is gone — the samples
   // are only worth keeping if they can actually be written.
@@ -54,7 +92,8 @@ export function recordSample(s: TraceSample) {
 }
 
 export async function flushTrace(): Promise<number> {
-  if (!available || buffer.length === 0) return 0
+  if (buffer.length === 0) return 0
+  if (!sidecarUsable()) return 0
   const batch = buffer
   buffer = []
   try {
@@ -64,15 +103,37 @@ export async function flushTrace(): Promise<number> {
       body: JSON.stringify({ samples: batch }),
       signal: AbortSignal.timeout(6000),
     })
-    if (!res.ok) return 0
+    if (!res.ok) {
+      // Reachable but unhappy — put the batch back and back off.
+      buffer = batch.concat(buffer).slice(-MAX_BUFFER)
+      backOff()
+      return 0
+    }
+    // A success clears the penalty entirely, so one blip during a run
+    // does not leave the rest of it on a four-minute retry.
+    retryDelay = RETRY_BASE_MS
+    unavailableUntil = 0
     const body = (await res.json()) as { written?: number }
     return body.written ?? 0
   } catch {
-    // Sidecar isn't running, or there's no database configured. Stop
-    // trying rather than retrying forever in the background of a game.
-    available = false
+    // Sidecar isn't running, or there's no database configured. Hold the
+    // samples and try again later rather than discarding them.
+    buffer = batch.concat(buffer).slice(-MAX_BUFFER)
+    backOff()
     return 0
   }
+}
+
+function backOff() {
+  unavailableUntil = Date.now() + retryDelay
+  retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS)
+}
+
+/** Testing seam — resets the module's backoff state between cases. */
+export function resetTraceState() {
+  buffer = []
+  retryDelay = RETRY_BASE_MS
+  unavailableUntil = 0
 }
 
 export interface PastRun {
