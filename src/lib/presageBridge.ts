@@ -51,6 +51,7 @@ export class PresageFrameSender {
   private lastTsUs = 0
   private rafHandle = 0
   private vfcHandle = 0
+  private watchdog: ReturnType<typeof setInterval> | null = null
   private header = new DataView(new ArrayBuffer(HEADER_BYTES))
   private packetBuf: ArrayBuffer | null = null
   private packet: Uint8Array | null = null
@@ -75,10 +76,31 @@ export class PresageFrameSender {
     if (this.running || !this.ctx) return
     this.running = true
     this.pump()
+
+    // Watchdog. rVFC can also stop firing for reasons outside this loop —
+    // a backgrounded tab, a camera track that drops — and because the
+    // loop re-arms from inside its own callback, one missed callback ends
+    // it silently and the pulse source is simply gone. Re-arm via rAF,
+    // which always fires, rather than trusting it not to happen.
+    this.watchdog = setInterval(() => {
+      if (!this.running) return
+      if (performance.now() - this.lastSentAt < 2000) return
+      if (this.vfcHandle && typeof this.video.cancelVideoFrameCallback === 'function') {
+        this.video.cancelVideoFrameCallback(this.vfcHandle)
+        this.vfcHandle = 0
+      }
+      if (this.rafHandle) {
+        cancelAnimationFrame(this.rafHandle)
+        this.rafHandle = 0
+      }
+      this.pump()
+    }, 2000)
   }
 
   stop() {
     this.running = false
+    if (this.watchdog) clearInterval(this.watchdog)
+    this.watchdog = null
     if (this.rafHandle) cancelAnimationFrame(this.rafHandle)
     if (this.vfcHandle && typeof this.video.cancelVideoFrameCallback === 'function') {
       this.video.cancelVideoFrameCallback(this.vfcHandle)
@@ -88,17 +110,31 @@ export class PresageFrameSender {
   }
 
   /**
-   * Drive off requestVideoFrameCallback where it exists, because it fires
-   * once per genuinely NEW camera frame. requestAnimationFrame fires at
-   * display rate, which on a 60Hz screen with a 30fps camera means half
-   * the frames captured are byte-identical duplicates. Duplicates are
-   * actively harmful here: rPPG reads colour change over time, and a
-   * repeated frame is a reading of "no change" that never happened.
+   * Drive off requestVideoFrameCallback ONCE THE VIDEO IS ACTUALLY
+   * PLAYING, because it fires once per genuinely new camera frame.
+   * requestAnimationFrame fires at display rate, so on a 60Hz screen with
+   * a 30fps camera half the captured frames are byte-identical
+   * duplicates — actively harmful, since rPPG reads colour change over
+   * time and a repeated frame is a reading of "no change" that never
+   * happened.
+   *
+   * But rVFC only ever fires if the video presents a frame, and this loop
+   * re-arms itself from inside its own callback. Registering it against a
+   * video that has no stream yet therefore kills the loop permanently —
+   * which is exactly what happened: the socket opens in milliseconds
+   * while getUserMedia takes hundreds plus a permission prompt, so the
+   * sender armed against an empty video and the sidecar sat there
+   * reporting "NO FRAMES arriving" forever.
+   *
+   * So: poll with rAF until the video has data, then switch to rVFC. rAF
+   * keeps firing regardless of the video's state, so the loop can always
+   * recover.
    */
   private pump = () => {
     if (!this.running) return
     const v = this.video
-    if (typeof v.requestVideoFrameCallback === 'function') {
+    const videoReady = v.readyState >= 2 && v.videoWidth > 0
+    if (videoReady && typeof v.requestVideoFrameCallback === 'function') {
       this.vfcHandle = v.requestVideoFrameCallback(() => {
         this.capture()
         this.pump()
@@ -158,6 +194,10 @@ export class PresageFrameSender {
 
       this.ws.send(this.packetBuf)
       this.framesSent++
+      // Say so once. "Is it even sending?" was the whole question during
+      // the first live test, and there was no way to answer it from the
+      // browser side.
+      if (this.framesSent === 1) console.info('[dread] sending camera frames to Presage sidecar')
     } catch {
       // A cross-origin or not-yet-ready video taints the canvas and makes
       // getImageData throw. The game must keep running regardless — pulse

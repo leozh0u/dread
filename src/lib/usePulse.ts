@@ -173,9 +173,18 @@ export function usePulseSource(videoRef: React.RefObject<HTMLVideoElement | null
       }
     }, 5000)
 
-    function startFrameSender() {
+    function startFrameSender(attempt = 0) {
       const video = videoRef.current
-      if (!video || !ws) return
+      if (!ws) return
+      if (!video) {
+        // The socket can open before React has attached the ref. Bailing
+        // here permanently was one half of why the sidecar saw no frames
+        // at all — retry rather than giving up on the whole integration
+        // because of a few milliseconds of ordering.
+        if (attempt < 20) setTimeout(() => startFrameSender(attempt + 1), 250)
+        else console.warn('[dread] no <video> to capture from — Presage will get no frames')
+        return
+      }
       senderRef.current?.stop()
       senderRef.current = new PresageFrameSender(video, ws)
       senderRef.current.start()
