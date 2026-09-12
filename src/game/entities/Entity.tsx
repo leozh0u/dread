@@ -322,6 +322,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
     if (closest === index) {
       useDirector.getState().setMonsterDistance(normalized)
       setMonsterOccluded(!los)
+      useDirector.getState().setMonsterVisible(los)
       setMonsterProximity(normalized)
       setMonsterAudioPosition(group.current.position.x, FLOOR_Y + 1, group.current.position.z)
     }

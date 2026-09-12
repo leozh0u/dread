@@ -7,6 +7,9 @@ import { playScare, playJumpscareSound } from './scareFx'
 
 const TICK_MS = 200
 const CLOSE_THRESHOLD = 0.35
+/** Normalised distance inside which line of sight stops mattering — it's
+ * on top of you. 0.08 of MAX_AUDIBLE_DIST is about 1.6 metres. */
+const TOUCHING = 0.08
 const NOISE_THRESHOLD = 0.15
 
 const RATE_EXPOSED = 8 // per tick, ~2.5s to death — being seen while it's close is fatal fast
@@ -17,6 +20,30 @@ const JUMPSCARE_COOLDOWN_MS = 6000
 const JUMPSCARE_CHANCE = 0.5
 
 const SCARE_TYPES: ScareType[] = ['proximity', 'audio', 'visual', 'absence']
+
+/**
+ * One tick of the detection meter, as a pure function.
+ *
+ * This decides whether the player lives, which makes it the single most
+ * consequential piece of logic in the game and the one most worth being
+ * able to test without a renderer. `startled` reports that a jumpscare is
+ * eligible; the caller owns the cooldown and the dice, since those aren't
+ * part of the rule.
+ */
+export function stepDetection(args: {
+  detection: number
+  close: boolean
+  isHidden: boolean
+  noisy: boolean
+}): { next: number; startled: boolean } {
+  const { detection, close, isHidden, noisy } = args
+  if (!close) return { next: detection + RATE_DECAY, startled: false }
+  if (!isHidden) return { next: detection + RATE_EXPOSED, startled: false }
+  if (noisy) return { next: detection + RATE_NOISY_HIDDEN, startled: true }
+  // Hidden and quiet, even with it right there — safe. This is the whole
+  // stealth skill the game teaches, so it has to be genuinely reliable.
+  return { next: detection + RATE_DECAY, startled: false }
+}
 
 /**
  * The stealth layer. Runs independently of the pulse-driven Director
@@ -44,18 +71,26 @@ export function useThreatLoop() {
       const monsterDistance = useDirector.getState().monsterDistance
       const isHidden = useThreat.getState().isHidden
       const noise = useMicStore.getState().level
-      const close = monsterDistance < CLOSE_THRESHOLD
+      const near = monsterDistance < CLOSE_THRESHOLD
       const noisy = noise > NOISE_THRESHOLD
 
-      const detection = useThreat.getState().detection
-      let next = detection
+      // "Close" means close AND able to see you. CLOSE_THRESHOLD is seven
+      // metres, and a creature seven metres away through a wall used to
+      // kill you exactly as fast as one standing in front of you. That
+      // never surfaced while they were stuck on a patrol line and could
+      // never approach; now that they navigate the real maze it would be
+      // the first thing anyone hit — and dying to something you could not
+      // possibly have seen is the least fair death a game can hand out.
+      //
+      // Within touching distance it still counts regardless: at that range
+      // it has hold of you, and arguing about sightlines is absurd.
+      const visible = useDirector.getState().monsterVisible
+      const close = near && (visible || monsterDistance < TOUCHING)
 
-      if (!close) {
-        next += RATE_DECAY
-      } else if (!isHidden) {
-        next += RATE_EXPOSED
-      } else if (noisy) {
-        next += RATE_NOISY_HIDDEN
+      const detection = useThreat.getState().detection
+      const { next, startled } = stepDetection({ detection, close, isHidden, noisy })
+
+      if (startled) {
         const now = Date.now()
         if (now - lastJumpscare.current > JUMPSCARE_COOLDOWN_MS && Math.random() < JUMPSCARE_CHANCE) {
           lastJumpscare.current = now
@@ -63,8 +98,6 @@ export function useThreatLoop() {
           playScare(type, useDirector.getState().setMonsterDistance)
           playJumpscareSound()
         }
-      } else {
-        next += RATE_DECAY // hidden and quiet, even though close — safe
       }
 
       useThreat.getState().setDetection(next)

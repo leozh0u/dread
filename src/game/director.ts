@@ -13,11 +13,17 @@ interface ScareStat {
 interface DirectorState {
   phase: DirectorPhase
   monsterDistance: number // 0 = on top of you, 1 = far away
+  /** Whether the NEAREST creature has line of sight to the player.
+   * Detection is gated on this: being six metres away through a wall must
+   * not kill you, and before the creatures could actually reach anyone it
+   * never came up. */
+  monsterVisible: boolean
   lastScare: ScareType | null
   scareLog: { t: number; type: ScareType; bpmBefore: number; bpmAfter: number }[]
   stats: Record<ScareType, ScareStat>
   setPhase: (p: DirectorPhase) => void
   setMonsterDistance: (d: number) => void
+  setMonsterVisible: (v: boolean) => void
   recordScareOutcome: (type: ScareType, bpmBefore: number, bpmAfter: number) => void
   /** Seed the bandit from a previous session (see lib/houseMemory.ts). */
   seedStats: (stats: Record<ScareType, ScareStat>) => void
@@ -52,6 +58,7 @@ function freshStats(): Record<ScareType, ScareStat> {
 export const useDirector = create<DirectorState>((set, get) => ({
   phase: 'CALIBRATING',
   monsterDistance: 1,
+  monsterVisible: false,
   lastScare: null,
   scareLog: [],
   stats: freshStats(),
@@ -75,6 +82,7 @@ export const useDirector = create<DirectorState>((set, get) => ({
     set({ stats })
   },
   setMonsterDistance: (d) => set({ monsterDistance: Math.max(0, Math.min(1, d)) }),
+  setMonsterVisible: (monsterVisible) => set({ monsterVisible }),
 
   recordScareOutcome: (type, bpmBefore, bpmAfter) => {
     const stats = { ...get().stats }
@@ -112,7 +120,7 @@ export const useDirector = create<DirectorState>((set, get) => ({
   // Phase is NOT hardcoded here — restart.ts decides STALK vs CALIBRATING
   // based on whether a baseline exists, so exactly one place makes that
   // call instead of two that could disagree.
-  resetForNewRun: () => set({ monsterDistance: 1, lastScare: null }),
+  resetForNewRun: () => set({ monsterDistance: 1, monsterVisible: false, lastScare: null }),
 }))
 
 /**
