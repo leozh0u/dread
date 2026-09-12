@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PointerLockControls } from '@react-three/drei'
 import { Physics, RigidBody } from '@react-three/rapier'
+import { Player } from './Player'
 import { EffectComposer, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { useDirector } from './director'
@@ -24,7 +25,7 @@ function Flashlight() {
     <>
       <spotLight
         ref={light}
-        intensity={8}
+        intensity={2500}
         angle={0.35}
         penumbra={0.5}
         distance={15}
@@ -93,12 +94,7 @@ export function Scene() {
       <Physics gravity={[0, -20, 0]}>
         <Corridor />
         <Monster />
-        <RigidBody type="dynamic" colliders="ball" position={[0, 1, 10]} enabledRotations={[false, false, false]}>
-          <mesh>
-            <sphereGeometry args={[0.4]} />
-            <meshStandardMaterial visible={false} />
-          </mesh>
-        </RigidBody>
+        <Player />
       </Physics>
       <Flashlight />
       <PointerLockControls />

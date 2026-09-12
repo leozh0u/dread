@@ -1,13 +1,14 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Scene } from './game/Scene'
 import { Webcam } from './components/Webcam'
 import { Hud } from './components/Hud'
 import { ScreenFlash } from './components/ScreenFlash'
 import { FearCurve } from './components/FearCurve'
+import { StartGate } from './components/StartGate'
 import { useDirectorLoop } from './game/useDirectorLoop'
 import { useDirector, type ScareType } from './game/director'
 import { useSession } from './game/session'
-import { playScare, startAmbient } from './game/scareFx'
+import { playScare, startAmbient, unlockAudio } from './game/scareFx'
 
 function Game() {
   const setMonsterDistance = useDirector((s) => s.setMonsterDistance)
@@ -19,9 +20,6 @@ function Game() {
   )
   useDirectorLoop(onScare)
 
-  // Ambient drone starts on first user gesture (browsers block autoplay
-  // AudioContext until then) — the calibration screen's "click to begin"
-  // step doubles as that gesture.
   useEffect(() => {
     if (sessionStatus === 'playing') startAmbient()
   }, [sessionStatus])
@@ -38,5 +36,18 @@ function Game() {
 }
 
 export default function App() {
+  const [started, setStarted] = useState(false)
+
+  if (!started) {
+    return (
+      <StartGate
+        onStart={() => {
+          unlockAudio() // must happen synchronously in the click, see scareFx.ts
+          setStarted(true)
+        }}
+      />
+    )
+  }
+
   return <Game />
 }

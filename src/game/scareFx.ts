@@ -29,6 +29,15 @@ function getCtx() {
   return ctx
 }
 
+/** Must be called synchronously inside a real click handler — Chrome
+ * leaves AudioContext suspended otherwise, and starting it 60s later
+ * inside a calibration-complete effect (well outside the gesture window)
+ * silently produces no sound. Called from StartGate's onClick. */
+export function unlockAudio() {
+  const audioCtx = getCtx()
+  if (audioCtx.state === 'suspended') audioCtx.resume()
+}
+
 /** Low drone that runs the whole session — muted for the 'absence' scare. */
 export function startAmbient() {
   const audioCtx = getCtx()
