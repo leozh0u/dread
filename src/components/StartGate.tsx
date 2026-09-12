@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { livenessConfigured, runLivenessCheck } from '../lib/liveness'
 
 /**
  * Every browser blocks camera access and AudioContext until a real user
@@ -7,6 +8,39 @@ import { useState } from 'react'
  */
 export function StartGate({ onStart }: { onStart: () => void }) {
   const [starting, setStarting] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  // null = not attempted yet. The house's line about you changes once it
+  // has decided what you are.
+  const [verdict, setVerdict] = useState<string | null>(null)
+  const showLiveness = livenessConfigured() && verdict === null
+
+  async function verifyThenStart() {
+    setVerifying(true)
+    const result = await runLivenessCheck()
+    setVerifying(false)
+    if (result.status === 'verified') {
+      setVerdict(
+        result.serverVerified
+          ? 'CONFIRMED. Something alive is out there.'
+          : 'CONFIRMED, unverified. The house will take your word for now.',
+      )
+    } else if (result.status === 'declined') {
+      setVerdict('You would rather not say. The house noticed.')
+    } else {
+      // Never block entry on a verification that couldn't run.
+      console.warn('[dread] liveness unavailable:', result.reason)
+      setVerdict(null)
+      begin()
+      return
+    }
+    // Let the verdict land before the dark.
+    setTimeout(begin, 1600)
+  }
+
+  function begin() {
+    setStarting(true)
+    onStart()
+  }
 
   return (
     <div
@@ -34,12 +68,13 @@ export function StartGate({ onStart }: { onStart: () => void }) {
       <p style={{ opacity: 0.45, fontSize: 12, letterSpacing: 1 }}>
         WASD move · arrow keys look · space jump · N mute
       </p>
+      {verdict && (
+        <p style={{ color: '#c33', fontSize: 13, letterSpacing: 1, opacity: 0.9 }}>{verdict}</p>
+      )}
+
       <button
-        onClick={() => {
-          setStarting(true)
-          onStart()
-        }}
-        disabled={starting}
+        onClick={showLiveness ? verifyThenStart : begin}
+        disabled={starting || verifying}
         style={{
           background: 'transparent',
           border: '1px solid #c33',
@@ -48,11 +83,38 @@ export function StartGate({ onStart }: { onStart: () => void }) {
           fontFamily: 'monospace',
           fontSize: 14,
           letterSpacing: 2,
-          cursor: starting ? 'default' : 'pointer',
+          cursor: starting || verifying ? 'default' : 'pointer',
         }}
       >
-        {starting ? 'LISTENING...' : 'BEGIN'}
+        {verifying
+          ? 'PROVING...'
+          : starting
+            ? 'LISTENING...'
+            : showLiveness
+              ? 'PROVE YOU ARE ALIVE'
+              : 'BEGIN'}
       </button>
+
+      {/* A judge who can't get past a verification screen can't play the
+          game at all, so this is always here. */}
+      {showLiveness && !verifying && !starting && (
+        <button
+          onClick={begin}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#c33',
+            opacity: 0.35,
+            fontFamily: 'monospace',
+            fontSize: 11,
+            letterSpacing: 1,
+            cursor: 'pointer',
+            textDecoration: 'underline',
+          }}
+        >
+          skip — just let me in
+        </button>
+      )}
     </div>
   )
 }
