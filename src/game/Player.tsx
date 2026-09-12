@@ -19,6 +19,8 @@ const FALL_LIMIT = -8
 /** Metres travelled per full two-step stride. Keeps the head bob locked
  * to the footstep rhythm rather than running on its own clock. */
 const STRIDE = 1.9
+/** Minimum gap between jumps. See the note where it is used. */
+const JUMP_COOLDOWN_MS = 280
 const keys = {
   forward: false,
   back: false,
@@ -80,6 +82,7 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
   const landDip = useRef(0)
   const cameraRoll = useRef(0)
   const wasGrounded = useRef(true)
+  const lastJump = useRef(0)
   const fallSpeed = useRef(0)
 
   useEffect(() => bindKeys(), [])
@@ -182,8 +185,26 @@ export function Player({ start = SPAWN_POINT }: { start?: [number, number, numbe
     if (!grounded) fallSpeed.current = vel.y
     wasGrounded.current = grounded
 
-    if (keys.jump && grounded) playJumpSound()
-    const jumpVel = keys.jump && grounded ? JUMP_SPEED : vel.y
+    /**
+     * A jump needs a moment between jumps.
+     *
+     * Grounded is `|vel.y| < 0.05`, which is true on the very frame you
+     * touch down — so holding the jump key through a landing fired the
+     * landing thud and the push-off scuff in the SAME frame, two
+     * transients on top of each other, which is most of what made jumping
+     * sound wrong. It also meant any jitter in the vertical velocity on a
+     * contact could retrigger the sound without a jump happening.
+     *
+     * A short floor between jumps fixes both without taking away holding
+     * the key to hop, which still works, just at a human rate.
+     */
+    const nowMs = performance.now()
+    const canJump = keys.jump && grounded && nowMs - lastJump.current > JUMP_COOLDOWN_MS
+    if (canJump) {
+      lastJump.current = nowMs
+      playJumpSound()
+    }
+    const jumpVel = canJump ? JUMP_SPEED : vel.y
     body.current.setLinvel({ x: move.x, y: jumpVel, z: move.z }, true)
 
     if (move.lengthSq() > 0 && grounded) {

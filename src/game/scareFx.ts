@@ -610,19 +610,64 @@ export function stopHeartbeatAudio() {
 // ---------------------------------------------------------------------------
 /** A short exhale-ish whoosh on takeoff — subtle, just enough that a jump
  * doesn't feel silent. */
+/**
+ * Pushing off the ground.
+ *
+ * Leo: "the jumping sound sounds bad."
+ *
+ * It was a 150ms burst of white noise through a fixed 800Hz high-pass,
+ * opened at full gain with `setValueAtTime`. Three separate reasons that
+ * reads as cheap:
+ *
+ *   - an instantaneous attack on a noise burst is a CLICK. Every real
+ *     sound has a rise, even a fast one, and a step discontinuity in a
+ *     waveform is heard as a separate transient sitting on top
+ *   - a static high-pass is a hiss. Real friction sounds sweep, because
+ *     the contact patch changes as the foot rolls and leaves
+ *   - there was no low end at all, so nothing connected the sound to a
+ *     body with weight. It was a "tss" where a person should be
+ *
+ * Rebuilt as the two things actually making the noise: a shoe scuffing
+ * as it rolls off the floor, and the dull thump of weight leaving it.
+ * Both are randomised per jump — a jump sound that is bit-identical every
+ * time is the other half of why this was noticeable, since you press the
+ * key a lot.
+ */
 export function playJumpSound() {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
+  const vary = 0.88 + Math.random() * 0.24
+
+  // The scuff: filtered noise sweeping DOWN as the foot leaves, with a
+  // short but real attack rather than a step.
   const src = noiseSource(audioCtx)
   const filter = audioCtx.createBiquadFilter()
-  filter.type = 'highpass'
-  filter.frequency.value = 800
+  filter.type = 'bandpass'
+  filter.Q.value = 0.7
+  filter.frequency.setValueAtTime(2100 * vary, t0)
+  filter.frequency.exponentialRampToValueAtTime(650 * vary, t0 + 0.13)
   const gain = audioCtx.createGain()
-  gain.gain.setValueAtTime(0.06, t0)
-  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.15)
+  gain.gain.setValueAtTime(0.0001, t0)
+  gain.gain.linearRampToValueAtTime(0.05 * vary, t0 + 0.012)
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.17)
   src.connect(filter).connect(gain).connect(master())
-  src.start()
-  src.stop(t0 + 0.16)
+  src.start(t0)
+  src.stop(t0 + 0.18)
+
+  // The weight: a short low thump, the body leaving the floor. Quiet —
+  // it is felt more than heard, and it is what stops the scuff sounding
+  // like it belongs to nobody.
+  const osc = audioCtx.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(125 * vary, t0)
+  osc.frequency.exponentialRampToValueAtTime(72 * vary, t0 + 0.09)
+  const oGain = audioCtx.createGain()
+  oGain.gain.setValueAtTime(0.0001, t0)
+  oGain.gain.linearRampToValueAtTime(0.05, t0 + 0.008)
+  oGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14)
+  osc.connect(oGain).connect(master())
+  osc.start(t0)
+  osc.stop(t0 + 0.15)
 }
 
 /** Landing thud, scaled by how hard the fall was — a light hop lands soft,
