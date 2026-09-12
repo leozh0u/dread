@@ -53,7 +53,7 @@ This is the highest-value sponsor: **no prior art at any hackathon**, and
    **API key**.
 4. Add the domain allowlist entry for the hosted build — this is the only
    thing stopping a stranger running inquiries against your template:
-   `senseishiba666.github.io` (plus `localhost` for dev).
+   `leozh0u.github.io` (plus `localhost` for dev).
 5. Then:
 
 ```bash
