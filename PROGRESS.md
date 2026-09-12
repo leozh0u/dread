@@ -80,13 +80,19 @@ static host — same fallback path that already exists for local use.
 
 ## Open — in priority order
 
-1. **Verify with Leo, live, on his machine:** audio audible from the
-   start (fixed), pointer-lock/movement bugs (fixed), the new maze layout
-   actually reads as a maze and not still-a-hallway (rebuilt this pass —
-   real junction graph with a loop, see below), the monster looking
-   "ominous" now (redesigned this pass — claws, spikes, asymmetric gait,
-   backlight). All reasoned through and code/module-tested, none of it
-   eyes-on with a real webcam and real ears yet.
+1. **Verify with Leo, live — nothing visual has been seen from this
+   side.** The sandbox browser renders no WebGL (confirmed: an unlit test
+   cube 3m from the camera is invisible while the GL context reports
+   healthy), so every visual change in this project has been shipped on
+   reasoning + typecheck + build only. Specifically unverified: the
+   Backrooms aesthetic pass, the angular monster (press M to inspect),
+   the maze reading as a maze, audio being audible and directional.
+   **This is the top item precisely because it is the easiest to let
+   slide.**
+2. **Monster look — still not signed off.** Redesigned twice now
+   (articulated capsules → angular low-poly). Leo's last word on it was
+   "it looks like Baymax." Until he says otherwise, assume it still
+   needs work.
 2. **Video plan.** Never actually written despite being flagged as a task
    since early in the session ("video planning for later" — later is now).
    Needs a shot list against HackRice's prescribed structure (30s intro /
@@ -238,6 +244,47 @@ shape itself moved on.
       (slowed, pitched down), downloaded, committed as a static asset —
       no runtime API dependency, falls back to browser TTS if it can't
       load.
+
+## Done — Backrooms aesthetic pass, calibration-death fix (this pass)
+
+- [x] **Fixed the repeated "Not enough data captured this run." dead
+      end** — two real bugs: (1) MONSTER_PATH included junction A, the
+      spawn nook, so the creature walked straight to the player at start;
+      (2) neither death nor the door-win was gated on the session having
+      started, so dying during the 60s calibration set an outcome while
+      `startedAt` was still null — exactly the state that renders that
+      empty screen. Patrol now starts at B; both outcomes gated.
+- [x] **Enter/Space restarts on the end screen** (and the button says
+      so), so a pointer-lock release that fails or lags can never strand
+      the player behind an unclickable button.
+- [x] **Monster geometry rebuilt angular** — every capsule and sphere
+      replaced with flat-shaded low-poly forms (faceted torso, octahedron
+      shard head, tapered 5-sided limbs with box joints, jutting ribs,
+      slit eyes). Capsules/spheres are literally the soft-robot shape
+      language, which is why the old one read as Baymax.
+- [x] **Press M = inspect mode** — parks the creature lit in front of the
+      player. Added because the sandbox browser here renders no WebGL at
+      all (verified: an unlit test cube 3m from the camera is invisible
+      while the GL context reports healthy), so the monster's look cannot
+      be checked from this side. Leo can judge it in one keypress.
+- [x] **Backrooms aesthetic rebuild, research-led** (sources in commit):
+      added a ceiling (there was none — a big reason it read as a void),
+      dropped it to office height 3.2, mono-yellow palette across
+      walls/floor/ceiling, ~35 fluorescent fixtures assigned
+      steady/flicker/dead, fog tinted to the room's own yellow instead of
+      black (fixes the "harsh black cutoff" directly). Fluorescents are
+      the primary light source now; flashlight is supporting.
+  - Lighting performance handled deliberately: 35 real point lights would
+    blow the shader uniform budget, so tubes are emissive meshes and a
+    pool of 4 point lights is re-pointed each frame at the nearest
+    fixtures — constant light count, no shader recompiles.
+- [x] **Audio**: fluorescent mains hum (120Hz + harmonics, detuned so it
+      beats against itself) and convolution reverb from a procedurally
+      generated impulse response, with positioned sounds sending into it.
+- [x] **Clues de-narrativised** — abstract shards again, no floating
+      world labels, no "a child's photograph" framing. Decorative props
+      (desks, drawings, posters, broken lights) carry the atmosphere
+      instead, which is what was actually wanted.
 
 ## Explicitly dropped (not forgotten, decided against)
 
