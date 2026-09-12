@@ -19,6 +19,8 @@ interface DirectorState {
   setPhase: (p: DirectorPhase) => void
   setMonsterDistance: (d: number) => void
   recordScareOutcome: (type: ScareType, bpmBefore: number, bpmAfter: number) => void
+  /** Seed the bandit from a previous session (see lib/houseMemory.ts). */
+  seedStats: (stats: Record<ScareType, ScareStat>) => void
   pickScare: () => ScareType
   resetForNewRun: () => void
 }
@@ -55,6 +57,23 @@ export const useDirector = create<DirectorState>((set, get) => ({
   stats: freshStats(),
 
   setPhase: (phase) => set({ phase }),
+
+  // Adds to what this session has learned rather than replacing it, so a
+  // recall that arrives slightly after play begins can't discard live
+  // evidence. Guarded field-by-field because these numbers come back from
+  // a remote service as text.
+  seedStats: (incoming) => {
+    const stats = { ...get().stats }
+    for (const type of SCARE_TYPES) {
+      const s = incoming?.[type]
+      if (!s || !Number.isFinite(s.attempts) || !Number.isFinite(s.totalDelta)) continue
+      stats[type] = {
+        attempts: stats[type].attempts + Math.max(0, s.attempts),
+        totalDelta: stats[type].totalDelta + s.totalDelta,
+      }
+    }
+    set({ stats })
+  },
   setMonsterDistance: (d) => set({ monsterDistance: Math.max(0, Math.min(1, d)) }),
 
   recordScareOutcome: (type, bpmBefore, bpmAfter) => {

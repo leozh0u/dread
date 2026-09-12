@@ -5,6 +5,8 @@ import { Hud } from './components/Hud'
 import { ScreenFlash } from './components/ScreenFlash'
 import { FearCurve } from './components/FearCurve'
 import { StartGate } from './components/StartGate'
+import { useHouseMemory } from './game/useHouseMemory'
+import { Recognition } from './components/Recognition'
 import { Crash } from './components/Crash'
 import { MuteButton } from './components/MuteButton'
 import { BreathingPacer } from './components/BreathingPacer'
@@ -88,6 +90,9 @@ function Game() {
   useMicSource()
   useAmbientHorror()
   useDevKeys()
+  // Backboard: what the Director learned about this player in previous
+  // sessions, and a line to tell them the house recognises them.
+  const recognition = useHouseMemory()
 
   // Ambient (room tone + monster growl/breathing) starts the moment the
   // game does, NOT once calibration finishes — calibration can take the
@@ -135,6 +140,7 @@ function Game() {
       <BreathingPacer />
       {sessionStatus === 'ended' && <FearCurve />}
       <MuteButton />
+      {recognition && <Recognition text={recognition} />}
       <GlLostBanner />
     </>
   )
