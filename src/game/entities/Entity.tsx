@@ -5,7 +5,7 @@ import { useDirector } from '../director'
 import { usePlayerPosition } from '../playerPosition'
 import { distance3 } from '../triggers'
 import { pointAtArcLength, PATH_TOTAL_LENGTH, nearestPatrolS } from '../maze'
-import { updateNavField, navStep, navDistance, hasLineOfSight } from '../nav'
+import { updateNavField, navStep, navStepToward, navDistance, hasLineOfSight } from '../nav'
 import { useMicStore } from '../../lib/useMic'
 import { useThreat } from '../threat'
 import {
@@ -115,6 +115,7 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
   const patrolDir = useRef(1)
   const wanderT = useRef(3 + index * 2)
   const pauseUntil = useRef(0)
+  const resyncIn = useRef(0)
   // Mutated every frame, read by the creature's own frame loop. Never a
   // prop and never state: props would freeze (refs don't re-render) and
   // state would re-render three creatures at 60fps for nothing.
@@ -174,9 +175,15 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
         here.x += step.x * sign * effSpeed * dt
         here.z += step.z * sign * effSpeed * dt
       }
-      // Keep patrol progress roughly in sync with where it actually is,
-      // so returning to patrol doesn't teleport it across the level.
-      pathS.current = nearestPatrolS(here.x, here.z, pathS.current)
+      // Resync patrol progress occasionally rather than every frame:
+      // nearestPatrolS samples the polyline 120 times, and doing that for
+      // three creatures at 60fps was 21,600 polyline evaluations a second
+      // for a number that only matters when a hunt ends.
+      resyncIn.current -= dt
+      if (resyncIn.current <= 0) {
+        resyncIn.current = 0.5
+        pathS.current = nearestPatrolS(here.x, here.z, pathS.current)
+      }
     } else {
       // Patrolling: walk the loop, but not like a tram. It pauses, and it
       // reverses direction at random intervals, so you can't learn the
@@ -192,9 +199,24 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
       }
       pathS.current = ((pathS.current % PATH_TOTAL_LENGTH) + PATH_TOTAL_LENGTH) % PATH_TOTAL_LENGTH
       const pos = pointAtArcLength(pathS.current)
-      // Ease back onto the patrol line rather than snapping to it.
-      here.x += (pos.x - here.x) * Math.min(1, dt * 3)
-      here.z += (pos.z - here.z) * Math.min(1, dt * 3)
+
+      // Getting back to the patrol line after a hunt has to be NAVIGATED,
+      // not eased. The first version lerped straight toward the patrol
+      // point, which dragged the creature through the walls of whatever
+      // room it had chased the player into — visible, and exactly the
+      // kind of clipping that makes a game look unfinished.
+      const offPath = Math.hypot(pos.x - here.x, pos.z - here.z)
+      if (offPath > 1.2) {
+        const back = navStepToward(here.x, here.z, pos.x, pos.z)
+        if (back) {
+          here.x += back.x * effSpeed * dt
+          here.z += back.z * effSpeed * dt
+        }
+      } else {
+        // Close enough that the straight line is inside the corridor.
+        here.x += (pos.x - here.x) * Math.min(1, dt * 3)
+        here.z += (pos.z - here.z) * Math.min(1, dt * 3)
+      }
     }
 
     // Inspect mode (press M) lines all three up in front of the player so
