@@ -28,10 +28,11 @@ function Flashlight() {
     <>
       <spotLight
         ref={light}
-        intensity={520}
-        angle={0.4}
-        penumbra={0.6}
-        distance={14}
+        intensity={170}
+        angle={0.42}
+        penumbra={0.75}
+        distance={17}
+        decay={1.55}
         color="#fff2d0"
         castShadow
         // Explicit and modest. Nothing but the flashlight casts, and its

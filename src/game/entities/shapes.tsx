@@ -62,7 +62,11 @@ export const materials = {
   /** Teeth. Low roughness so the torch puts a wet highlight along the row
    * instead of lighting them evenly — that highlight is the only thing
    * that should make a mouth visible in the dark. */
-  tooth: new THREE.MeshStandardMaterial({ color: '#9c937f', roughness: 0.3, metalness: 0.05 }),
+  // Teeth. Dark and matte enough not to become the brightest object in
+  // the frame: at roughness 0.3 the torch, which points straight down the
+  // creature's face, put a specular highlight across the whole row and
+  // turned it into a lit keyboard.
+  tooth: new THREE.MeshStandardMaterial({ color: '#736a58', roughness: 0.62, metalness: 0.03 }),
 }
 
 /**
@@ -351,12 +355,19 @@ export function Grin({
       // deterministic jitter so teeth are uneven but stable
       const j = Math.sin(i * 12.9898) * 43758.5453
       const jitter = j - Math.floor(j)
+      const j2 = Math.sin(i * 4.271 + 1.7) * 24634.6345
+      const jitter2 = j2 - Math.floor(j2)
+      // GAPS. A complete row of teeth is a grin; a row with pieces
+      // missing is damage. Roughly one in five is dropped, chosen by the
+      // same deterministic hash as everything else so a given creature
+      // has the same missing teeth every run.
+      if (jitter2 < 0.2) continue
       out.push({
         x: (t - 0.5) * width,
         y: -arc * (1 - (2 * t - 1) ** 2) * 0.5,
-        h: (0.05 + 0.05 * (1 - Math.abs(2 * t - 1))) * scale * (0.6 + jitter * 0.8),
-        w: (width / teeth) * (0.45 + jitter * 0.3),
-        rot: (2 * t - 1) * 0.55 + (jitter - 0.5) * 0.25,
+        h: (0.05 + 0.05 * (1 - Math.abs(2 * t - 1))) * scale * (0.45 + jitter * 1.15),
+        w: (width / teeth) * (0.4 + jitter * 0.35),
+        rot: (2 * t - 1) * 0.55 + (jitter - 0.5) * 0.6,
       })
     }
     return out
@@ -371,7 +382,10 @@ export function Grin({
           rotation={[0, 0, tooth.rot]}
           material={color ? undefined : materials.tooth}
         >
-          <boxGeometry args={[tooth.w, tooth.h, 0.025]} />
+          {/* Tapered to a point rather than a flat-topped bar. A row of
+              rectangles is a keyboard no matter how uneven it is; the
+              taper is what makes the same row read as teeth. */}
+          <coneGeometry args={[tooth.w * 0.5, tooth.h, 5]} />
           {color ? <meshStandardMaterial color={color} roughness={0.3} /> : null}
         </mesh>
       ))}
