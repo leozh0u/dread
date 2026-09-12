@@ -42,47 +42,74 @@ not just text on a screen.
       the exit door didn't physically block the player (isolated collider
       fix)
 
+## Live build for judges
+
+**https://leozh0u.github.io/dread/** — deployed via GitHub Actions
+(`.github/workflows/deploy.yml`), redeploys automatically on every push to
+main. Repo is now **public** (was private; GitHub Pages needs that on the
+free plan — confirmed with Leo before flipping it). Runs entirely off the
+in-browser rPPG fallback since the Presage sidecar isn't reachable from a
+static host — same fallback path that already exists for local use.
+
 ## Open — in priority order
 
-1. **Visuals.** Monster is still a black box placeholder. Level geometry
-   is blocky (deliberately, for scope — darkness/fog hides it — but the
-   monster itself needs at least a silhouette, ideally a cheap rigged
-   Mixamo model).
-2. **Video plan.** Never actually written despite being flagged as a task
+1. **Video plan.** Never actually written despite being flagged as a task
    since early in the session ("video planning for later" — later is now).
    Needs a shot list against HackRice's prescribed structure (30s intro /
    2min demo / 30s technical / 30s impact).
-3. **Presage on real hardware — untested.** The sidecar has never been run
+2. **Presage on real hardware — untested.** The sidecar has never been run
    against a live camera or a real API key (this sandbox has neither).
    This is the single highest-risk unknown left: if it doesn't work on
    Leo's laptop, the fallback estimator carries the whole demo, which is
    noisier. Needs testing on Leo's actual machine ASAP, not the night
    before submission. **Leo is checking Discord/handbook for the key.**
-4. **Sponsor integrations not yet built** (mapped conceptually, no code):
+   Also the honest limit on "accurate heart rate" right now — the
+   in-browser fallback's accuracy ceiling is what it is; the real fix is
+   this key, not more client-side rPPG tuning.
+3. **Sponsor integrations not yet built** (mapped conceptually, no code):
    MathWorks (an autonomic HR/HRV model), ElevenLabs (voice lines layered
-   on top of the procedural audio below, see Done), Persona (identity
-   gate), Backboard (cross-session memory — the bandit stats *do* persist
-   across a restart right now, which is a start, but nothing calls the
-   actual Backboard API), Tiger Data (pulse history isn't stored anywhere
-   durable yet, just in-memory). **Leo is checking Discord/handbook for
+   on top of the procedural audio, see Done), Persona (identity gate),
+   Backboard (cross-session memory — the bandit stats *do* persist across
+   a restart right now, which is a start, but nothing calls the actual
+   Backboard API), Tiger Data (pulse history isn't stored anywhere durable
+   yet, just in-memory). **Leo is checking Discord/handbook for the
    ElevenLabs key too.**
-5. **Ongoing standard, not a one-time item:** keep verifying claims by
+4. **Ongoing standard, not a one-time item:** keep verifying claims by
    direct testing, not code review alone — this session's two real bugs
    (sensors, door collision) both looked completely correct on paper and
    were only caught by actually driving the player through them.
 
-## Done — audio (this pass)
+## Done — audio, visuals, hosting (this pass)
 
 - [x] **Real procedural sound design, zero API keys needed.** Heartbeat
       that audibly "lub-dub"s in sync with the player's live bpm; a
       continuous monster growl bed that gets louder and tonally closer as
       it approaches; footsteps on movement; four distinct textured scare
       stingers (screech/stab/lunge/silence) instead of one generic tone;
-      a harsher dedicated jumpscare sound. All synthesized at runtime
-      (WebAudio noise buffers + filters + envelopes) — verified by direct
-      module injection in-browser (no exceptions, confirmed against
-      console). ElevenLabs, if the key turns up, layers voice lines on
-      top of this later; the game was never blocked on it.
+      a harsher dedicated jumpscare sound. ElevenLabs, if the key turns
+      up, layers voice lines on top of this later; the game was never
+      blocked on it.
+- [x] **Stereo/spatial audio.** The monster growl runs through a WebAudio
+      PannerNode (HRTF) at its real world position, with the listener
+      synced to the camera every frame — it actually pans/attenuates by
+      where the thing is relative to where you're looking.
+- [x] **Real 3D monster** — articulated torso/head/arms/legs, procedural
+      lurch-walk, glowing eyes that brighten as it closes in, and a
+      lunge-and-recoil attack animation tied directly to the Director's
+      'proximity' scare events (not a black box anymore).
+- [x] **Distinct hiding props** (closet/curtain/crate/table) and level
+      dressing (swinging bulb, tilted frames, toppled chair) instead of
+      identical translucent boxes and flat corridor walls.
+- [x] **Real blink detection.** MediaPipe FaceLandmarker reads eye-closed
+      state off the same webcam feed used for pulse; eyes shut past 3.5s
+      triggers a whisper ("open your eyes") panned into a random ear —
+      client-side, no API key, degrades silently if the model can't load.
+- [x] **Hosted for judges** — see "Live build for judges" above.
+
+All of the above verified by direct in-browser testing this pass (module
+injection for audio functions, live FaceLandmarker creation with the real
+CDN model, screenshot confirmation of monster position/animation) — not
+code review alone, per the standing verification rule above.
 
 ## Explicitly dropped (not forgotten, decided against)
 
