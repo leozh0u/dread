@@ -128,9 +128,38 @@ to where the player *projected* onto it, so standing in any room made you
 unreachable. Both are the kind of bug that is invisible in code review and
 obvious in the first ten seconds of play.
 
+**The game could not be finished, and the test said it could.** Late on,
+we wrote an automated playthrough that drives the real controls through
+the real maze in a real browser. It died at the spawn point before taking
+a step, and chasing that turned up three faults that had been there the
+whole time.
+
+Every trigger volume in the level spanned y ∈ [0, 3] — correct when the
+floor was at y=0. The floor is at -0.9 now, and the player's tracked
+position is their capsule centre at -0.15, which is *below* all of them by
+fifteen centimetres. The effect was total rather than partial: you could
+collect all three fragments, open the door, walk through it and out the
+other side, and nothing would happen. Hiding — the entire stealth skill
+the game teaches — never registered either. Both endings and the core
+mechanic were unreachable.
+
+The reason it survived is the part worth telling. Our headless
+playthrough test walks a player through those same regions and had been
+passing all along. It placed them at y=0.5 — which is the height the
+*fragments* sit at, and a height the running game never produces. The
+vertical term was zero in the test and 0.65 in reality. **A test fed
+numbers the system does not produce will confirm whatever you already
+believed.** Changing one constant to the player's real height turned three
+green checks red instantly.
+
+The same root cause had also quietly shrunk the fragment pickup radius
+from 90cm to an effective 62cm horizontally — you could stand close enough
+to touch a fragment in a dark maze and not collect it, with nothing
+explaining why.
+
 ## Accomplishments we're proud of
 
-The game is **verified, not hoped**. There's a test suite of ~130 checks
+The game is **verified, not hoped**. There's a test suite of ~196 checks
 that runs without a renderer: it flood-fills the real collision geometry to
 prove the level can be finished, walks a full playthrough to both endings,
 simulates monster chases and asserts they never occupy solid geometry,
@@ -142,6 +171,26 @@ the browser bundle.
 That suite caught two sealed rooms that also opened holes into the void
 outside the level, and it caught them before a player did.
 
+It grew a lot in the last day, and specifically toward the things that
+would have been invisible in play. The fallback pulse estimator — the one
+that keeps the game alive if the sidecar dies — is now driven by synthetic
+signals with known answers, including the cases built to break it:
+lighting drift, frame jitter, dropped frames, the second harmonic of the
+real rate, and pure noise, which it must refuse rather than answer. That
+test found it reporting 45 bpm for a clean 84 bpm signal under a realistic
+exposure ramp, and inventing confident heart rates out of sensor noise.
+The refusal case is swept over forty seeds, because "noise happened not to
+peak this time" is not a property — and the same sweep checks it still
+finds a real pulse buried in that identical noise, so the threshold cannot
+pass by rejecting everything.
+
+The headline claim has a test now too: that a permanently calm player gets
+a paced cycle rather than a barrage, and a permanently frightened one is
+never struck at at all. And the calm-room ending — the one the whole
+impact argument rests on — is covered for the first time, including that a
+spike one tick from the end resets you, and that a gap in the sensor holds
+your progress rather than wiping it.
+
 ## What we learned
 
 Sensing that fails silently is worse than sensing that fails loudly. Every
@@ -149,10 +198,52 @@ serious bug in this project shared the property that the broken state and
 the working-but-not-yet state looked identical. The single highest-leverage
 thing we built was the readout that told us which was which.
 
+## Why this matters
+
+Two real things meet in this game, and they are the reason we think it is
+more than a novelty.
+
+**Graded exposure** — controlled, repeated contact with something
+frightening, held at the edge of what a person can tolerate rather than
+past it — is the standard evidence-based treatment for phobia and anxiety.
+Its hardest operational problem is knowing where that edge is. A clinician
+reads it off the person in front of them; software has historically had to
+guess, or ask.
+
+**Heart-rate biofeedback** — watching your own arousal and learning to
+bring it down — is used for anxiety regulation today, and normally needs a
+chest strap, a finger clip, or a clinic.
+
+DREAD already runs that loop. It measures arousal from a laptop webcam,
+escalates when the player habituates, backs off when they're overwhelmed,
+and its second ending **can only be reached by deliberately calming
+yourself**: stand in the calm room and hold your heart rate within five
+beats of your own resting baseline for eight seconds. Leave, or spike, and
+it resets. That isn't a metaphor on an end screen — it's the win condition,
+and it fails you if you don't actually regulate.
+
+We built it to be frightening. But the control loop underneath is the one
+exposure therapy uses, and the measurement it needs no longer requires
+anything strapped to the person.
+
+**It is not a clinical tool and we have not tested it as one.** What it
+demonstrates is narrower and, we think, more interesting: the hardware
+barrier to arousal-adaptive software is gone. Anything that would work
+better by knowing whether the person using it is calm — therapy tools,
+training simulators, accessibility settings, difficulty itself — can now
+know.
+
 ## What's next
 
 Wire heart-rate *variability* through as well as heart rate — the model
-already accepts it and currently runs on HR deviation alone.
+already accepts it and currently runs on HR deviation alone. HRV is the
+better arousal signal and the one biofeedback protocols actually train
+against.
+
+Beyond that, the interesting version of this is not a scarier game. It's
+the same loop with the threat removed: a paced-breathing trainer that
+knows when you've actually settled, rather than one that counts to four
+and hopes.
 
 ## A limitation we want to name
 
