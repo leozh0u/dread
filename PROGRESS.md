@@ -53,14 +53,13 @@ static host — same fallback path that already exists for local use.
 
 ## Open — in priority order
 
-1. **Verify with Leo that "can't hear anything" / "haven't seen the
-   monster" are actually fixed now.** Root-caused as a real bug (ambient
-   audio was gated behind full calibration completing, which can take
-   60s or stall entirely — see Done below) and fixed, but not yet
-   confirmed on his actual machine with a real webcam. Same for the
-   pointer-lock bugs (couldn't click after dying, WASD/look sometimes
-   stopped responding) — fixed and reasoned through, not yet confirmed
-   by him live.
+1. **Verify with Leo, live, on his machine:** audio audible from the
+   start (fixed), pointer-lock/movement bugs (fixed), the new maze layout
+   actually reads as a maze and not still-a-hallway (rebuilt this pass —
+   real junction graph with a loop, see below), the monster looking
+   "ominous" now (redesigned this pass — claws, spikes, asymmetric gait,
+   backlight). All reasoned through and code/module-tested, none of it
+   eyes-on with a real webcam and real ears yet.
 2. **Video plan.** Never actually written despite being flagged as a task
    since early in the session ("video planning for later" — later is now).
    Needs a shot list against HackRice's prescribed structure (30s intro /
@@ -82,11 +81,11 @@ static host — same fallback path that already exists for local use.
    Backboard API), Tiger Data (pulse history isn't stored anywhere durable
    yet, just in-memory). **Leo is checking Discord/handbook for the
    ElevenLabs key too.**
-4. **Leo's recorded voice lines** — he wants to record his own lines
-   ("open your eyes," etc.) and have them pitch-shifted/distorted rather
-   than relying on ElevenLabs or browser TTS. No API key needed for this
-   at all. Waiting on him to actually record and send audio files; the
-   distortion pipeline isn't built yet since there's nothing to process.
+4. **Leo's own recorded voice lines** — he floated recording his own
+   lines and having them pitch-shifted/distorted, as an alternative to
+   the generated voice line now in place (see Done below). Still open if
+   he wants to actually do that instead/in addition — waiting on him to
+   record and send audio.
 5. **Jumpscares** — explicitly deferred by Leo ("we can add jumpscares
    later"); the existing probabilistic hidden+noisy+close jumpscare stays
    as-is, not being expanded right now.
@@ -128,7 +127,15 @@ injection for audio functions, live FaceLandmarker creation with the real
 CDN model, screenshot confirmation of monster position/animation) — not
 code review alone, per the standing verification rule above.
 
-## Done — map, monster AI, objective, wall-phasing fix (this pass)
+## Done — map, monster AI, objective, wall-phasing fix (superseded below)
+
+**Note:** the "bigger map" and "confined-to-corridor patrol" described in
+this section were a single spine corridor with alcove rooms. Leo asked
+for something actually maze-like ("like the backrooms") a few messages
+later — see the next section below for the real rebuild. Keeping this
+section rather than deleting it since the wall-phasing fix and the
+dual-win-condition work described here are still current, just the map
+shape itself moved on.
 
 - [x] **Fixed a real wall-phasing bug.** Root cause: the player's collider
       was an auto-generated bounding sphere approximating its capsule
@@ -160,6 +167,50 @@ code review alone, per the standing verification rule above.
       photograph," in-world via drei's Html), not unlabeled glowing
       shapes — answers Leo's "what are those yellow diamond crystals?"
       directly. HUD also states the current objective in plain language.
+
+## Done — real maze, monster redesign v2, real voice line (this pass)
+
+- [x] **Real maze layout** (`maze.ts`) — a graph of junctions and
+      corridors instead of one spine with alcoves. Real 90-degree turns,
+      a genuine loop (two routes between the B and D junctions, so
+      evading the monster is an actual option), dead ends. Walls and
+      junction caps are generated from the graph rather than hand-placed,
+      which is what made a level this size buildable correctly. Verified
+      by walking the player through a real 90-degree turn and confirming
+      it's correctly stopped by the generated cap on a junction's closed
+      side.
+  - [x] Monster now follows this graph via arc-length progress along the
+        main loop + exit spur (`pointAtArcLength`/`projectToArcLength` in
+        maze.ts) instead of a straight line — verified via direct
+        function calls (round-trips correctly, wraps at the loop end,
+        shortest-path delta picks the correct direction).
+- [x] **Monster visual/animation redesign, grounded in actual
+      horror-animation research** (asymmetric limb timing instead of a
+      mirrored gait, unpredictable rhythm with hitches instead of a
+      metronome, a too-far-forward lean, gaze that lags the body's own
+      facing) — see the commit for sources. Added claws, spine spikes, an
+      asymmetric head, a faint cold backlight (so it doesn't just vanish
+      as black-on-black), and real facing rotation (it never turned to
+      face its direction of travel before).
+- [x] **Softer fog** — linear fog (hard cutoff at a fixed distance)
+      swapped for exponential, which falls off as a curve instead of a
+      wall.
+- [x] **Random ambient horror stingers** (a creak, a scratch) on an
+      unpredictable timer at a random point in the maze, deliberately
+      independent of the monster's location — "something else is in
+      here," real stakes/unpredictability per Leo's ask.
+- [x] **Spatial audio tuned tighter** (lower refDistance, steeper
+      rolloff) across the monster growl, footsteps, and the new stingers
+      so directionality reads clearly rather than subtly.
+- [x] **A real generated voice line for the blink-whisper**, replacing
+      browser TTS. Checked the available audio-generation tool's
+      constraints first: standalone use is text-to-speech only (sound
+      effects/music are restricted to that tool's own game pipeline), so
+      only the whisper line uses it — the creak/scratch stingers correctly
+      stay procedural. Generated once via Higgsfield's seed_audio
+      (slowed, pitched down), downloaded, committed as a static asset —
+      no runtime API dependency, falls back to browser TTS if it can't
+      load.
 
 ## Explicitly dropped (not forgotten, decided against)
 
