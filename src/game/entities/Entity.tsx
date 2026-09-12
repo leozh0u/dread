@@ -137,6 +137,34 @@ const TWITCH_GAP_MAX_S = 2.6
  * happening at an indistinct shape on the horizon. */
 const TWITCH_RANGE = 16
 
+/**
+ * Which animation a creature should be playing, as a pure function.
+ *
+ * Extracted for the same reason as stepDetection, nextPhase and
+ * stepStartle. The states this picks between are the whole point of the
+ * animation work — noticing you, committing, and trying to kill you —
+ * and verifying them by playing the game means getting a creature to see
+ * you at close range on demand, which is exactly the situation that is
+ * hardest to stage deliberately.
+ *
+ * Ordered by urgency, most urgent first. A creature that is mid-strike
+ * has no business playing a notice-you beat because it also just heard
+ * something.
+ */
+export function pickAnim(args: {
+  attacking: boolean
+  strike: number
+  charging: boolean
+  alerting: boolean
+  hunting: boolean
+}): EntityState['anim'] {
+  const { attacking, strike, charging, alerting, hunting } = args
+  if (attacking || strike > 0.55) return 'strike'
+  if (charging) return 'charge'
+  if (alerting) return 'alert'
+  return hunting ? 'stalk' : 'patrol'
+}
+
 /** How long the "it has seen you" pose plays. Long enough to read as a
  * deliberate beat, short enough that it never delays the pursuit. */
 const ALERT_POSE_S = 0.85
@@ -659,15 +687,13 @@ export function Entity({ kind, index, startS }: { kind: EntityKind; index: numbe
         : 0
     const strikeAmount = attacking ? 1 : realDist < STRIKE_DIST ? 1 - realDist / STRIKE_DIST : 0
 
-    const anim: EntityState['anim'] = attacking || strikeAmount > 0.55
-      ? 'strike'
-      : lunging || lungeState.current === 'coil'
-        ? 'charge'
-        : t < alertPoseUntil.current
-          ? 'alert'
-          : hunting
-            ? 'stalk'
-            : 'patrol'
+    const anim = pickAnim({
+      attacking,
+      strike: strikeAmount,
+      charging: lunging || lungeState.current === 'coil',
+      alerting: t < alertPoseUntil.current,
+      hunting,
+    })
 
     if (anim !== state.current.anim) animStartedAt.current = t
     reportAnim(index, anim)
