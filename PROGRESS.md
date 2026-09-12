@@ -89,43 +89,35 @@ static host — same fallback path that already exists for local use.
 
 ## Open — in priority order
 
-1. **ElevenLabs — BLOCKED ON LEO, one command.** He has the key. It must
-   NOT go in the client bundle: this is a static site, so anything shipped
-   to the browser is public. Plan is to generate the audio locally and
-   commit only the resulting files (same approach as the existing whisper
-   line). Waiting on him to run:
-   `echo "ELEVENLABS_API_KEY=your_key_here" >> .env.local`
-   (`.env.local` is already gitignored — verified.) Then: per-creature
-   monster vocalisations, plus voice lines.
-2. **Verify with Leo, live — nothing visual has been seen from this
-   side.** The sandbox browser renders no WebGL (confirmed: an unlit test
-   cube 3m from the camera is invisible while the GL context reports
-   healthy), so every visual change has shipped on reasoning + typecheck +
-   build + structural assertions only. Unverified: the Backrooms look, the
-   three new entities (press M to line them up lit), the expanded maze.
-3. **The three entities are not signed off.** The previous single monster
-   was rejected twice ("it looks like Baymax"). These are a different
-   approach entirely — flat unlit black silhouettes with glowing faces,
-   built from his reference images — but until he looks, assume they still
-   need work.
-4. **Presage on real hardware — untested.** The sidecar has never run
-   against a live camera or a real API key. Still the highest-risk
-   unknown: if it fails on his laptop, the noisier in-browser fallback
-   carries the demo. Needs testing on his machine, not the night before.
-5. **Sponsor integrations** beyond ElevenLabs: MathWorks, Persona,
-   Backboard, Tiger Data — mapped conceptually, zero code.
-6. **Leo's own recorded voice lines** — still open if he wants his own
-   voice pitch-shifted rather than generated ones.
-7. **Jumpscares** — explicitly deferred by Leo, untouched.
-8. **Ongoing standard:** verify by direct testing, not code review. Two
-   traps worth remembering, both of which have bitten more than once:
-   - Reading game state via dynamic `import()` in the browser console can
-     resolve to a DUPLICATE module instance and report stale values. It
-     has produced a false "this is broken" conclusion three times.
-     Frame-logging inside the component is the reliable check.
-   - `str.replace(old, new)` where `old` computed empty inserts `new`
-     between every character. This turned PROGRESS.md into a 40MB file
-     once; restored from git. Assert your slice markers are ordered.
+1. **NOBODY HAS EVER COMPLETED A RUN.** Not Leo, not me. Three fragments
+   across a maze, a door, two endings — never played end to end. If a
+   fragment is unreachable or a win doesn't fire, the discovery point
+   would be while filming. Verified as far as possible without playing
+   (route geometrically unobstructed, both trigger zones register, door
+   unlocks at 3 fragments) but an actual playthrough is the only proof.
+   Dev keys added to make this fast: **C** skips calibration, **K**
+   grants all fragments, **J** does both.
+2. **Presage on real hardware** — Leo is on it. Highest-risk unknown: if
+   it fails on his laptop the noisier in-browser fallback carries the
+   demo.
+3. **Shoot the video Saturday evening**, not Sunday morning. Shot list is
+   in VIDEO.md. Use **J** so it doesn't open on 60s of calibration.
+4. **MATLAB** — script is written (matlab/autonomic_model.m), Leo runs it
+   once; the game already works without it via a documented fallback.
+5. **Remaining sponsors need credentials from Leo**: Persona, Backboard
+   (keys -> .env.local), Tiger Data (needs a decision — a static site
+   can't hold DB credentials, so it needs a serverless proxy; may not be
+   worth the time).
+6. **Creature design still not signed off.** Rebuilt with connected
+   skeletons and shaded materials after Leo's screenshots showed floating
+   parts and flat cardboard shapes. Press **M** to inspect.
+7. **Jumpscares** — explicitly deferred by Leo.
+8. **Ongoing standard:** verify by direct testing. Traps hit repeatedly
+   this session: reading state via dynamic `import()` in the console can
+   resolve to a DUPLICATE module and report stale values (three false
+   "it's broken" conclusions); and a black screen with no HUD is a React
+   crash, not a game state — there's now an error boundary that says so.
+
 
 ## Done — audio, visuals, hosting (this pass)
 

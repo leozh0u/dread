@@ -13,6 +13,7 @@ import { useTriggersLoop } from './game/useTriggersLoop'
 import { useCalmRoomLoop } from './game/useCalmRoomLoop'
 import { useMicSource } from './lib/useMic'
 import { useAmbientHorror } from './game/useAmbientHorror'
+import { useDevKeys } from './game/devKeys'
 import { useDirector, type ScareType } from './game/director'
 import { useSession } from './game/session'
 import { playScare, startAmbient, startHeartbeatAudio, stopHeartbeatAudio, unlockAudio } from './game/scareFx'
@@ -85,6 +86,7 @@ function Game() {
   useTriggersLoop()
   useMicSource()
   useAmbientHorror()
+  useDevKeys()
 
   // Ambient (room tone + monster growl/breathing) starts the moment the
   // game does, NOT once calibration finishes — calibration can take the
