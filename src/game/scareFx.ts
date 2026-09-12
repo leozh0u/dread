@@ -483,15 +483,34 @@ function proximityLunge() {
   osc.stop(t0 + 0.55)
 }
 
+// A real recorded voice line (generated once via Higgsfield's seed_audio
+// TTS, slowed and pitched down) instead of the browser's built-in speech
+// synthesis, which sounds robotic and varies wildly across browsers.
+// Loaded and decoded once, then reused for every whisper. Falls back to
+// SpeechSynthesis if the file can't be fetched/decoded for any reason —
+// same never-silent principle as everything else in this file.
+const WHISPER_URL = `${import.meta.env.BASE_URL}audio/whisper-open-your-eyes.wav`
+let whisperBufferPromise: Promise<AudioBuffer> | null = null
+
+function loadWhisperBuffer(audioCtx: AudioContext): Promise<AudioBuffer> {
+  if (!whisperBufferPromise) {
+    whisperBufferPromise = fetch(WHISPER_URL)
+      .then((r) => r.arrayBuffer())
+      .then((buf) => audioCtx.decodeAudioData(buf))
+  }
+  return whisperBufferPromise
+}
+
 /** Fired when the player's eyes have been closed too long (see
- * useBlinkDetection.ts) — a breathy hiss panned hard into one ear, plus
- * the literal words via the browser's built-in speech synthesis (free,
- * no API key). Speech synthesis output can't be routed through this
- * WebAudio graph in most browsers, so it isn't itself spatialized — the
- * panned hiss underneath is what actually sells "which ear" it came from. */
+ * useBlinkDetection.ts) — the recorded whisper panned hard into one ear,
+ * with a breathy noise-hiss layered underneath for extra presence. */
 export function playWhisper(ear: 'left' | 'right') {
   const audioCtx = getCtx()
   const t0 = audioCtx.currentTime
+  const panner = audioCtx.createStereoPanner()
+  panner.pan.value = ear === 'left' ? -1 : 1
+  panner.connect(master())
+
   const src = noiseSource(audioCtx)
   const filter = audioCtx.createBiquadFilter()
   filter.type = 'bandpass'
@@ -499,21 +518,32 @@ export function playWhisper(ear: 'left' | 'right') {
   filter.Q.value = 0.6
   const gain = audioCtx.createGain()
   gain.gain.setValueAtTime(0.0001, t0)
-  gain.gain.linearRampToValueAtTime(0.1, t0 + 0.3)
+  gain.gain.linearRampToValueAtTime(0.08, t0 + 0.3)
   gain.gain.linearRampToValueAtTime(0.0001, t0 + 1.6)
-  const panner = audioCtx.createStereoPanner()
-  panner.pan.value = ear === 'left' ? -1 : 1
-  src.connect(filter).connect(gain).connect(panner).connect(master())
+  src.connect(filter).connect(gain).connect(panner)
   src.start()
   src.stop(t0 + 1.7)
 
-  if ('speechSynthesis' in window) {
-    const utter = new SpeechSynthesisUtterance('open your eyes')
-    utter.volume = 0.5
-    utter.pitch = 0.6
-    utter.rate = 0.75
-    window.speechSynthesis.speak(utter)
-  }
+  loadWhisperBuffer(audioCtx)
+    .then((buffer) => {
+      const voice = audioCtx.createBufferSource()
+      voice.buffer = buffer
+      const voiceGain = audioCtx.createGain()
+      voiceGain.gain.value = 0.7
+      voice.connect(voiceGain).connect(panner)
+      voice.start()
+    })
+    .catch(() => {
+      // Couldn't fetch/decode the recording (offline, etc.) — fall back
+      // to the browser's own voice so the whisper still says something.
+      if ('speechSynthesis' in window) {
+        const utter = new SpeechSynthesisUtterance('open your eyes')
+        utter.volume = 0.5
+        utter.pitch = 0.6
+        utter.rate = 0.75
+        window.speechSynthesis.speak(utter)
+      }
+    })
 }
 
 /** A harsher, louder sting for the up-close "it almost got you" jumpscare —
