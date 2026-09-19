@@ -2,6 +2,8 @@
 
 **A horror game that reads your pulse from your webcam and hunts your fear.**
 
+Play it: https://leozh0u.github.io/dread/ · headphones, and let it see your face
+
 Built for HackRice 16 · Games & Gamification track
 
 ---
@@ -21,6 +23,10 @@ A small bandit algorithm tracks which *kind* of scare (proximity, audio, visual,
 spikes your pulse hardest, and leans toward it as the session goes on. It's not a trained model —
 with ~20 data points in a single play session, a multi-armed bandit is the right tool, not an
 excuse.
+
+**That's the design. What shipped is not all of it:** the Presage pulse never arrived, so the build
+you can play runs an in-browser estimator, or nothing at all, and is playable either way. The whole
+story is in [Status, honestly](#status-honestly) below, including why it failed.
 
 Related prior art: [*Nevermind*](https://www.pcgamer.com/nevermind-the-biofeedback-enhanced-horror-game-is-now-on-steam/)
 (2015) proved biofeedback horror works, but needed a chest-strap heart rate monitor. DREAD runs on
@@ -88,21 +94,44 @@ cp .env.example .env   # add a free key from physiology.presagetech.com
 npm start
 ```
 
-## Status
+## Status, honestly
 
-Scaffolded the night before build day. Confirmed working end-to-end before writing game logic:
-- Presage SDK loads natively on this machine (darwin-arm64)
-- TypeScript compiles clean, production build succeeds
-- Dev server boots and serves
+**The pulse sensing never worked, and the reason is worth writing down.**
 
-Not yet built: monster art (Mixamo placeholder pending), audio (ElevenLabs sound design), Persona
-gate, the post-game fear-curve screen, MathWorks autonomic model. See `PLAN.md` for the build
-schedule and sponsor-prize mapping.
+Presage's SDK ships the face and pose models in the package, but the cardiac
+model is delivered from their servers at runtime, gated on the API key, and that
+delivery never succeeded on our key. Everything downstream of it behaved exactly
+as you would expect from that: face tracking worked, framing validation gave
+real specific feedback, the graph reached `kRunning`, and the pulse was null
+forever. It was never a lighting problem and never a framing problem. Sitting
+still was never going to fix it, and `SmartSpectraOptions` exposes no model path
+override, so it could not be pointed at a local file from our side either.
+
+So the game falls back. `fallbackPulse.ts` is a from-scratch green-channel rPPG
+estimator that runs in the browser off the same webcam feed, and
+`sensorless.ts` handles the case where no reading ever arrives at all: the house
+says it cannot see you, and the Director runs on its own timing instead. **The
+deployed build is playable either way**, which was the point of building the
+failsafe before the sensor.
+
+**What did get built:** a generated house with a maze, clues and a sealed exit;
+a Director state machine with a scare-selection bandit; threat and ambient
+loops; blink detection through MediaPipe; twenty ElevenLabs sound effects
+wired through a bank; a calm room; house memory that persists between runs; and
+an autonomic arousal model solved in MATLAB and shipped as an interpolated
+lookup table (`matlab/autonomic_model.m` to `src/game/arousalTable.json`), so
+nothing in the live demo depends on MATLAB running.
+
+There are fourteen test scripts covering the level, the nav mesh, the geometry,
+the threat loop, the Director, the ambient audio, the startle logic, the ROI,
+the calm room, house memory and the bundle secret scan.
 
 ## Stack
 
-React · TypeScript · Vite · Three.js / React Three Fiber · Rapier (physics) · Zustand · Presage
-SmartSpectra (pulse sensing) · ElevenLabs (planned: audio) · Persona (planned: identity gate)
+React · TypeScript · Vite · Three.js / React Three Fiber · Rapier (physics) · Zustand · Howler ·
+MediaPipe Tasks Vision (blink detection) · ElevenLabs (sound design) · MATLAB (autonomic model,
+solved offline and shipped as a lookup table) · Presage SmartSpectra (pulse sensing, in the sidecar)
+· TigerData/Postgres (the pulse trace, in the sidecar)
 
 ---
 
